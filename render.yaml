@@ -1,8 +1,8 @@
 # Render Blueprint for Esther AI Trading Agent
 
 services:
-  # A Python web service
-  - type: worker
+  # A Python web service to keep the bot alive on Render's free tier
+  - type: web
     name: esther-bot
     env: python
     plan: free # Specifies the free instance type
