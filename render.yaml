@@ -9,17 +9,16 @@ services:
     buildCommand: "pip install -r requirements.txt"
     startCommand: "python src/main.py"
     envVars:
-      - key: TELEGRAM_BOT_TOKEN
-      - key: GEMINI_API_KEY
-      - key: OKX_API_KEY
-      - key: OKX_API_SECRET
-      - key: OKX_API_PASSPHRASE
+      # The DATABASE_URL is automatically provided by Render from the linked database service.
       - key: DATABASE_URL
         fromDatabase:
           name: esther-db # This should match the name of your Render PostgreSQL database
           property: connectionString
+      # Non-secret environment variables can be defined here.
       - key: PYTHON_VERSION
         value: 3.11 # Specify a Python version
+      # IMPORTANT: All other secrets (TELEGRAM_BOT_TOKEN, GEMINI_API_KEY, etc.) 
+      # must be added as a Secret File in the Render dashboard's "Environment" tab.
 
 databases:
   # A PostgreSQL database on the free plan
