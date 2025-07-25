@@ -1,0 +1,32 @@
+# Render Blueprint for Esther AI Trading Agent
+
+services:
+  # A Python web service
+  - type: worker
+    name: esther-bot
+    env: python
+    plan: free # Specifies the free instance type
+    buildCommand: "pip install -r requirements.txt"
+    startCommand: "python src/main.py"
+    envVars:
+      - key: TELEGRAM_BOT_TOKEN
+        fromSecret: true
+      - key: GEMINI_API_KEY
+        fromSecret: true
+      - key: OKX_API_KEY
+        fromSecret: true
+      - key: OKX_API_SECRET
+        fromSecret: true
+      - key: OKX_API_PASSPHRASE
+        fromSecret: true
+      - key: DATABASE_URL
+        fromDatabase:
+          name: esther-db # This should match the name of your Render PostgreSQL database
+          property: connectionString
+      - key: PYTHON_VERSION
+        value: 3.11 # Specify a Python version
+
+databases:
+  # A PostgreSQL database on the free plan
+  - name: esther-db
+    plan: free
