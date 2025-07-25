@@ -1,6 +1,14 @@
 import os
 import logging
 import threading
+import sys
+from pathlib import Path
+
+# Add project root to the Python path
+# This allows imports like 'from src.nlp import NLPClient' to work when the script is run from the root
+project_root = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(project_root))
+
 from flask import Flask
 from telegram import Update
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
