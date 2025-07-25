@@ -65,6 +65,15 @@ from src.database import get_db_connection
 nlp_client = NLPClient()
 okx_client = OKXClient()
 
+# A simple, hardcoded map for common token symbols to their Ethereum addresses
+# A real application would need a more robust and dynamic solution.
+TOKEN_ADDRESSES = {
+    "ETH": "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+    "USDC": "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48",
+    "USDT": "0xdac17f958d2ee523a2206206994597c13d831ec7",
+    "WBTC": "0x2260fac5e5542a773aa44fbcfedf7c193bc2c599",
+}
+
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handles user messages, parses intent, and routes to the correct function."""
     user_message = update.message.text
@@ -92,15 +101,34 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         # In a real scenario, you might have a different endpoint for simple price checks
         # or derive the price from the swap quote.
         
-        # For Phase 1, we use the get_quote method which returns mock data.
-        # This simulates getting a price without needing a real API call yet.
-        # A real implementation would need to handle token addresses instead of symbols.
-        quote_data = okx_client.get_quote(from_token=symbol.upper(), to_token="USDT", amount="1")
+        # This is a placeholder for a proper price check.
+        # For now, we will get a quote for a small amount to estimate the price.
+        from_token_address = TOKEN_ADDRESSES.get(symbol.upper())
+        to_token_address = TOKEN_ADDRESSES.get("USDT") # Default to USDT for price checks
+
+        if not from_token_address or not to_token_address:
+            await update.message.reply_text(f"Sorry, I don't have the address for the token {symbol.upper()}.")
+            return
+
+        # We need to format the amount according to the token's decimals.
+        # This is a major simplification. A real app needs to fetch token decimals.
+        # Assuming 18 decimals for ETH for this example.
+        amount_in_wei = "1000000000000000000" # 1 ETH
+
+        quote_response = okx_client.get_quote(
+            from_token_address=from_token_address,
+            to_token_address=to_token_address,
+            amount=amount_in_wei
+        )
         
-        if "error" in quote_data:
-            await update.message.reply_text(f"Sorry, I couldn't fetch a quote. Error: {quote_data['error']}")
+        if quote_response.get("success"):
+            quote_data = quote_response["data"]
+            # The API returns the amount in the smallest unit (e.g., wei for ETH, 6 decimals for USDC)
+            # This is another major simplification. A real app needs to format this correctly.
+            price_estimate = float(quote_data.get('toTokenAmount', 0)) / 1_000_000 # Assuming 6 decimals for USDT
+            await update.message.reply_text(f"The current estimated price for {symbol.upper()}-USDT is ${price_estimate:.2f}.")
         else:
-            await update.message.reply_text(f"The current estimated price for {quote_data['symbol']} is ${quote_data['price']}.")
+            await update.message.reply_text(f"Sorry, I couldn't fetch a quote. Error: {quote_response.get('error')}")
 
     elif intent == "greeting":
         await update.message.reply_text("Hello! How can I assist you with your trades today?")
@@ -118,16 +146,32 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         # The actual swap logic will be implemented next.
         await update.message.reply_text(f"Getting a quote to buy {amount} {symbol.upper()} with {currency.upper()}...")
         
-        # This is a simplification. A real implementation needs token addresses.
-        quote_data = okx_client.get_quote(from_token=currency.upper(), to_token=symbol.upper(), amount=amount)
+        # This is a simplification. A real implementation needs token addresses and decimal conversion.
+        from_token_address = TOKEN_ADDRESSES.get(currency.upper())
+        to_token_address = TOKEN_ADDRESSES.get(symbol.upper())
 
-        if "error" in quote_data:
-            await update.message.reply_text(f"Sorry, I couldn't get a quote. Error: {quote_data['error']}")
+        if not from_token_address or not to_token_address:
+            await update.message.reply_text(f"Sorry, I don't have the address for one of the tokens.")
+            return
+
+        # This is a huge simplification. Amount needs to be converted based on the 'from' token's decimals.
+        # We will assume the user provides the amount in its main unit for now.
+        # The API expects the amount in the smallest unit (e.g., wei).
+        # This logic needs to be properly implemented with decimal fetching.
+        amount_in_smallest_unit = str(int(float(amount) * 10**6)) # Assuming 6 decimals for USDT/USDC
+
+        quote_response = okx_client.get_quote(
+            from_token_address=from_token_address,
+            to_token_address=to_token_address,
+            amount=amount_in_smallest_unit
+        )
+
+        if quote_response.get("success"):
+            quote_data = quote_response["data"]
+            to_amount = float(quote_data.get('toTokenAmount', 0)) / 10**18 # Assuming 18 decimals for ETH/WBTC
+            await update.message.reply_text(f"Quote: To buy {to_amount:.6f} {symbol.upper()}, it will cost {amount} {currency.upper()}. Please confirm to proceed.")
         else:
-            # This is a mock confirmation message based on mock data
-            price = quote_data['price']
-            await update.message.reply_text(f"To buy {amount} {symbol.upper()}, it will cost approximately {price} {currency.upper()}. Please confirm to proceed.")
-            # Here we would add logic to handle the user's confirmation (e.g., using ConversationHandler)
+            await update.message.reply_text(f"Sorry, I couldn't get a quote. Error: {quote_response.get('error')}")
     
     else: # unknown or help
         await update.message.reply_text("I'm not sure how to help with that. You can ask me for the price of a token, like 'what is the price of BTC?'.")

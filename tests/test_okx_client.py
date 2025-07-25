@@ -44,12 +44,27 @@ class TestOKXClient(unittest.TestCase):
         self.assertFalse(result['success'])
         self.assertEqual(result['error'], "Invalid API Key")
 
-    def test_get_quote_placeholder(self):
-        """Test that the get_quote method returns mock data as a placeholder."""
+    @patch.dict(os.environ, {
+        "OKX_API_KEY": "test_key",
+        "OKX_API_SECRET": "test_secret",
+        "OKX_API_PASSPHRASE": "test_passphrase"
+    })
+    @patch('requests.get')
+    def test_get_quote_success(self, mock_get):
+        """Test successful fetching of a swap quote."""
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {
+            "code": "0",
+            "data": [{"toTokenAmount": "3000000000"}]
+        }
+        mock_get.return_value = mock_response
+
         client = OKXClient()
-        result = client.get_quote("BTC", "USDT", "100")
-        self.assertEqual(result['price'], "65000.00")
-        self.assertEqual(result['symbol'], "BTC-USDT")
+        result = client.get_quote("from_addr", "to_addr", "100")
+
+        self.assertTrue(result['success'])
+        self.assertEqual(result['data']['toTokenAmount'], "3000000000")
 
 if __name__ == '__main__':
     unittest.main()

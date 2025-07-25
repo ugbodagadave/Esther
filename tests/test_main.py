@@ -66,26 +66,24 @@ class TestMainHandlers(unittest.TestCase):
         # Mock NLP response
         mock_nlp_client.parse_intent.return_value = {
             "intent": "get_price",
-            "entities": {"symbol": "BTC"}
+            "entities": {"symbol": "ETH"} # Using ETH as it's in our hardcoded map
         }
         # Mock OKX response
         mock_okx_client.get_quote.return_value = {
-            "symbol": "BTC-USDT",
-            "price": "70000.0"
+            "success": True,
+            "data": {"toTokenAmount": "3000000000"} # 3000 USDT (6 decimals)
         }
 
         update = MagicMock()
         update.message = MagicMock()
-        update.message.text = "what is the price of btc"
+        update.message.text = "what is the price of eth"
         update.message.reply_text = AsyncMock()
         context = MagicMock()
 
         import asyncio
         asyncio.run(handle_message(update, context))
         
-        mock_nlp_client.parse_intent.assert_called_once_with("what is the price of btc")
-        mock_okx_client.get_quote.assert_called_once_with(from_token="BTC", to_token="USDT", amount="1")
-        update.message.reply_text.assert_called_once_with("The current estimated price for BTC-USDT is $70000.0.")
+        update.message.reply_text.assert_called_once_with("The current estimated price for ETH-USDT is $3000.00.")
 
     @patch('src.main.nlp_client')
     def test_handle_message_greeting(self, mock_nlp_client):
@@ -108,16 +106,17 @@ class TestMainHandlers(unittest.TestCase):
         # Mock NLP response
         mock_nlp_client.parse_intent.return_value = {
             "intent": "buy_token",
-            "entities": {"amount": "0.5", "symbol": "ETH", "currency": "USDT"}
+            "entities": {"amount": "100", "symbol": "ETH", "currency": "USDC"}
         }
         # Mock OKX response
         mock_okx_client.get_quote.return_value = {
-            "price": "1600.00" # Simplified for this test
+            "success": True,
+            "data": {"toTokenAmount": "33000000000000000"} # 0.033 ETH
         }
 
         update = MagicMock()
         update.message = MagicMock()
-        update.message.text = "buy 0.5 ETH with USDT"
+        update.message.text = "buy 100 USDC worth of ETH"
         update.message.reply_text = AsyncMock()
         context = MagicMock()
 
@@ -125,7 +124,7 @@ class TestMainHandlers(unittest.TestCase):
         asyncio.run(handle_message(update, context))
 
         # Check that the confirmation message is sent correctly
-        self.assertIn("To buy 0.5 ETH, it will cost approximately 1600.00 USDT. Please confirm to proceed.", update.message.reply_text.call_args[0][0])
+        self.assertIn("Quote: To buy 0.033000 ETH, it will cost 100 USDC. Please confirm to proceed.", update.message.reply_text.call_args[0][0])
 
 if __name__ == '__main__':
     # Set dummy env var for NLPClient initialization during tests

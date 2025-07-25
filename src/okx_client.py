@@ -77,18 +77,38 @@ class OKXClient:
             logger.error(f"Error during credential verification: {e}")
             return {"success": False, "error": str(e)}
 
-    def get_quote(self, from_token: str, to_token: str, amount: str, chain_index: int = 1) -> dict:
+    def get_quote(self, from_token_address: str, to_token_address: str, amount: str, chain_index: int = 1) -> dict:
         """
-        Fetches a swap quote from the OKX DEX aggregator.
+        Fetches a real swap quote from the OKX DEX aggregator.
         """
-        # This method will be fully implemented in Phase 2.
-        # For now, it serves as a placeholder for the price-checking logic.
-        logger.info("get_quote is a placeholder and will be fully implemented in Phase 2.")
-        # In a real scenario, this would make an authenticated call like verify_credentials.
-        # For Phase 1, we will return a mock price.
-        if from_token and to_token and amount:
-             return {"price": "65000.00", "symbol": f"{from_token}-{to_token}"} # Mock data
-        return {"error": "Invalid parameters for quote"}
+        try:
+            request_path = '/api/v5/dex/aggregator/quote'
+            params = {
+                "chainIndex": chain_index,
+                "amount": amount,
+                "toTokenAddress": to_token_address,
+                "fromTokenAddress": from_token_address
+            }
+            
+            query_string = '&'.join([f'{k}={v}' for k, v in params.items()])
+            full_request_path = f"{request_path}?{query_string}"
+
+            headers = self._get_request_headers('GET', full_request_path)
+            url = f"{self.base_url}{full_request_path}"
+            
+            response = requests.get(url, headers=headers)
+            response.raise_for_status()
+            data = response.json()
+
+            if data.get("code") == "0":
+                # The actual quote data is in the first element of the 'data' list
+                return {"success": True, "data": data.get("data", [{}])[0]}
+            else:
+                logger.error(f"Error fetching quote from OKX API: {data.get('msg')}")
+                return {"success": False, "error": data.get("msg")}
+        except requests.exceptions.RequestException as e:
+            logger.error(f"Error fetching quote: {e}")
+            return {"success": False, "error": str(e)}
 
 
 if __name__ == '__main__':
