@@ -6,7 +6,7 @@
     - **Google Gemini 2.5 Pro**: The core engine for complex NLP tasks, including parsing trading commands, market analysis, personalized recommendations, and sentiment analysis.
     - **Google Gemini 2.5 Flash**: Used for high-volume, low-latency tasks such as answering simple queries, handling basic conversation, and initial intent recognition.
 - **Primary Interface**: The **Telegram Bot API** will be used to manage all user interactions within the Telegram platform.
-- **Database**: A scalable database is required. **MongoDB** is a strong candidate due to its flexible schema, which is well-suited for storing user profiles, conversation histories, and varied alert configurations. PostgreSQL is a viable alternative if a relational structure becomes necessary.
+- **Database**: **PostgreSQL** will be used as the relational database. It provides a robust and scalable solution for storing user data, trade history, and configurations. The database will be hosted on Render's free tier.
 
 ## 2. Core Integrations
 - **OKX DEX API**: This is the central integration for all trading-related functionality. It will be used to fetch market data, execute trades, and manage user portfolios. Secure and efficient interaction with this API is a top priority.

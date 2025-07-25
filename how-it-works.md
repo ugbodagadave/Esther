@@ -26,7 +26,7 @@ graph TD
     end
 
     subgraph Data & Services
-        I[MongoDB Database]
+        I[PostgreSQL Database]
         J[OKX DEX API]
         K[News APIs]
         L[Blockchain Explorers]
@@ -55,7 +55,7 @@ Here is the step-by-step journey of a user command, from Telegram to execution a
     *   **Strategy Pattern**: Based on complexity, the system selects either **Gemini Flash** (for simple requests like "price of ETH") or **Gemini Pro** (for complex requests like "buy 0.5 ETH if...").
     *   The chosen Gemini model processes the text, returning a structured object containing the user's `intent` (e.g., `buy_token`) and `entities` (e.g., `{token: 'ETH', amount: 0.5, currency: 'USDT'}`).
 3.  **Core Logic Orchestration**: The **Core Logic Layer** receives the structured `intent` and `entities`.
-    *   It retrieves the user's profile and encrypted API keys from the **MongoDB Database** via the **Data Access Layer**.
+    *   It retrieves the user's profile and encrypted API keys from the **PostgreSQL Database** via the **Data Access Layer**.
     *   **Command Pattern**: It instantiates a command object (e.g., `BuyCommand`) with the necessary data.
 4.  **Pre-execution & Confirmation**:
     *   For transactional commands, the Core Logic Layer first calls the **External Services Layer** to fetch any required data (e.g., current price, estimated fees from the **OKX DEX API**).
@@ -67,7 +67,7 @@ Here is the step-by-step journey of a user command, from Telegram to execution a
 6.  **Response and Logging**:
     *   The result of the API call (success or failure) is received.
     *   A final status message is sent to the user (e.g., "Trade executed successfully" or "Trade failed: Insufficient funds").
-    *   The transaction details are logged in the **MongoDB Database** for the user's history.
+    *   The transaction details are logged in the **PostgreSQL Database** for the user's history.
 
 ## 4. Gemini Model Allocation Strategy
 The choice between Gemini Pro and Flash is dynamic and crucial for balancing performance and cost.
@@ -86,6 +86,6 @@ The choice between Gemini Pro and Flash is dynamic and crucial for balancing per
 ## 5. Security Design
 Security is paramount. The following measures are integral to the design:
 -   **Environment Variables**: All system-level API keys and secrets are managed exclusively through environment variables and are never hardcoded.
--   **Database Encryption**: User-specific sensitive data, particularly OKX DEX API keys, are encrypted using a strong algorithm (e.g., AES-256) before being stored in MongoDB. The encryption key itself is managed as a secure environment variable.
+-   **Database Encryption**: User-specific sensitive data, particularly OKX DEX API keys, are encrypted using a strong algorithm (e.g., AES-256) before being stored in the PostgreSQL database. The encryption key itself is managed as a secure environment variable.
 -   **Immutable Transaction Confirmation**: The pre-execution confirmation step is a mandatory, non-skippable part of the workflow for any action that modifies a user's assets.
 -   **Principle of Least Privilege**: The OKX DEX API keys requested from the user should have the minimum required permissions for the bot's functionality.

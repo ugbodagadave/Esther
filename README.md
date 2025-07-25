@@ -18,7 +18,7 @@ Esther is a sophisticated, AI-powered trading agent that operates within Telegra
 -   **Backend**: Python, `asyncio`
 -   **AI**: Google Gemini Pro & Flash
 -   **Platform**: Telegram
--   **Database**: MongoDB
+-   **Database**: PostgreSQL
 -   **DEX Integration**: OKX DEX API
 -   **Deployment**: Render
 
@@ -31,7 +31,7 @@ Esther is a sophisticated, AI-powered trading agent that operates within Telegra
 -   A Google Gemini API Key
 -   An OKX DEX API Key (required for Phase 2+)
 -   A NewsAPI.org API Key (required for Phase 4+)
--   A MongoDB instance (required for Phase 2+)
+-   A PostgreSQL instance (e.g., from Render's free tier)
 
 ### Installation & Setup
 
@@ -59,7 +59,7 @@ Esther is a sophisticated, AI-powered trading agent that operates within Telegra
     OKX_API_KEY=your_okx_api_key
     OKX_API_SECRET=your_okx_api_secret
     OKX_API_PASSPHRASE=your_okx_api_passphrase
-    MONGO_DB_URI=your_mongodb_uri
+    DATABASE_URL=your_postgresql_connection_string
     ENCRYPTION_KEY=a_secure_random_32_byte_string
     
     # Required for Phase 4 and beyond
