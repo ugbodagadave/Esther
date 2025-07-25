@@ -58,15 +58,15 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         # In a real scenario, you might have a different endpoint for simple price checks
         # or derive the price from the swap quote.
         
-        # For the purpose of this step, let's assume we have a get_price method
-        # and we will mock it in tests.
-        # Let's modify the OKX client to have a simple price check for now.
-        price_data = okx_client.get_price(trading_pair) # Assuming get_price exists for now
+        # For Phase 1, we use the get_quote method which returns mock data.
+        # This simulates getting a price without needing a real API call yet.
+        # A real implementation would need to handle token addresses instead of symbols.
+        quote_data = okx_client.get_quote(from_token=symbol.upper(), to_token="USDT", amount="1")
         
-        if "error" in price_data:
-            await update.message.reply_text(f"Sorry, I couldn't fetch the price. Error: {price_data['error']}")
+        if "error" in quote_data:
+            await update.message.reply_text(f"Sorry, I couldn't fetch a quote. Error: {quote_data['error']}")
         else:
-            await update.message.reply_text(f"The current price of {trading_pair} is ${price_data['price']}.")
+            await update.message.reply_text(f"The current estimated price for {quote_data['symbol']} is ${quote_data['price']}.")
 
     elif intent == "greeting":
         await update.message.reply_text("Hello! How can I assist you with your trades today?")

@@ -3,10 +3,8 @@ import requests
 import logging
 import hmac
 import base64
-import time
-import json
-from dotenv import load_dotenv
 from datetime import datetime, timezone
+from dotenv import load_dotenv
 
 # Load environment variables from .env file
 load_dotenv()
@@ -26,7 +24,7 @@ def sign(message, secret_key):
 
 class OKXClient:
     def __init__(self):
-        self.base_url = "https://www.okx.com"
+        self.base_url = "https://web3.okx.com"
         self.api_key = os.getenv("OKX_API_KEY")
         self.api_secret = os.getenv("OKX_API_SECRET")
         self.passphrase = os.getenv("OKX_API_PASSPHRASE")
@@ -44,67 +42,64 @@ class OKXClient:
             'Content-Type': 'application/json'
         }
 
-    def get_price(self, symbol: str) -> dict:
+    def verify_credentials(self):
         """
-        Fetches the current price of a trading pair from OKX.
-        e.g. symbol='BTC-USDT'
-        """
-        try:
-            url = f"{self.base_url}/api/v5/market/ticker?instId={symbol.upper()}"
-            response = requests.get(url)
-            response.raise_for_status()
-            data = response.json()
-
-            if data.get("code") == "0":
-                ticker_data = data.get("data", [{}])[0]
-                return {"symbol": symbol, "price": ticker_data.get("last")}
-            else:
-                logger.error(f"Error from OKX API: {data.get('msg')}")
-                return {"error": data.get("msg")}
-        except requests.exceptions.RequestException as e:
-            logger.error(f"Error fetching price from OKX: {e}")
-            return {"error": str(e)}
-
-    def get_account_balance(self):
-        """
-        Fetches the account balance to verify API credentials.
+        Verifies API credentials by making a read-only, authenticated request to a DEX endpoint.
+        We will try to get a quote for a tiny amount of a common pair.
         """
         try:
-            request_path = '/api/v5/account/balance'
-            headers = self._get_request_headers('GET', request_path)
-            url = f"{self.base_url}{request_path}"
+            # Using the quote endpoint as a read-only way to verify keys
+            request_path = '/api/v5/dex/aggregator/quote'
+            params = {
+                "chainIndex": 1, # Ethereum
+                "amount": "1", # A tiny amount
+                "toTokenAddress": "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48", # USDC
+                "fromTokenAddress": "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee" # ETH
+            }
+            
+            # The GET request with params needs the params to be part of the request_path for signing
+            query_string = '&'.join([f'{k}={v}' for k, v in params.items()])
+            full_request_path = f"{request_path}?{query_string}"
+
+            headers = self._get_request_headers('GET', full_request_path)
+            url = f"{self.base_url}{full_request_path}"
             
             response = requests.get(url, headers=headers)
             response.raise_for_status()
             data = response.json()
 
             if data.get("code") == "0":
-                return {"success": True, "data": data.get("data")}
+                return {"success": True, "data": "Credentials are valid."}
             else:
-                logger.error(f"Error from OKX API: {data.get('msg')}")
+                logger.error(f"Credential verification failed. OKX API Error: {data.get('msg')}")
                 return {"success": False, "error": data.get("msg")}
         except requests.exceptions.RequestException as e:
-            logger.error(f"Error fetching account balance: {e}")
+            logger.error(f"Error during credential verification: {e}")
             return {"success": False, "error": str(e)}
 
-    def get_swap_quote(self, from_token: str, to_token: str, amount: str, chain_index: int = 1, slippage: float = 0.05) -> dict:
+    def get_quote(self, from_token: str, to_token: str, amount: str, chain_index: int = 1) -> dict:
         """
         Fetches a swap quote from the OKX DEX aggregator.
         """
-        # This method will be fully implemented later.
-        logger.info("get_swap_quote is not yet implemented.")
-        return {"error": "Not implemented"}
+        # This method will be fully implemented in Phase 2.
+        # For now, it serves as a placeholder for the price-checking logic.
+        logger.info("get_quote is a placeholder and will be fully implemented in Phase 2.")
+        # In a real scenario, this would make an authenticated call like verify_credentials.
+        # For Phase 1, we will return a mock price.
+        if from_token and to_token and amount:
+             return {"price": "65000.00", "symbol": f"{from_token}-{to_token}"} # Mock data
+        return {"error": "Invalid parameters for quote"}
+
 
 if __name__ == '__main__':
     # Example usage to test API credentials
-    print("Attempting to verify OKX API credentials...")
+    print("Attempting to verify OKX API credentials with a DEX endpoint...")
     client = OKXClient()
     if not all([client.api_key, client.api_secret, client.passphrase]):
         print("OKX credentials not found in .env file.")
     else:
-        balance_info = client.get_account_balance()
-        if balance_info.get("success"):
-            print("Successfully connected to OKX API and fetched balance.")
-            # print("Balance Data:", balance_info.get("data")) # Optionally print for more detail
+        verification_result = client.verify_credentials()
+        if verification_result.get("success"):
+            print("Successfully connected to OKX DEX API. Credentials are valid.")
         else:
-            print(f"Failed to connect to OKX API. Error: {balance_info.get('error')}")
+            print(f"Failed to connect to OKX DEX API. Error: {verification_result.get('error')}")

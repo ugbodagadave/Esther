@@ -32,7 +32,7 @@ class TestMainHandlers(unittest.TestCase):
             "entities": {"symbol": "BTC"}
         }
         # Mock OKX response
-        mock_okx_client.get_price.return_value = {
+        mock_okx_client.get_quote.return_value = {
             "symbol": "BTC-USDT",
             "price": "70000.0"
         }
@@ -47,8 +47,8 @@ class TestMainHandlers(unittest.TestCase):
         asyncio.run(handle_message(update, context))
         
         mock_nlp_client.parse_intent.assert_called_once_with("what is the price of btc")
-        mock_okx_client.get_price.assert_called_once_with("BTC-USDT")
-        update.message.reply_text.assert_called_once_with("The current price of BTC-USDT is $70000.0.")
+        mock_okx_client.get_quote.assert_called_once_with(from_token="BTC", to_token="USDT", amount="1")
+        update.message.reply_text.assert_called_once_with("The current estimated price for BTC-USDT is $70000.0.")
 
     @patch('src.main.nlp_client')
     def test_handle_message_greeting(self, mock_nlp_client):
