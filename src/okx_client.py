@@ -15,6 +15,32 @@ class OKXClient:
         self.api_secret = os.getenv("OKX_API_SECRET")
         self.passphrase = os.getenv("OKX_API_PASSPHRASE")
 
+    def get_price(self, symbol: str) -> dict:
+        """
+        Fetches the current price of a trading pair from OKX.
+        e.g. symbol='BTC-USDT'
+        """
+        try:
+            # Using v5 public tickers endpoint
+            url = f"https://www.okx.com/api/v5/market/ticker?instId={symbol.upper()}"
+            response = requests.get(url)
+            response.raise_for_status()
+            data = response.json()
+
+            if data.get("code") == "0":
+                ticker_data = data.get("data", [{}])[0]
+                return {
+                    "symbol": symbol,
+                    "price": ticker_data.get("last"),
+                }
+            else:
+                logger.error(f"Error from OKX API: {data.get('msg')}")
+                return {"error": data.get("msg")}
+
+        except requests.exceptions.RequestException as e:
+            logger.error(f"Error fetching price from OKX: {e}")
+            return {"error": str(e)}
+
     def get_swap_quote(self, from_token: str, to_token: str, amount: str, chain_index: int = 1, slippage: float = 0.05) -> dict:
         """
         Fetches a swap quote from the OKX DEX aggregator.
