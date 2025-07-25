@@ -26,6 +26,25 @@ class TestNLPClient(unittest.TestCase):
 
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test_key"})
     @patch('google.generativeai.GenerativeModel')
+    def test_parse_intent_buy_token(self, mock_gen_model):
+        """Test parsing a 'buy_token' intent."""
+        mock_response = MagicMock()
+        mock_response.text = '{"intent": "buy_token", "entities": {"amount": "0.5", "symbol": "ETH", "currency": "USDT"}}'
+        
+        mock_model_instance = MagicMock()
+        mock_model_instance.generate_content.return_value = mock_response
+        mock_gen_model.return_value = mock_model_instance
+
+        nlp_client = NLPClient()
+        result = nlp_client.parse_intent("buy 0.5 ETH with USDT")
+
+        self.assertEqual(result['intent'], 'buy_token')
+        self.assertEqual(result['entities']['amount'], '0.5')
+        self.assertEqual(result['entities']['symbol'], 'ETH')
+        self.assertEqual(result['entities']['currency'], 'USDT')
+
+    @patch.dict(os.environ, {"GEMINI_API_KEY": "test_key"})
+    @patch('google.generativeai.GenerativeModel')
     def test_parse_intent_unknown(self, mock_gen_model):
         """Test handling of an unknown intent."""
         mock_response = MagicMock()

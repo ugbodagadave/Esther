@@ -104,6 +104,30 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
 
     elif intent == "greeting":
         await update.message.reply_text("Hello! How can I assist you with your trades today?")
+
+    elif intent == "buy_token":
+        symbol = entities.get("symbol")
+        amount = entities.get("amount")
+        currency = entities.get("currency")
+
+        if not all([symbol, amount, currency]):
+            await update.message.reply_text("To buy a token, please tell me the amount, the token symbol, and the currency to use (e.g., 'buy 0.5 ETH with USDT').")
+            return
+        
+        # For now, we'll just get a quote and show it to the user.
+        # The actual swap logic will be implemented next.
+        await update.message.reply_text(f"Getting a quote to buy {amount} {symbol.upper()} with {currency.upper()}...")
+        
+        # This is a simplification. A real implementation needs token addresses.
+        quote_data = okx_client.get_quote(from_token=currency.upper(), to_token=symbol.upper(), amount=amount)
+
+        if "error" in quote_data:
+            await update.message.reply_text(f"Sorry, I couldn't get a quote. Error: {quote_data['error']}")
+        else:
+            # This is a mock confirmation message based on mock data
+            price = quote_data['price']
+            await update.message.reply_text(f"To buy {amount} {symbol.upper()}, it will cost approximately {price} {currency.upper()}. Please confirm to proceed.")
+            # Here we would add logic to handle the user's confirmation (e.g., using ConversationHandler)
     
     else: # unknown or help
         await update.message.reply_text("I'm not sure how to help with that. You can ask me for the price of a token, like 'what is the price of BTC?'.")

@@ -102,6 +102,31 @@ class TestMainHandlers(unittest.TestCase):
         
         update.message.reply_text.assert_called_once_with("Hello! How can I assist you with your trades today?")
 
+    @patch('src.main.nlp_client')
+    @patch('src.main.okx_client')
+    def test_handle_message_buy_token(self, mock_okx_client, mock_nlp_client):
+        # Mock NLP response
+        mock_nlp_client.parse_intent.return_value = {
+            "intent": "buy_token",
+            "entities": {"amount": "0.5", "symbol": "ETH", "currency": "USDT"}
+        }
+        # Mock OKX response
+        mock_okx_client.get_quote.return_value = {
+            "price": "1600.00" # Simplified for this test
+        }
+
+        update = MagicMock()
+        update.message = MagicMock()
+        update.message.text = "buy 0.5 ETH with USDT"
+        update.message.reply_text = AsyncMock()
+        context = MagicMock()
+
+        import asyncio
+        asyncio.run(handle_message(update, context))
+
+        # Check that the confirmation message is sent correctly
+        self.assertIn("To buy 0.5 ETH, it will cost approximately 1600.00 USDT. Please confirm to proceed.", update.message.reply_text.call_args[0][0])
+
 if __name__ == '__main__':
     # Set dummy env var for NLPClient initialization during tests
     os.environ["GEMINI_API_KEY"] = "test_key"

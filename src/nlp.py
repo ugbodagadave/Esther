@@ -25,13 +25,16 @@ class NLPClient:
             # or a more structured approach. For now, we use a simple prompt.
             prompt = f"""
             From the following user query, extract the intent and any relevant entities.
-            The possible intents are: 'get_price', 'greeting', 'help', 'unknown'.
-            If the intent is 'get_price', the entity should be the token symbol (e.g., BTC, ETH).
+            The possible intents are: 'buy_token', 'get_price', 'greeting', 'help', 'unknown'.
+            
+            - For 'get_price', extract the 'symbol' (e.g., BTC, ETH).
+            - For 'buy_token', extract the 'amount', 'symbol', and the 'currency' to buy with.
 
             Query: "{text}"
 
             Respond in JSON format with "intent" and "entities" keys.
-            For example: {{"intent": "get_price", "entities": {{"symbol": "BTC"}}}}
+            Example for get_price: {{"intent": "get_price", "entities": {{"symbol": "BTC"}}}}
+            Example for buy_token: {{"intent": "buy_token", "entities": {{"amount": "0.5", "symbol": "ETH", "currency": "USDT"}}}}
             """
             
             response = self.model.generate_content(prompt)
