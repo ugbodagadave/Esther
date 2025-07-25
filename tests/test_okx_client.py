@@ -6,8 +6,8 @@ from src.okx_client import OKXClient
 class TestOKXClient(unittest.TestCase):
 
     @patch('requests.get')
-    def test_get_price_success(self, mock_get):
-        """Test successful price fetching from OKX API."""
+    def test_get_swap_quote_success(self, mock_get):
+        """Test successful swap quote fetching."""
         mock_response = MagicMock()
         mock_response.status_code = 200
         mock_response.json.return_value = {
@@ -15,50 +15,59 @@ class TestOKXClient(unittest.TestCase):
             "msg": "",
             "data": [
                 {
-                    "instType": "SPOT",
-                    "instId": "BTC-USDT",
-                    "last": "65000.0",
-                    "vol24h": "10000"
+                    "toTokenAmount": "10000",
+                    "fromTokenAmount": "10",
                 }
             ]
         }
         mock_get.return_value = mock_response
 
         client = OKXClient()
-        result = client.get_price("BTC-USDT")
+        result = client.get_swap_quote(
+            from_token='ETH_ADDRESS', 
+            to_token='USDT_ADDRESS', 
+            amount='1000000'
+        )
 
-        self.assertEqual(result['symbol'], "BTC-USDT")
-        self.assertEqual(result['price'], "65000.0")
+        self.assertEqual(result['toTokenAmount'], "10000")
         self.assertNotIn('error', result)
 
     @patch('requests.get')
-    def test_get_price_api_error(self, mock_get):
+    def test_get_swap_quote_api_error(self, mock_get):
         """Test handling of an API error from OKX."""
         mock_response = MagicMock()
         mock_response.status_code = 200
         mock_response.json.return_value = {
-            "code": "51001",
-            "msg": "Instrument ID does not exist",
+            "code": "58100",
+            "msg": "Invalid from-token address",
             "data": []
         }
         mock_get.return_value = mock_response
 
         client = OKXClient()
-        result = client.get_price("INVALID-TOKEN")
+        result = client.get_swap_quote(
+            from_token='INVALID', 
+            to_token='USDT_ADDRESS', 
+            amount='1000000'
+        )
 
         self.assertIn('error', result)
-        self.assertEqual(result['error'], "Instrument ID does not exist")
+        self.assertEqual(result['error'], "Invalid from-token address")
 
     @patch('requests.get')
-    def test_get_price_request_exception(self, mock_get):
+    def test_get_swap_quote_request_exception(self, mock_get):
         """Test handling of a requests exception."""
-        mock_get.side_effect = requests.exceptions.RequestException("Connection error")
+        mock_get.side_effect = requests.exceptions.RequestException("Connection failed")
 
         client = OKXClient()
-        result = client.get_price("BTC-USDT")
+        result = client.get_swap_quote(
+            from_token='ETH_ADDRESS', 
+            to_token='USDT_ADDRESS', 
+            amount='1000000'
+        )
 
         self.assertIn('error', result)
-        self.assertEqual(result['error'], "Connection error")
+        self.assertEqual(result['error'], "Connection failed")
 
 if __name__ == '__main__':
     unittest.main()
