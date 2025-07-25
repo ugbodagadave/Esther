@@ -29,9 +29,9 @@ Esther is a sophisticated, AI-powered trading agent that operates within Telegra
 -   Python 3.9+
 -   A Telegram Bot Token
 -   A Google Gemini API Key
--   An OKX DEX API Key
--   A NewsAPI.org API Key
--   A MongoDB instance
+-   An OKX DEX API Key (required for Phase 2+)
+-   A NewsAPI.org API Key (required for Phase 4+)
+-   A MongoDB instance (required for Phase 2+)
 
 ### Installation & Setup
 
@@ -49,16 +49,21 @@ Esther is a sophisticated, AI-powered trading agent that operates within Telegra
     ```
 
 3.  **Set up environment variables:**
-    Create a `.env` file in the root directory and add the following:
+    Create a `.env` file in the root directory. For the current phase, only the first two are required:
     ```
+    # Required for Phase 1
     TELEGRAM_BOT_TOKEN=your_telegram_bot_token
     GEMINI_API_KEY=your_gemini_api_key
+
+    # Required for Phase 2 and beyond
     OKX_API_KEY=your_okx_api_key
     OKX_API_SECRET=your_okx_api_secret
     OKX_API_PASSPHRASE=your_okx_api_passphrase
-    NEWS_API_KEY=your_news_api_key
     MONGO_DB_URI=your_mongodb_uri
     ENCRYPTION_KEY=a_secure_random_32_byte_string
+    
+    # Required for Phase 4 and beyond
+    NEWS_API_KEY=your_news_api_key
     ```
 
 4.  **Run the bot:**
