@@ -5,14 +5,51 @@ import os
 
 class TestMainHandlers(unittest.TestCase):
 
-    def test_start_command(self):
+    @patch('src.main.get_db_connection')
+    def test_start_command_new_user(self, mock_get_conn):
+        # Mock database connection and cursor
+        mock_conn = MagicMock()
+        mock_cursor = MagicMock()
+        mock_get_conn.return_value = mock_conn
+        mock_conn.cursor.return_value.__enter__.return_value = mock_cursor
+        # Mock fetchone to return None, simulating a new user
+        mock_cursor.fetchone.return_value = None
+
+        # Mock Telegram's user object
         update = MagicMock()
+        update.effective_user = MagicMock(id=123, username='testuser')
         update.message = MagicMock()
         update.message.reply_text = AsyncMock()
         context = MagicMock()
+
         import asyncio
         asyncio.run(start(update, context))
-        update.message.reply_text.assert_called_once_with("Hello! I am Esther, your AI-powered trading agent. How can I help you today?")
+
+        # Verify user was created and correct message was sent
+        mock_cursor.execute.assert_any_call("SELECT id FROM users WHERE telegram_id = %s;", (123,))
+        mock_cursor.execute.assert_any_call("INSERT INTO users (telegram_id, username) VALUES (%s, %s);", (123, 'testuser'))
+        update.message.reply_text.assert_called_once_with("Welcome! I've created an account for you. How can I help you get started with trading on OKX DEX?")
+
+    @patch('src.main.get_db_connection')
+    def test_start_command_existing_user(self, mock_get_conn):
+        # Mock database to return an existing user
+        mock_conn = MagicMock()
+        mock_cursor = MagicMock()
+        mock_get_conn.return_value = mock_conn
+        mock_conn.cursor.return_value.__enter__.return_value = mock_cursor
+        mock_cursor.fetchone.return_value = (1,) # Simulate finding a user
+
+        update = MagicMock()
+        update.effective_user = MagicMock(id=123, username='testuser')
+        update.message = MagicMock()
+        update.message.reply_text = AsyncMock()
+        context = MagicMock()
+
+        import asyncio
+        asyncio.run(start(update, context))
+
+        # Verify the welcome back message was sent
+        update.message.reply_text.assert_called_once_with("Welcome back! How can I help you today?")
 
     def test_help_command(self):
         update = MagicMock()

@@ -17,8 +17,41 @@ logger = logging.getLogger(__name__)
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Sends a message when the command /start is issued."""
-    await update.message.reply_text("Hello! I am Esther, your AI-powered trading agent. How can I help you today?")
+    """Handles the /start command, registers the user if they don't exist."""
+    user = update.effective_user
+    logger.info(f"User {user.username} ({user.id}) started the bot.")
+    
+    conn = get_db_connection()
+    if conn is None:
+        await update.message.reply_text("Sorry, I'm having trouble connecting to the database. Please try again later.")
+        return
+        
+    try:
+        with conn.cursor() as cur:
+            # Check if user exists
+            cur.execute("SELECT id FROM users WHERE telegram_id = %s;", (user.id,))
+            result = cur.fetchone()
+            
+            if result is None:
+                # User does not exist, create new user
+                cur.execute(
+                    "INSERT INTO users (telegram_id, username) VALUES (%s, %s);",
+                    (user.id, user.username)
+                )
+                conn.commit()
+                logger.info(f"New user {user.username} ({user.id}) created.")
+                await update.message.reply_text("Welcome! I've created an account for you. How can I help you get started with trading on OKX DEX?")
+            else:
+                # User already exists
+                logger.info(f"Existing user {user.username} ({user.id}) returned.")
+                await update.message.reply_text("Welcome back! How can I help you today?")
+
+    except Exception as e:
+        logger.error(f"Database error during /start for user {user.id}: {e}")
+        await update.message.reply_text("An error occurred while accessing your account. Please try again.")
+    finally:
+        if conn:
+            conn.close()
 
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Sends a message when the command /help is issued."""
@@ -26,6 +59,7 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
 
 from src.nlp import NLPClient
 from src.okx_client import OKXClient
+from src.database import get_db_connection
 
 # Initialize clients
 nlp_client = NLPClient()
