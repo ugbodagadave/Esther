@@ -16,7 +16,7 @@ services:
           property: connectionString
       # Non-secret environment variables can be defined here.
       - key: PYTHON_VERSION
-        value: 3.11 # Specify a Python version
+        value: 3.11.7 # Specify a major, minor, and patch version
       # IMPORTANT: All other secrets (TELEGRAM_BOT_TOKEN, GEMINI_API_KEY, etc.) 
       # must be added as a Secret File in the Render dashboard's "Environment" tab.
 
