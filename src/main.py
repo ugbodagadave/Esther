@@ -346,6 +346,290 @@ async def sell_token_intent(update: Update, context: ContextTypes.DEFAULT_TYPE, 
 
     return AWAIT_CONFIRMATION
 
+# --- Wallet Management ---
+async def add_wallet_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Starts the conversation to add a new wallet."""
+    await update.message.reply_text("Let's add a new wallet. What would you like to name it?")
+    return AWAIT_WALLET_NAME
+
+async def received_wallet_name(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Receives the wallet name and asks for the address."""
+    context.user_data['wallet_name'] = update.message.text
+    await update.message.reply_text("Got it. Now, please provide the wallet's public address.")
+    return AWAIT_WALLET_ADDRESS
+
+async def received_wallet_address(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Receives the wallet address and asks for the private key."""
+    context.user_data['wallet_address'] = update.message.text
+    await update.message.reply_text("Great. Now, please provide the private key. This will be encrypted and stored securely.")
+    return AWAIT_PRIVATE_KEY
+
+async def received_private_key(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Receives the private key, saves the wallet, and ends the conversation."""
+    user = update.effective_user
+    private_key = update.message.text
+    wallet_name = context.user_data.get('wallet_name')
+    wallet_address = context.user_data.get('wallet_address')
+
+    encrypted_private_key = encrypt_data(private_key)
+
+    conn = get_db_connection()
+    if conn is None:
+        await update.message.reply_text("Database connection failed. Please try again later.")
+        return ConversationHandler.END
+
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SELECT id FROM users WHERE telegram_id = %s;", (user.id,))
+            user_id = cur.fetchone()[0]
+
+            cur.execute(
+                "INSERT INTO wallets (user_id, name, address, encrypted_private_key) VALUES (%s, %s, %s, %s);",
+                (user_id, wallet_name, wallet_address, encrypted_private_key)
+            )
+            conn.commit()
+            await update.message.reply_text(f"✅ Wallet '{wallet_name}' added successfully!")
+    except Exception as e:
+        logger.error(f"Error adding wallet for user {user.id}: {e}")
+        await update.message.reply_text("An error occurred while saving your wallet.")
+    finally:
+        if conn:
+            conn.close()
+        context.user_data.clear()
+
+    return ConversationHandler.END
+
+async def list_wallets(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Lists all of the user's saved wallets."""
+    user = update.effective_user
+    conn = get_db_connection()
+    if conn is None:
+        await update.message.reply_text("Database connection failed. Please try again later.")
+        return
+
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SELECT id FROM users WHERE telegram_id = %s;", (user.id,))
+            user_id = cur.fetchone()[0]
+
+            cur.execute("SELECT name, address FROM wallets WHERE user_id = %s;", (user_id,))
+            wallets = cur.fetchall()
+
+            if not wallets:
+                await update.message.reply_text("You haven't added any wallets yet. Use /addwallet to get started.")
+                return
+
+            message = "Your saved wallets:\n\n"
+            for name, address in wallets:
+                message += f"🔹 **{name}**: `{address}`\n"
+            
+            await update.message.reply_text(message, parse_mode='Markdown')
+    except Exception as e:
+        logger.error(f"Error listing wallets for user {user.id}: {e}")
+        await update.message.reply_text("An error occurred while fetching your wallets.")
+    finally:
+        if conn:
+            conn.close()
+
+async def delete_wallet_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Starts the process of deleting a wallet."""
+    user = update.effective_user
+    conn = get_db_connection()
+    if conn is None:
+        await update.message.reply_text("Database connection failed. Please try again later.")
+        return
+
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SELECT id FROM users WHERE telegram_id = %s;", (user.id,))
+            user_id = cur.fetchone()[0]
+
+            cur.execute("SELECT name FROM wallets WHERE user_id = %s;", (user_id,))
+            wallets = cur.fetchall()
+
+            if not wallets:
+                await update.message.reply_text("You don't have any wallets to delete.")
+                return
+
+            keyboard = [[InlineKeyboardButton(name[0], callback_data=f"delete_{name[0]}")] for name in wallets]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            await update.message.reply_text("Which wallet would you like to delete?", reply_markup=reply_markup)
+    except Exception as e:
+        logger.error(f"Error starting wallet deletion for user {user.id}: {e}")
+        await update.message.reply_text("An error occurred while fetching your wallets.")
+    finally:
+        if conn:
+            conn.close()
+
+async def delete_wallet_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Handles the callback for deleting a wallet."""
+    query = update.callback_query
+    await query.answer()
+    wallet_name = query.data.split("_")[1]
+    user = update.effective_user
+
+    conn = get_db_connection()
+    if conn is None:
+        await query.edit_message_text("Database connection failed. Please try again later.")
+        return
+
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SELECT id FROM users WHERE telegram_id = %s;", (user.id,))
+            user_id = cur.fetchone()[0]
+
+            cur.execute("DELETE FROM wallets WHERE user_id = %s AND name = %s;", (user_id, wallet_name))
+            conn.commit()
+            await query.edit_message_text(f"✅ Wallet '{wallet_name}' has been deleted.")
+    except Exception as e:
+        logger.error(f"Error deleting wallet for user {user.id}: {e}")
+        await query.edit_message_text("An error occurred while deleting your wallet.")
+    finally:
+        if conn:
+            conn.close()
+
+# --- Wallet Management ---
+async def add_wallet_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Starts the conversation to add a new wallet."""
+    await update.message.reply_text("Let's add a new wallet. What would you like to name it?")
+    return AWAIT_WALLET_NAME
+
+async def received_wallet_name(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Receives the wallet name and asks for the address."""
+    context.user_data['wallet_name'] = update.message.text
+    await update.message.reply_text("Got it. Now, please provide the wallet's public address.")
+    return AWAIT_WALLET_ADDRESS
+
+async def received_wallet_address(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Receives the wallet address and asks for the private key."""
+    context.user_data['wallet_address'] = update.message.text
+    await update.message.reply_text("Great. Now, please provide the private key. This will be encrypted and stored securely.")
+    return AWAIT_PRIVATE_KEY
+
+async def received_private_key(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Receives the private key, saves the wallet, and ends the conversation."""
+    user = update.effective_user
+    private_key = update.message.text
+    wallet_name = context.user_data.get('wallet_name')
+    wallet_address = context.user_data.get('wallet_address')
+
+    encrypted_private_key = encrypt_data(private_key)
+
+    conn = get_db_connection()
+    if conn is None:
+        await update.message.reply_text("Database connection failed. Please try again later.")
+        return ConversationHandler.END
+
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SELECT id FROM users WHERE telegram_id = %s;", (user.id,))
+            user_id = cur.fetchone()[0]
+
+            cur.execute(
+                "INSERT INTO wallets (user_id, name, address, encrypted_private_key) VALUES (%s, %s, %s, %s);",
+                (user_id, wallet_name, wallet_address, encrypted_private_key)
+            )
+            conn.commit()
+            await update.message.reply_text(f"✅ Wallet '{wallet_name}' added successfully!")
+    except Exception as e:
+        logger.error(f"Error adding wallet for user {user.id}: {e}")
+        await update.message.reply_text("An error occurred while saving your wallet.")
+    finally:
+        if conn:
+            conn.close()
+        context.user_data.clear()
+
+    return ConversationHandler.END
+
+async def list_wallets(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Lists all of the user's saved wallets."""
+    user = update.effective_user
+    conn = get_db_connection()
+    if conn is None:
+        await update.message.reply_text("Database connection failed. Please try again later.")
+        return
+
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SELECT id FROM users WHERE telegram_id = %s;", (user.id,))
+            user_id = cur.fetchone()[0]
+
+            cur.execute("SELECT name, address FROM wallets WHERE user_id = %s;", (user_id,))
+            wallets = cur.fetchall()
+
+            if not wallets:
+                await update.message.reply_text("You haven't added any wallets yet. Use /addwallet to get started.")
+                return
+
+            message = "Your saved wallets:\n\n"
+            for name, address in wallets:
+                message += f"🔹 **{name}**: `{address}`\n"
+            
+            await update.message.reply_text(message, parse_mode='Markdown')
+    except Exception as e:
+        logger.error(f"Error listing wallets for user {user.id}: {e}")
+        await update.message.reply_text("An error occurred while fetching your wallets.")
+    finally:
+        if conn:
+            conn.close()
+
+async def delete_wallet_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Starts the process of deleting a wallet."""
+    user = update.effective_user
+    conn = get_db_connection()
+    if conn is None:
+        await update.message.reply_text("Database connection failed. Please try again later.")
+        return
+
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SELECT id FROM users WHERE telegram_id = %s;", (user.id,))
+            user_id = cur.fetchone()[0]
+
+            cur.execute("SELECT name FROM wallets WHERE user_id = %s;", (user_id,))
+            wallets = cur.fetchall()
+
+            if not wallets:
+                await update.message.reply_text("You don't have any wallets to delete.")
+                return
+
+            keyboard = [[InlineKeyboardButton(name[0], callback_data=f"delete_{name[0]}")] for name in wallets]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            await update.message.reply_text("Which wallet would you like to delete?", reply_markup=reply_markup)
+    except Exception as e:
+        logger.error(f"Error starting wallet deletion for user {user.id}: {e}")
+        await update.message.reply_text("An error occurred while fetching your wallets.")
+    finally:
+        if conn:
+            conn.close()
+
+async def delete_wallet_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Handles the callback for deleting a wallet."""
+    query = update.callback_query
+    await query.answer()
+    wallet_name = query.data.split("_")[1]
+    user = update.effective_user
+
+    conn = get_db_connection()
+    if conn is None:
+        await query.edit_message_text("Database connection failed. Please try again later.")
+        return
+
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SELECT id FROM users WHERE telegram_id = %s;", (user.id,))
+            user_id = cur.fetchone()[0]
+
+            cur.execute("DELETE FROM wallets WHERE user_id = %s AND name = %s;", (user_id, wallet_name))
+            conn.commit()
+            await query.edit_message_text(f"✅ Wallet '{wallet_name}' has been deleted.")
+    except Exception as e:
+        logger.error(f"Error deleting wallet for user {user.id}: {e}")
+        await query.edit_message_text("An error occurred while deleting your wallet.")
+    finally:
+        if conn:
+            conn.close()
+
 # --- Alert Management ---
 async def add_alert_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Starts the conversation to add a new price alert."""
