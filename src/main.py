@@ -55,6 +55,7 @@ okx_client = OKXClient()
 # --- Conversation Handler States ---
 AWAIT_CONFIRMATION = 1
 AWAIT_WALLET_NAME, AWAIT_WALLET_ADDRESS, AWAIT_PRIVATE_KEY = 2, 3, 4
+AWAIT_ALERT_SYMBOL, AWAIT_ALERT_CONDITION, AWAIT_ALERT_PRICE = 5, 6, 7
 
 # Global flag for simulation mode, configurable via .env file
 DRY_RUN_MODE = os.getenv("DRY_RUN_MODE", "True").lower() in ("true", "1", "t")
@@ -345,6 +346,103 @@ async def sell_token_intent(update: Update, context: ContextTypes.DEFAULT_TYPE, 
 
     return AWAIT_CONFIRMATION
 
+# --- Alert Management ---
+async def add_alert_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Starts the conversation to add a new price alert."""
+    await update.message.reply_text("Let's set up a price alert. Which token symbol would you like to monitor (e.g., BTC, ETH)?")
+    return AWAIT_ALERT_SYMBOL
+
+async def received_alert_symbol(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Receives the token symbol and asks for the condition."""
+    context.user_data['alert_symbol'] = update.message.text.upper()
+    keyboard = [
+        [
+            InlineKeyboardButton("Above", callback_data="alert_above"),
+            InlineKeyboardButton("Below", callback_data="alert_below"),
+        ]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    await update.message.reply_text("Great. Do you want to be alerted when the price is above or below a certain value?", reply_markup=reply_markup)
+    return AWAIT_ALERT_CONDITION
+
+async def received_alert_condition(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Receives the alert condition and asks for the target price."""
+    query = update.callback_query
+    await query.answer()
+    context.user_data['alert_condition'] = query.data.split("_")[1]
+    await query.edit_message_text(text=f"Condition set to '{context.user_data['alert_condition']}'. Now, what is the target price in USD?")
+    return AWAIT_ALERT_PRICE
+
+async def received_alert_price(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Receives the target price, saves the alert, and ends the conversation."""
+    user = update.effective_user
+    try:
+        target_price = float(update.message.text)
+    except ValueError:
+        await update.message.reply_text("That doesn't look like a valid price. Please enter a number.")
+        return AWAIT_ALERT_PRICE
+
+    symbol = context.user_data.get('alert_symbol')
+    condition = context.user_data.get('alert_condition')
+
+    conn = get_db_connection()
+    if conn is None:
+        await update.message.reply_text("Database connection failed. Please try again later.")
+        return ConversationHandler.END
+
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SELECT id FROM users WHERE telegram_id = %s;", (user.id,))
+            user_id = cur.fetchone()[0]
+
+            cur.execute(
+                "INSERT INTO alerts (user_id, symbol, target_price, condition) VALUES (%s, %s, %s, %s);",
+                (user_id, symbol, target_price, condition)
+            )
+            conn.commit()
+            await update.message.reply_text(f"✅ Alert set! I will notify you when {symbol} goes {condition} ${target_price:.2f}.")
+    except Exception as e:
+        logger.error(f"Error adding alert for user {user.id}: {e}")
+        await update.message.reply_text("An error occurred while saving your alert.")
+    finally:
+        if conn:
+            conn.close()
+        context.user_data.clear()
+
+    return ConversationHandler.END
+
+async def list_alerts(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Lists all of the user's active alerts."""
+    user = update.effective_user
+    conn = get_db_connection()
+    if conn is None:
+        await update.message.reply_text("Database connection failed. Please try again later.")
+        return
+
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SELECT id FROM users WHERE telegram_id = %s;", (user.id,))
+            user_id = cur.fetchone()[0]
+
+            cur.execute("SELECT symbol, condition, target_price FROM alerts WHERE user_id = %s AND is_active = TRUE;", (user_id,))
+            alerts = cur.fetchall()
+
+            if not alerts:
+                await update.message.reply_text("You have no active alerts. Use /addalert to create one.")
+                return
+
+            message = "Your active alerts:\n\n"
+            for symbol, condition, target_price in alerts:
+                message += f"🔹 **{symbol}** {condition} `${target_price:.2f}`\n"
+            
+            await update.message.reply_text(message, parse_mode='Markdown')
+    except Exception as e:
+        logger.error(f"Error listing alerts for user {user.id}: {e}")
+        await update.message.reply_text("An error occurred while fetching your alerts.")
+    finally:
+        if conn:
+            conn.close()
+
 def run_bot():
     """Runs the Telegram bot's polling loop in a dedicated asyncio event loop."""
     if not TELEGRAM_BOT_TOKEN:
@@ -380,14 +478,26 @@ def run_bot():
         fallbacks=[CommandHandler("start", start)],
     )
 
+    add_alert_conv_handler = ConversationHandler(
+        entry_points=[CommandHandler("addalert", add_alert_start)],
+        states={
+            AWAIT_ALERT_SYMBOL: [MessageHandler(filters.TEXT & ~filters.COMMAND, received_alert_symbol)],
+            AWAIT_ALERT_CONDITION: [CallbackQueryHandler(received_alert_condition, pattern="^alert_")],
+            AWAIT_ALERT_PRICE: [MessageHandler(filters.TEXT & ~filters.COMMAND, received_alert_price)],
+        },
+        fallbacks=[CommandHandler("start", start)],
+    )
+
     application.add_handler(swap_conv_handler)
     application.add_handler(add_wallet_conv_handler)
+    application.add_handler(add_alert_conv_handler)
     application.add_handler(CallbackQueryHandler(delete_wallet_callback, pattern="^delete_"))
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CommandHandler("help", help_command))
-    application.add_handler(CommandHandler("addwallet", add_wallet_start))
     application.add_handler(CommandHandler("listwallets", list_wallets))
     application.add_handler(CommandHandler("deletewallet", delete_wallet_start))
+    application.add_handler(CommandHandler("addalert", add_alert_start))
+    application.add_handler(CommandHandler("listalerts", list_alerts))
     
     logger.info("Starting bot polling...")
     application.run_polling()

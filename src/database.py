@@ -69,6 +69,19 @@ def initialize_database():
                     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
                 );
             """)
+
+            # Create alerts table
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS alerts (
+                    id SERIAL PRIMARY KEY,
+                    user_id INTEGER NOT NULL REFERENCES users(id),
+                    symbol VARCHAR(255) NOT NULL,
+                    target_price DECIMAL NOT NULL,
+                    condition VARCHAR(10) NOT NULL, -- 'above' or 'below'
+                    is_active BOOLEAN DEFAULT TRUE,
+                    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+                );
+            """)
             
             conn.commit()
             logger.info("Database tables initialized successfully.")

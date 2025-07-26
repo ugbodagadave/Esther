@@ -74,6 +74,13 @@ Here is the step-by-step journey of a user command, from Telegram to execution a
     *   The result of the quote API call is received.
     *   A final status message is sent to the user (e.g., "Trade executed successfully" or "Trade failed: Insufficient funds").
     *   The transaction details are logged in the **PostgreSQL Database** for the user's history.
+7.  **Background Monitoring (Price Alerts)**:
+    *   A separate, continuously running process (`src/monitoring.py`) handles real-time price alerts.
+    *   **Periodic Checks**: Every 60 seconds, this process queries the `alerts` table in the **PostgreSQL Database** for all active alerts.
+    *   **Live Price Fetch**: For each active alert, it calls the **OKX DEX API** to get the current price of the monitored token.
+    *   **Condition Check**: It compares the live price against the alert's target price and condition (e.g., `current_price > target_price`).
+    *   **Notification**: If an alert is triggered, the monitoring service uses the **Telegram Bot API** to send a direct message to the user.
+    *   **Deactivation**: Once an alert is triggered, it is marked as inactive in the database to prevent duplicate notifications.
 
 ## 4. Gemini Model Allocation Strategy
 The choice between Gemini Pro and Flash is dynamic and crucial for balancing performance and cost.

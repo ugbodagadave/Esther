@@ -19,8 +19,8 @@ def run_e2e_test():
     # Load environment variables
     load_dotenv()
     
-    # --- Test 1: Gemini API Call ---
-    print("\n[1/2] Testing Gemini API connection and intent parsing...")
+    # --- Test 1: Gemini API Call (Buy Intent) ---
+    print("\n[1/4] Testing Gemini API connection and 'buy_token' intent parsing...")
     try:
         nlp_client = NLPClient()
         test_query = "buy 0.01 eth with usdc"
@@ -38,8 +38,27 @@ def run_e2e_test():
     except Exception as e:
         print(f"    ❌ FAILURE: An exception occurred during the Gemini API test: {e}")
 
-    # --- Test 2: OKX DEX API Quote Call ---
-    print("\n[2/3] Testing OKX DEX API connection and quote functionality...")
+    # --- Test 2: Gemini API Call (Sell Intent) ---
+    print("\n[2/4] Testing Gemini API connection and 'sell_token' intent parsing...")
+    try:
+        nlp_client = NLPClient()
+        test_query = "sell 0.5 eth for usdt"
+        print(f"    Query: '{test_query}'")
+        
+        intent_data = nlp_client.parse_intent(test_query, model_type='pro')
+        
+        if intent_data and intent_data.get('intent') == 'sell_token':
+            print("    ✅ SUCCESS: Gemini API responded and correctly parsed the 'sell_token' intent.")
+            print(f"    -> Response: {intent_data}")
+        else:
+            print("    ❌ FAILURE: Did not receive a valid 'sell_token' intent from Gemini.")
+            print(f"    -> Response: {intent_data}")
+            
+    except Exception as e:
+        print(f"    ❌ FAILURE: An exception occurred during the Gemini API test: {e}")
+
+    # --- Test 3: OKX DEX API Quote Call ---
+    print("\n[3/4] Testing OKX DEX API connection and quote functionality...")
     okx_client = OKXClient()
     if not all([okx_client.api_key, okx_client.api_secret, okx_client.passphrase]):
         print("    ❌ FAILURE: OKX credentials not found in .env file.")
@@ -63,8 +82,8 @@ def run_e2e_test():
     except Exception as e:
         print(f"    ❌ FAILURE: An exception occurred during the OKX DEX quote test: {e}")
 
-    # --- Test 3: OKX DEX API Swap Simulation Call ---
-    print("\n[3/3] Testing OKX DEX API swap simulation...")
+    # --- Test 4: OKX DEX API Swap Simulation Call ---
+    print("\n[4/4] Testing OKX DEX API swap simulation...")
     try:
         wallet_address = os.getenv("TEST_WALLET_ADDRESS")
         if not wallet_address:

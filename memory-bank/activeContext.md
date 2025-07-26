@@ -10,12 +10,13 @@ The current focus is wrapping up the initial development phase and preparing for
 - **Dry Run Mode Implemented**: A critical "dry run" feature was implemented to allow for safe, realistic demos using live market data without executing real transactions. This was prioritized to facilitate investor demos.
 - **Model Names Corrected**: The Gemini model names were corrected to `gemini-2.5-pro` and `gemini-2.5-flash` as per the user's explicit instructions and official documentation.
 - **Sell Order Functionality**: Expanded the NLP model and core logic to handle `sell_token` intents, including a full conversation flow for confirmation.
+- **Real-time Price Alerts**: Implemented a background monitoring service to check for and notify users of triggered price alerts.
 
 ## 3. Next Steps
-With the core trading flows (buy/sell) and wallet management in place, the next steps will focus on enhancing the user experience and adding more advanced features:
-1.  **Implement Real-time Price Alerts**: Develop a system for users to set up and receive real-time price alerts via Telegram.
-2.  **Refine and Document `DRY_RUN_MODE`**: Ensure the `DRY_RUN_MODE` is consistently applied across all new features and document its usage.
-3.  **Expand NLP for Advanced Orders**: Train the NLP model to understand more complex commands, such as setting stop-loss/take-profit orders.
+With the core trading flows, wallet management, and price alerts now implemented, the next steps will focus on hardening the system and preparing for more advanced features:
+1.  **Refine and Document `DRY_RUN_MODE`**: Ensure the `DRY_RUN_MODE` is consistently applied across all new features and document its usage.
+2.  **Expand NLP for Advanced Orders**: Train the NLP model to understand more complex commands, such as setting stop-loss/take-profit orders.
+3.  **Personalized Market Insights**: Begin work on proactive trend analysis and portfolio-based recommendations.
 4.  **Real-time Notifications**: Begin work on the observer pattern for real-time market alerts.
 5.  **Refine `DRY_RUN_MODE`**: Ensure the `DRY_RUN_MODE` flag is respected across all new features to maintain a safe testing environment.
 

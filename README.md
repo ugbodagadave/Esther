@@ -16,15 +16,16 @@ The world of Decentralized Finance (DeFi) is powerful but complex. Esther's miss
     -   **Get Live Quotes**: Ask for the price of any token (e.g., "What's the price of ETH?").
     -   **Execute Swaps**: Initiate token swaps with simple commands (e.g., "Buy 0.1 ETH with USDC" or "Sell 0.5 ETH for USDT").
 -   **Secure Confirmation Flow**: All transactions require explicit user confirmation via interactive buttons, preventing accidental trades.
+-   **Real-time Price Alerts**: Set up custom price alerts for any token (e.g., "/addalert BTC above 70000").
 -   **Dry Run Mode**: A global simulation mode that uses live market data to demonstrate trading functionality without executing real on-chain transactions. Perfect for safe testing and demos.
 -   **User Account Management**: Automatically creates and manages user profiles in a secure PostgreSQL database.
+-   **Secure Wallet Management**: Add, list, and delete your wallet addresses securely. Private keys are encrypted before being stored.
 -   **Intelligent Intent Parsing**: Powered by Google's Gemini models (`2.5-pro` and `2.5-flash`) to understand user commands.
 -   **Robust Deployment**: Fully configured for continuous deployment on Render, including a Flask health check endpoint to ensure uptime.
 
 ### Upcoming Features
 -   **Advanced Order Types**: Support for conditional trades and stop-loss/take-profit orders.
--   **Secure Wallet Management**: A system for users to securely register and manage their wallet addresses.
--   **Personalized Market Insights**: Proactive alerts, trend analysis, and portfolio-based recommendations.
+-   **Personalized Market Insights**: Proactive trend analysis and portfolio-based recommendations.
 -   **On-Demand Education**: An integrated learning module to explain DeFi concepts on the fly.
 
 ## 🛠️ Tech Stack
