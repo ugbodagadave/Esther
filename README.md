@@ -93,6 +93,20 @@ For a detailed technical breakdown, see [How It Works](./how-it-works.md).
     ```
     The bot will start polling for messages, and the Flask web server will run on port 8080 to handle health checks.
 
+## ⚙️ Configuration
+
+### Dry Run Mode
+For safe testing and development, the bot includes a `DRY_RUN_MODE`. When enabled, all swap transactions are simulated using live market data, but no real on-chain transactions are executed. This is the default behavior.
+
+To enable or disable Dry Run Mode, set the `DRY_RUN_MODE` variable in your `.env` file:
+```dotenv
+# Set to "True" to simulate all transactions (default and recommended for testing)
+DRY_RUN_MODE="True"
+
+# Set to "False" to execute real transactions on the blockchain
+# DRY_RUN_MODE="False"
+```
+
 ## 🤝 Contributing
 
 Contributions are welcome! Please feel free to submit a pull request or open an issue to discuss proposed changes.
