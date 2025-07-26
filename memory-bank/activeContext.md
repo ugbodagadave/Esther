@@ -11,11 +11,12 @@ The current focus is wrapping up the initial development phase and preparing for
 - **Model Names Corrected**: The Gemini model names were corrected to `gemini-2.5-pro` and `gemini-2.5-flash` as per the user's explicit instructions and official documentation.
 
 ## 3. Next Steps
-The immediate next step is to implement the **user confirmation flow** for trades. This involves:
-1.  **Using `ConversationHandler`**: Implementing Telegram's `ConversationHandler` to manage a multi-step dialogue with the user after a quote is presented.
-2.  **Handling User Response**: Capturing the user's confirmation (e.g., "yes", "confirm") or cancellation.
-3.  **Executing the Swap**: If confirmed, calling the `execute_swap` method with `dry_run=False` (though this will initially point to a "not implemented" function).
-4.  **Updating the `OKXClient`**: Implementing the real logic for `execute_swap` with `dry_run=False`, which will involve a call to the `/api/v5/dex/aggregator/swap` endpoint.
+With the user confirmation flow now implemented, the next steps will focus on hardening the system and preparing for more advanced features:
+1.  **User Wallet Management**: Implement a secure way for users to register and manage their wallet addresses. This will replace the hardcoded `TEST_WALLET_ADDRESS`.
+2.  **Error Handling & Resilience**: Improve error handling across the application, particularly for API interactions and the conversation flow.
+3.  **Expand NLP Capabilities**: Train the NLP model to understand more complex commands, such as "sell" orders, setting stop-loss/take-profit, and querying trade history.
+4.  **Real-time Notifications**: Begin work on the observer pattern for real-time market alerts.
+5.  **Refine `DRY_RUN_MODE`**: Ensure the `DRY_RUN_MODE` flag is respected across all new features to maintain a safe testing environment.
 
 ## 4. Active Learnings & Insights
 - A strong documentation-first approach is critical for a project of this complexity, especially given the reliance on external APIs and AI models.

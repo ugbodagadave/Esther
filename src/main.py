@@ -11,8 +11,16 @@ project_root = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(project_root))
 
 from flask import Flask
-from telegram import Update
-from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.ext import (
+    Application,
+    CommandHandler,
+    MessageHandler,
+    filters,
+    ContextTypes,
+    ConversationHandler,
+    CallbackQueryHandler,
+)
 from dotenv import load_dotenv
 
 # Load environment variables from .env file
@@ -42,6 +50,9 @@ from src.database import get_db_connection
 # Initialize clients
 nlp_client = NLPClient()
 okx_client = OKXClient()
+
+# --- Conversation Handler States ---
+AWAIT_CONFIRMATION = 1
 
 # Global flag for simulation mode
 DRY_RUN_MODE = True
@@ -91,8 +102,8 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     """Sends a message when the command /help is issued."""
     await update.message.reply_text("I can help you with trading on OKX DEX. Try asking me for the price of a token, for example: 'What is the price of BTC?'")
 
-async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Handles user messages, parses intent, and routes to the correct function."""
+async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Handles regular text messages, parses intent, and initiates actions."""
     user_message = update.message.text
     parsed_intent = nlp_client.parse_intent(user_message)
     
@@ -100,81 +111,169 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     entities = parsed_intent.get("entities", {})
 
     if intent == "get_price":
-        symbol = entities.get("symbol")
-        if not symbol:
-            await update.message.reply_text("Please specify a token symbol (e.g., BTC, ETH).")
-            return
-        
-        from_token_address = TOKEN_ADDRESSES.get(symbol.upper())
-        to_token_address = TOKEN_ADDRESSES.get("USDT")
-
-        if not from_token_address or not to_token_address:
-            await update.message.reply_text(f"Sorry, I don't have the address for the token {symbol.upper()}.")
-            return
-
-        amount_in_wei = "1000000000000000000" # 1 ETH for price check
-
-        quote_response = okx_client.get_quote(
-            from_token_address=from_token_address,
-            to_token_address=to_token_address,
-            amount=amount_in_wei
-        )
-        
-        if quote_response.get("success"):
-            quote_data = quote_response["data"]
-            price_estimate = float(quote_data.get('toTokenAmount', 0)) / 1_000_000
-            await update.message.reply_text(f"The current estimated price for {symbol.upper()}-USDT is ${price_estimate:.2f}.")
-        else:
-            await update.message.reply_text(f"Sorry, I couldn't fetch a quote. Error: {quote_response.get('error')}")
+        await get_price_intent(update, context, entities)
+        return ConversationHandler.END
 
     elif intent == "buy_token":
-        symbol = entities.get("symbol")
-        amount = entities.get("amount")
-        currency = entities.get("currency")
+        return await buy_token_intent(update, context, entities)
 
-        if not all([symbol, amount, currency]):
-            await update.message.reply_text("To buy a token, please tell me the amount, the token symbol, and the currency to use (e.g., 'buy 0.5 ETH with USDT').")
-            return
-        
-        await update.message.reply_text(f"[DRY RUN] Simulating a swap of {amount} {currency.upper()} for {symbol.upper()}...")
-        
-        from_token_address = TOKEN_ADDRESSES.get(currency.upper())
-        to_token_address = TOKEN_ADDRESSES.get(symbol.upper())
-
-        if not from_token_address or not to_token_address:
-            await update.message.reply_text(f"Sorry, I don't have the address for one of the tokens.")
-            return
-
-        # This is a huge simplification. Amount needs to be converted based on the 'from' token's decimals.
-        amount_in_smallest_unit = str(int(float(amount) * 10**6)) # Assuming 6 decimals for USDC/USDT
-
-        swap_response = okx_client.execute_swap(
-            from_token_address=from_token_address,
-            to_token_address=to_token_address,
-            amount=amount_in_smallest_unit,
-            dry_run=DRY_RUN_MODE
-        )
-
-        if swap_response.get("success"):
-            # This is a simulation, so we show the simulated result
-            simulated_data = swap_response["data"]
-            to_amount = float(simulated_data.get('toTokenAmount', 0)) / 10**18 # Assuming 18 decimals for ETH/WBTC
-            
-            response_message = (
-                f"[DRY RUN] ✅ Swap Simulated Successfully!\n\n"
-                f"➡️ From: {amount} {currency.upper()}\n"
-                f"⬅️ To (Estimated): {to_amount:.6f} {symbol.upper()}\n\n"
-                f"This was a simulation. No real transaction was executed."
-            )
-            await update.message.reply_text(response_message)
-        else:
-            await update.message.reply_text(f"[DRY RUN] ❌ Simulation Failed. Error: {swap_response.get('error')}")
-    
     elif intent == "greeting":
         await update.message.reply_text("Hello! How can I assist you with your trades today?")
+        return ConversationHandler.END
 
     else:
-        await update.message.reply_text("I'm not sure how to help with that. You can ask me for the price of a token.")
+        await update.message.reply_text("I'm not sure how to help with that. You can ask me for the price of a token or to buy a token.")
+        return ConversationHandler.END
+
+async def get_price_intent(update: Update, context: ContextTypes.DEFAULT_TYPE, entities: dict):
+    """Handles the get_price intent."""
+    symbol = entities.get("symbol")
+    if not symbol:
+        await update.message.reply_text("Please specify a token symbol (e.g., BTC, ETH).")
+        return
+    
+    from_token_address = TOKEN_ADDRESSES.get(symbol.upper())
+    to_token_address = TOKEN_ADDRESSES.get("USDT")
+
+    if not from_token_address or not to_token_address:
+        await update.message.reply_text(f"Sorry, I don't have the address for the token {symbol.upper()}.")
+        return
+
+    amount_in_wei = "1000000000000000000" # 1 ETH for price check
+
+    quote_response = okx_client.get_quote(
+        from_token_address=from_token_address,
+        to_token_address=to_token_address,
+        amount=amount_in_wei
+    )
+    
+    if quote_response.get("success"):
+        quote_data = quote_response["data"]
+        price_estimate = float(quote_data.get('toTokenAmount', 0)) / 1_000_000
+        await update.message.reply_text(f"The current estimated price for {symbol.upper()}-USDT is ${price_estimate:.2f}.")
+    else:
+        await update.message.reply_text(f"Sorry, I couldn't fetch a quote. Error: {quote_response.get('error')}")
+
+async def buy_token_intent(update: Update, context: ContextTypes.DEFAULT_TYPE, entities: dict) -> int:
+    """Handles the buy_token intent and starts the confirmation conversation."""
+    symbol = entities.get("symbol")
+    amount = entities.get("amount")
+    currency = entities.get("currency")
+
+    if not all([symbol, amount, currency]):
+        await update.message.reply_text("To buy a token, please tell me the amount, the token symbol, and the currency to use (e.g., 'buy 0.5 ETH with USDT').")
+        return ConversationHandler.END
+
+    from_token_address = TOKEN_ADDRESSES.get(currency.upper())
+    to_token_address = TOKEN_ADDRESSES.get(symbol.upper())
+
+    if not from_token_address or not to_token_address:
+        await update.message.reply_text(f"Sorry, I don't have the address for one of the tokens.")
+        return ConversationHandler.END
+
+    # Store details in context for later use
+    context.user_data['swap_details'] = {
+        "from_token": currency.upper(),
+        "to_token": symbol.upper(),
+        "from_token_address": from_token_address,
+        "to_token_address": to_token_address,
+        "amount": amount,
+    }
+
+    # This is a huge simplification. Amount needs to be converted based on the 'from' token's decimals.
+    amount_in_smallest_unit = str(int(float(amount) * 10**6)) # Assuming 6 decimals for USDC/USDT
+
+    # Get a quote to show the user
+    quote_response = okx_client.get_quote(
+        from_token_address=from_token_address,
+        to_token_address=to_token_address,
+        amount=amount_in_smallest_unit
+    )
+
+    if not quote_response.get("success"):
+        await update.message.reply_text(f"Sorry, I couldn't get a quote for that swap. Error: {quote_response.get('error')}")
+        return ConversationHandler.END
+
+    quote_data = quote_response["data"]
+    to_amount = float(quote_data.get('toTokenAmount', 0)) / 10**18 # Assuming 18 decimals for ETH/WBTC
+
+    context.user_data['swap_details']['amount_in_smallest_unit'] = amount_in_smallest_unit
+    context.user_data['swap_details']['estimated_to_amount'] = to_amount
+
+    keyboard = [
+        [
+            InlineKeyboardButton("✅ Confirm", callback_data="confirm_swap"),
+            InlineKeyboardButton("❌ Cancel", callback_data="cancel_swap"),
+        ]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+
+    response_message = (
+        f"Please confirm the following swap:\n\n"
+        f"➡️ **From:** {amount} {currency.upper()}\n"
+        f"⬅️ **To (Estimated):** {to_amount:.6f} {symbol.upper()}\n\n"
+        f"This transaction will be executed on the blockchain."
+    )
+    
+    await update.message.reply_text(response_message, reply_markup=reply_markup, parse_mode='Markdown')
+
+    return AWAIT_CONFIRMATION
+
+async def confirm_swap(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Executes the swap after user confirmation."""
+    query = update.callback_query
+    await query.answer()
+    
+    swap_details = context.user_data.get('swap_details')
+    if not swap_details:
+        await query.edit_message_text(text="Sorry, the swap details have expired. Please try again.")
+        return ConversationHandler.END
+
+    # In a real app, you would fetch this from the user's profile in the database
+    wallet_address = os.getenv("TEST_WALLET_ADDRESS", "0xYourDefaultWalletAddress")
+
+    await query.edit_message_text(text=f"Executing swap of {swap_details['amount']} {swap_details['from_token']} for {swap_details['to_token']}...")
+
+    swap_response = okx_client.execute_swap(
+        from_token_address=swap_details['from_token_address'],
+        to_token_address=swap_details['to_token_address'],
+        amount=swap_details['amount_in_smallest_unit'],
+        wallet_address=wallet_address,
+        dry_run=DRY_RUN_MODE
+    )
+
+    if swap_response.get("success"):
+        response_data = swap_response["data"]
+        to_amount = float(response_data.get('toTokenAmount', 0)) / 10**18 # Assuming 18 decimals for ETH/WBTC
+        
+        status_message = "✅ Swap Simulated Successfully!" if DRY_RUN_MODE else "✅ Swap Executed Successfully!"
+        
+        response_message = (
+            f"[{'DRY RUN' if DRY_RUN_MODE else 'LIVE'}] {status_message}\n\n"
+            f"➡️ From: {swap_details['amount']} {swap_details['from_token']}\n"
+            f"⬅️ To (Actual): {to_amount:.6f} {swap_details['to_token']}\n\n"
+        )
+        if DRY_RUN_MODE:
+            response_message += "This was a simulation. No real transaction was executed."
+        else:
+            tx_hash = response_data.get('txHash', 'N/A')
+            response_message += f"Transaction Hash: `{tx_hash}`"
+
+        await query.edit_message_text(text=response_message, parse_mode='Markdown')
+    else:
+        status_message = "❌ Simulation Failed" if DRY_RUN_MODE else "❌ Swap Failed"
+        await query.edit_message_text(text=f"[{'DRY RUN' if DRY_RUN_MODE else 'LIVE'}] {status_message}. Error: {swap_response.get('error')}")
+
+    context.user_data.pop('swap_details', None)
+    return ConversationHandler.END
+
+async def cancel_swap(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Cancels the swap conversation."""
+    query = update.callback_query
+    await query.answer()
+    await query.edit_message_text(text="Swap cancelled.")
+    context.user_data.pop('swap_details', None)
+    return ConversationHandler.END
 
 def run_bot():
     """Runs the Telegram bot's polling loop in a dedicated asyncio event loop."""
@@ -187,9 +286,23 @@ def run_bot():
     asyncio.set_event_loop(loop)
 
     application = Application.builder().token(TELEGRAM_BOT_TOKEN).build()
+
+    # --- Conversation Handler for Swaps ---
+    conv_handler = ConversationHandler(
+        entry_points=[MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text)],
+        states={
+            AWAIT_CONFIRMATION: [
+                CallbackQueryHandler(confirm_swap, pattern="^confirm_swap$"),
+                CallbackQueryHandler(cancel_swap, pattern="^cancel_swap$"),
+            ],
+        },
+        fallbacks=[CommandHandler("start", start)],
+        per_message=False,
+    )
+
+    application.add_handler(conv_handler)
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CommandHandler("help", help_command))
-    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
     
     logger.info("Starting bot polling...")
     application.run_polling()

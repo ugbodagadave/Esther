@@ -11,13 +11,15 @@ The project is in its initial phase. The focus is on establishing a complete and
 - **Database Integration**: The bot successfully connects to the PostgreSQL database on Render to manage users.
 - **NLP Integration**: The bot uses Gemini models (`2.5-flash` and `2.5-pro`) to parse user intent for price checks and buying tokens.
 - **Live OKX DEX API Integration**: The bot can make authenticated, read-only calls to the OKX DEX API to fetch live quotes.
+- **User Confirmation Flow**: A multi-step `ConversationHandler` is implemented to confirm trades with the user before execution.
+- **Real & Simulated Swap Execution**: The `OKXClient` can now execute both real and simulated swaps via the `/api/v5/dex/aggregator/swap` endpoint.
 - **Dry Run Mode**: A simulation mode is fully implemented, allowing for safe, realistic demos using live market data without executing real trades.
 - **Deployment**: The application is fully configured for deployment on Render's free tier, with all known issues resolved.
 
 ## 3. What's Left to Build
-- **User Confirmation Flow**: Implement the logic to handle a user's confirmation (e.g., "Yes, proceed") after a quote is presented. This will likely involve using Telegram's `ConversationHandler`.
-- **Real Swap Execution**: Implement the logic in `OKXClient` to execute a real swap transaction on the blockchain (the `dry_run=False` path).
+- **User Wallet Management**: Implement a secure system for users to add and manage their wallet addresses.
 - **Advanced NLP**: Expand the NLP module to handle more complex queries, conditional orders, and other intents (`sell`, `swap`, etc.).
+- **Enhanced Error Handling**: Improve resilience and provide more user-friendly error messages, especially for failed transactions.
 - **Remaining Phases**: All features outlined in the development plan, including enhanced market analysis, personalization, and custom alerts.
 
 ## 4. Known Issues & Blockers

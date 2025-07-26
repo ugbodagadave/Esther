@@ -1,6 +1,7 @@
 import unittest
 from unittest.mock import AsyncMock, MagicMock, patch
-from src.main import start, help_command, handle_message
+from telegram.ext import ConversationHandler
+from src.main import start, help_command, handle_text, confirm_swap, cancel_swap, AWAIT_CONFIRMATION
 import os
 
 class TestMainHandlers(unittest.TestCase):
@@ -62,16 +63,16 @@ class TestMainHandlers(unittest.TestCase):
 
     @patch('src.main.nlp_client')
     @patch('src.main.okx_client')
-    def test_handle_message_get_price_success(self, mock_okx_client, mock_nlp_client):
+    def test_handle_text_get_price_success(self, mock_okx_client, mock_nlp_client):
         # Mock NLP response
         mock_nlp_client.parse_intent.return_value = {
             "intent": "get_price",
-            "entities": {"symbol": "ETH"} # Using ETH as it's in our hardcoded map
+            "entities": {"symbol": "ETH"}
         }
         # Mock OKX response
         mock_okx_client.get_quote.return_value = {
             "success": True,
-            "data": {"toTokenAmount": "3000000000"} # 3000 USDT (6 decimals)
+            "data": {"toTokenAmount": "3000000000"}
         }
 
         update = MagicMock()
@@ -81,12 +82,13 @@ class TestMainHandlers(unittest.TestCase):
         context = MagicMock()
 
         import asyncio
-        asyncio.run(handle_message(update, context))
+        result = asyncio.run(handle_text(update, context))
         
         update.message.reply_text.assert_called_once_with("The current estimated price for ETH-USDT is $3000.00.")
+        self.assertEqual(result, ConversationHandler.END)
 
     @patch('src.main.nlp_client')
-    def test_handle_message_greeting(self, mock_nlp_client):
+    def test_handle_text_greeting(self, mock_nlp_client):
         mock_nlp_client.parse_intent.return_value = {"intent": "greeting", "entities": {}}
 
         update = MagicMock()
@@ -96,22 +98,22 @@ class TestMainHandlers(unittest.TestCase):
         context = MagicMock()
 
         import asyncio
-        asyncio.run(handle_message(update, context))
+        result = asyncio.run(handle_text(update, context))
         
         update.message.reply_text.assert_called_once_with("Hello! How can I assist you with your trades today?")
+        self.assertEqual(result, ConversationHandler.END)
 
     @patch('src.main.nlp_client')
     @patch('src.main.okx_client')
-    def test_handle_message_buy_token(self, mock_okx_client, mock_nlp_client):
+    def test_handle_text_buy_token_starts_conversation(self, mock_okx_client, mock_nlp_client):
         # Mock NLP response
         mock_nlp_client.parse_intent.return_value = {
             "intent": "buy_token",
             "entities": {"amount": "100", "symbol": "ETH", "currency": "USDC"}
         }
-        # Mock OKX response for the dry run swap
-        mock_okx_client.execute_swap.return_value = {
+        # Mock OKX quote response
+        mock_okx_client.get_quote.return_value = {
             "success": True,
-            "status": "simulated",
             "data": {"toTokenAmount": "33000000000000000"} # 0.033 ETH
         }
 
@@ -120,14 +122,72 @@ class TestMainHandlers(unittest.TestCase):
         update.message.text = "buy 100 USDC worth of ETH"
         update.message.reply_text = AsyncMock()
         context = MagicMock()
+        context.user_data = {}
 
         import asyncio
-        asyncio.run(handle_message(update, context))
+        result = asyncio.run(handle_text(update, context))
 
-        # Check that the final simulation message is sent correctly
-        self.assertIn("[DRY RUN] ✅ Swap Simulated Successfully!", update.message.reply_text.call_args[0][0])
-        self.assertIn("From: 100 USDC", update.message.reply_text.call_args[0][0])
-        self.assertIn("To (Estimated): 0.033000 ETH", update.message.reply_text.call_args[0][0])
+        # Check that the confirmation message is sent and we are in the right state
+        self.assertIn("Please confirm the following swap:", update.message.reply_text.call_args[0][0])
+        self.assertEqual(result, AWAIT_CONFIRMATION)
+        self.assertIn('swap_details', context.user_data)
+
+    @patch('src.main.okx_client')
+    @patch.dict(os.environ, {"TEST_WALLET_ADDRESS": "test_wallet"})
+    def test_confirm_swap_success(self, mock_okx_client):
+        # Mock OKX response for the swap
+        mock_okx_client.execute_swap.return_value = {
+            "success": True,
+            "data": {"toTokenAmount": "33000000000000000"} # 0.033 ETH
+        }
+
+        update = MagicMock()
+        query = MagicMock()
+        query.answer = AsyncMock()
+        query.edit_message_text = AsyncMock()
+        update.callback_query = query
+        
+        context = MagicMock()
+        context.user_data = {
+            'swap_details': {
+                "from_token": "USDC",
+                "to_token": "ETH",
+                "from_token_address": "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48",
+                "to_token_address": "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+                "amount": "100",
+                "amount_in_smallest_unit": "100000000"
+            }
+        }
+
+        import asyncio
+        with patch('src.main.DRY_RUN_MODE', True):
+             result = asyncio.run(confirm_swap(update, context))
+
+        # Check that the intermediate and final messages are sent
+        self.assertEqual(query.edit_message_text.call_count, 2)
+        query.edit_message_text.assert_any_call(text="Executing swap of 100 USDC for ETH...")
+        
+        # Get the keyword arguments of the second call
+        final_call_kwargs = query.edit_message_text.call_args_list[1].kwargs
+        self.assertIn("[DRY RUN] ✅ Swap Simulated Successfully!", final_call_kwargs.get('text'))
+        self.assertEqual(result, ConversationHandler.END)
+        self.assertNotIn('swap_details', context.user_data)
+
+    def test_cancel_swap(self):
+        update = MagicMock()
+        update.callback_query = MagicMock()
+        update.callback_query.answer = AsyncMock()
+        update.callback_query.edit_message_text = AsyncMock()
+        
+        context = MagicMock()
+        context.user_data = {'swap_details': {}}
+
+        import asyncio
+        result = asyncio.run(cancel_swap(update, context))
+
+        update.callback_query.edit_message_text.assert_called_once_with(text="Swap cancelled.")
+        self.assertEqual(result, ConversationHandler.END)
+        self.assertNotIn('swap_details', context.user_data)
 
 if __name__ == '__main__':
     # Set dummy env var for NLPClient initialization during tests

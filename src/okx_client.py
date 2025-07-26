@@ -74,9 +74,10 @@ class OKXClient:
             logger.error(f"Error fetching quote: {e}")
             return {"success": False, "error": str(e)}
 
-    def execute_swap(self, from_token_address: str, to_token_address: str, amount: str, dry_run: bool = True) -> dict:
+    def execute_swap(self, from_token_address: str, to_token_address: str, amount: str, wallet_address: str, slippage: str = "1", dry_run: bool = True) -> dict:
         """
         Executes a swap. If dry_run is True, it only fetches the quote and simulates the transaction.
+        If dry_run is False, it executes a real swap on the blockchain.
         """
         if dry_run:
             logger.info(f"Executing DRY RUN swap from {from_token_address} to {to_token_address}")
@@ -92,9 +93,34 @@ class OKXClient:
             else:
                 return quote_response # Propagate the error from get_live_quote
         else:
-            # This is where the real swap execution logic will go in the future.
-            logger.info("Real swap execution is not yet implemented.")
-            return {"success": False, "error": "Real swap execution is not implemented."}
+            logger.info(f"Executing REAL swap for wallet {wallet_address}")
+            try:
+                request_path = '/api/v5/dex/aggregator/swap'
+                body = {
+                    "fromTokenAddress": from_token_address,
+                    "toTokenAddress": to_token_address,
+                    "amount": amount,
+                    "walletAddress": wallet_address,
+                    "slippage": slippage,
+                    "chainIndex": 1
+                }
+                
+                headers = self._get_request_headers('POST', request_path, str(body))
+                url = f"{self.base_url}{request_path}"
+                
+                response = requests.post(url, headers=headers, json=body)
+                response.raise_for_status()
+                data = response.json()
+
+                if data.get("code") == "0":
+                    logger.info(f"Successfully executed swap: {data.get('msg')}")
+                    return {"success": True, "data": data.get("data", [{}])[0]}
+                else:
+                    logger.error(f"Error executing swap on OKX API: {data.get('msg')}")
+                    return {"success": False, "error": data.get("msg")}
+            except requests.exceptions.RequestException as e:
+                logger.error(f"Error executing swap: {e}")
+                return {"success": False, "error": str(e)}
 
 
 if __name__ == '__main__':

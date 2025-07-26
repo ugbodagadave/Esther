@@ -36,7 +36,7 @@ class TestOKXClient(unittest.TestCase):
         }
         
         client = OKXClient()
-        result = client.execute_swap("from", "to", "100", dry_run=True)
+        result = client.execute_swap("from", "to", "100", "wallet_addr", dry_run=True)
 
         self.assertTrue(result['success'])
         self.assertEqual(result['status'], 'simulated')
@@ -52,17 +52,27 @@ class TestOKXClient(unittest.TestCase):
         }
 
         client = OKXClient()
-        result = client.execute_swap("from", "to", "100", dry_run=True)
+        result = client.execute_swap("from", "to", "100", "wallet_addr", dry_run=True)
 
         self.assertFalse(result['success'])
         self.assertEqual(result['error'], "Insufficient liquidity")
 
-    def test_execute_swap_real_run_not_implemented(self):
-        """Test that a real swap returns a 'not implemented' error."""
+    @patch('requests.post')
+    def test_execute_swap_real_run_success(self, mock_post):
+        """Test a successful real swap execution."""
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {
+            "code": "0",
+            "data": [{"txHash": "0x12345"}]
+        }
+        mock_post.return_value = mock_response
+
         client = OKXClient()
-        result = client.execute_swap("from", "to", "100", dry_run=False)
-        self.assertFalse(result['success'])
-        self.assertEqual(result['error'], "Real swap execution is not implemented.")
+        result = client.execute_swap("from", "to", "100", "wallet_addr", dry_run=False)
+        
+        self.assertTrue(result['success'])
+        self.assertEqual(result['data']['txHash'], "0x12345")
 
 if __name__ == '__main__':
     unittest.main()
