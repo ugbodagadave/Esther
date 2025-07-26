@@ -784,7 +784,11 @@ def run_bot():
     application.add_handler(CommandHandler("listalerts", list_alerts))
     
     logger.info("Starting bot polling...")
-    application.run_polling()
+    application.run_polling(
+        drop_pending_updates=True,
+        close_loop=False,
+        stop_signals=None  # This disables signal handling
+    )
 
 if __name__ == "__main__":
     # Start the bot in a separate thread
