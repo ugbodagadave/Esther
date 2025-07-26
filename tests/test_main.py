@@ -189,6 +189,35 @@ class TestMainHandlers(unittest.TestCase):
         self.assertEqual(result, ConversationHandler.END)
         self.assertNotIn('swap_details', context.user_data)
 
+    @patch('src.main.nlp_client')
+    @patch('src.main.okx_client')
+    def test_handle_text_sell_token_starts_conversation(self, mock_okx_client, mock_nlp_client):
+        # Mock NLP response
+        mock_nlp_client.parse_intent.return_value = {
+            "intent": "sell_token",
+            "entities": {"amount": "0.5", "symbol": "ETH", "currency": "USDT"}
+        }
+        # Mock OKX quote response
+        mock_okx_client.get_quote.return_value = {
+            "success": True,
+            "data": {"toTokenAmount": "1800000000"} # 1800 USDT
+        }
+
+        update = MagicMock()
+        update.message = MagicMock()
+        update.message.text = "sell 0.5 ETH for USDT"
+        update.message.reply_text = AsyncMock()
+        context = MagicMock()
+        context.user_data = {}
+
+        import asyncio
+        result = asyncio.run(handle_text(update, context))
+
+        # Check that the confirmation message is sent and we are in the right state
+        self.assertIn("Please confirm the following swap:", update.message.reply_text.call_args[0][0])
+        self.assertEqual(result, AWAIT_CONFIRMATION)
+        self.assertIn('swap_details', context.user_data)
+
 if __name__ == '__main__':
     # Set dummy env var for NLPClient initialization during tests
     os.environ["GEMINI_API_KEY"] = "test_key"

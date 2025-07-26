@@ -53,12 +53,12 @@ Here is the step-by-step journey of a user command, from Telegram to execution a
 2.  **NLP Processing**: The message is passed to the **NLP Module**.
     *   A preliminary check determines the likely complexity of the query.
     *   **Strategy Pattern**: Based on complexity, the system selects either **Gemini Flash** (for simple requests like "price of ETH") or **Gemini Pro** (for complex requests like "buy 0.5 ETH if...").
-    *   The chosen Gemini model processes the text, returning a structured object containing the user's `intent` (e.g., `buy_token`) and `entities` (e.g., `{token: 'ETH', amount: 0.5, currency: 'USDT'}`).
+    *   The chosen Gemini model processes the text, returning a structured object containing the user's `intent` (e.g., `buy_token`, `sell_token`) and `entities` (e.g., `{token: 'ETH', amount: 0.5, currency: 'USDT'}`).
 3.  **Core Logic Orchestration**: The **Core Logic Layer** receives the structured `intent` and `entities`.
     *   It retrieves the user's profile and encrypted API keys from the **PostgreSQL Database** via the **Data Access Layer**.
     *   **Command Pattern**: It instantiates a command object (e.g., `BuyCommand`) with the necessary data.
 4.  **Pre-execution & Confirmation (Conversation Flow)**:
-    *   For transactional commands like `buy_token`, the **Core Logic Layer** initiates a multi-step conversation using Telegram's `ConversationHandler`.
+    *   For transactional commands like `buy_token` or `sell_token`, the **Core Logic Layer** initiates a multi-step conversation using Telegram's `ConversationHandler`.
     *   **Quote Fetch**: It first calls the **External Services Layer** to get a live quote from the **OKX DEX API**. This ensures the user sees up-to-date pricing.
     *   **Confirmation Prompt**: A detailed confirmation message is constructed, including the estimated amount of the token to be received. This message is sent to the user with inline keyboard buttons ("✅ Confirm", "❌ Cancel").
     *   **State Management**: The `ConversationHandler` transitions the user's chat into a specific state (`AWAIT_CONFIRMATION`). In this state, the bot will only listen for the user to click one of the confirmation buttons. The details of the pending swap are stored in the `context.user_data` dictionary to maintain state.

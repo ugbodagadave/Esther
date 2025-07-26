@@ -9,12 +9,13 @@ The current focus is wrapping up the initial development phase and preparing for
 - **Live API Integration**: The OKX DEX and Gemini APIs have been successfully integrated and tested with live credentials.
 - **Dry Run Mode Implemented**: A critical "dry run" feature was implemented to allow for safe, realistic demos using live market data without executing real transactions. This was prioritized to facilitate investor demos.
 - **Model Names Corrected**: The Gemini model names were corrected to `gemini-2.5-pro` and `gemini-2.5-flash` as per the user's explicit instructions and official documentation.
+- **Sell Order Functionality**: Expanded the NLP model and core logic to handle `sell_token` intents, including a full conversation flow for confirmation.
 
 ## 3. Next Steps
-With the user confirmation flow now implemented, the next steps will focus on hardening the system and preparing for more advanced features:
-1.  **User Wallet Management**: Implement a secure way for users to register and manage their wallet addresses. This will replace the hardcoded `TEST_WALLET_ADDRESS`.
-2.  **Error Handling & Resilience**: Improve error handling across the application, particularly for API interactions and the conversation flow.
-3.  **Expand NLP Capabilities**: Train the NLP model to understand more complex commands, such as "sell" orders, setting stop-loss/take-profit, and querying trade history.
+With the core trading flows (buy/sell) and wallet management in place, the next steps will focus on enhancing the user experience and adding more advanced features:
+1.  **Implement Real-time Price Alerts**: Develop a system for users to set up and receive real-time price alerts via Telegram.
+2.  **Refine and Document `DRY_RUN_MODE`**: Ensure the `DRY_RUN_MODE` is consistently applied across all new features and document its usage.
+3.  **Expand NLP for Advanced Orders**: Train the NLP model to understand more complex commands, such as setting stop-loss/take-profit orders.
 4.  **Real-time Notifications**: Begin work on the observer pattern for real-time market alerts.
 5.  **Refine `DRY_RUN_MODE`**: Ensure the `DRY_RUN_MODE` flag is respected across all new features to maintain a safe testing environment.
 
