@@ -1,6 +1,7 @@
 import os
 import google.generativeai as genai
 import logging
+import json
 
 # Enable logging
 logging.basicConfig(
@@ -14,15 +15,20 @@ class NLPClient:
         if not self.api_key:
             raise ValueError("GEMINI_API_KEY not found in environment variables.")
         genai.configure(api_key=self.api_key)
-        self.model = genai.GenerativeModel('gemini-1.5-flash')
+        
+        # Initialize both models as per the PRD and official documentation
+        self.flash_model = genai.GenerativeModel('gemini-2.5-flash')
+        self.pro_model = genai.GenerativeModel('gemini-2.5-pro')
 
-    def parse_intent(self, text: str) -> dict:
+    def parse_intent(self, text: str, model_type: str = 'flash') -> dict:
         """
-        Uses Gemini Flash to parse the user's intent from a text message.
+        Uses the specified Gemini model to parse the user's intent from a text message.
+        :param text: The user's message.
+        :param model_type: 'flash' or 'pro'. Defaults to 'flash'.
         """
         try:
-            # A more sophisticated implementation would use few-shot prompting
-            # or a more structured approach. For now, we use a simple prompt.
+            model = self.flash_model if model_type == 'flash' else self.pro_model
+            
             prompt = f"""
             From the following user query, extract the intent and any relevant entities.
             The possible intents are: 'buy_token', 'get_price', 'greeting', 'help', 'unknown'.
@@ -32,21 +38,19 @@ class NLPClient:
 
             Query: "{text}"
 
-            Respond in JSON format with "intent" and "entities" keys.
+            Respond ONLY with a valid JSON object in the format {{"intent": "...", "entities": {{...}}}}.
             Example for get_price: {{"intent": "get_price", "entities": {{"symbol": "BTC"}}}}
             Example for buy_token: {{"intent": "buy_token", "entities": {{"amount": "0.5", "symbol": "ETH", "currency": "USDT"}}}}
             """
             
-            response = self.model.generate_content(prompt)
+            response = model.generate_content(prompt)
             
-            # Basic parsing of the JSON response from the model
-            # A robust implementation would have better error handling here
-            import json
-            json_response = response.text.strip().replace("```json", "").replace("```", "")
-            return json.loads(json_response)
+            # Clean up the response to ensure it's valid JSON
+            json_response_text = response.text.strip().replace("```json", "").replace("```", "")
+            return json.loads(json_response_text)
 
         except Exception as e:
-            logger.error(f"Error parsing intent with Gemini: {e}")
+            logger.error(f"Error parsing intent with Gemini {model_type} model: {e}")
             return {"intent": "unknown", "entities": {}}
 
 if __name__ == '__main__':
@@ -54,9 +58,9 @@ if __name__ == '__main__':
     nlp_client = NLPClient()
     
     query1 = "what is the price of btc?"
-    intent1 = nlp_client.parse_intent(query1)
-    print(f"Query: '{query1}' -> Intent: {intent1}")
+    intent1 = nlp_client.parse_intent(query1, model_type='flash')
+    print(f"Query: '{query1}' (Flash) -> Intent: {intent1}")
 
-    query2 = "hello there"
-    intent2 = nlp_client.parse_intent(query2)
-    print(f"Query: '{query2}' -> Intent: {intent2}")
+    query2 = "buy 0.1 WBTC with my USDC"
+    intent2 = nlp_client.parse_intent(query2, model_type='pro')
+    print(f"Query: '{query2}' (Pro) -> Intent: {intent2}")
