@@ -1,26 +1,43 @@
 # Esther: The OKX DEX AI Trading Agent
 
- <!-- Placeholder for a project banner -->
+<div align="center">
+  <img src="https://placehold.co/600x300/000000/FFFFFF/png?text=Esther+AI" alt="Esther AI Trading Agent Banner">
+</div>
 
-Esther is a sophisticated, AI-powered trading agent that operates within Telegram. It provides a conversational interface to the OKX Decentralized Exchange (DEX), allowing users to trade, analyze the market, and manage their portfolio using natural language.
+**Esther** is a sophisticated, AI-powered trading agent that operates within Telegram. It provides a seamless, conversational interface to the OKX Decentralized Exchange (DEX), empowering users to trade, analyze the market, and manage their portfolio using natural language.
+
+## 🌟 Core Philosophy
+The world of Decentralized Finance (DeFi) is powerful but complex. Esther's mission is to democratize access to DeFi by abstracting away the technical hurdles. It serves as an intelligent, trustworthy, and educational co-pilot for both novice investors and experienced traders.
 
 ## ✨ Features
 
--   **Natural Language Trading**: Execute trades, swaps, and complex conditional orders on OKX DEX using plain English.
--   **Intelligent Market Analysis**: Get real-time market data, trend analysis, and predictive insights powered by Google Gemini.
--   **Personalized Recommendations**: Receive tailored trading strategies and portfolio advice based on your trading history and risk profile.
--   **On-Demand Education**: Learn about DeFi concepts, trading mechanics, and blockchain technology through a conversational interface.
--   **Portfolio Management**: Track your asset performance, analyze diversification, and get suggestions for rebalancing.
--   **Custom Alerts**: Set up highly customizable alerts for price movements, volume changes, and more.
+### Current Features
+-   **Conversational Trading**:
+    -   **Get Live Quotes**: Ask for the price of any token (e.g., "What's the price of ETH?").
+    -   **Execute Swaps**: Initiate token swaps with a simple command (e.g., "Buy 0.1 ETH with USDC").
+-   **Secure Confirmation Flow**: All transactions require explicit user confirmation via interactive buttons, preventing accidental trades.
+-   **Dry Run Mode**: A global simulation mode that uses live market data to demonstrate trading functionality without executing real on-chain transactions. Perfect for safe testing and demos.
+-   **User Account Management**: Automatically creates and manages user profiles in a secure PostgreSQL database.
+-   **Intelligent Intent Parsing**: Powered by Google's Gemini models (`2.5-pro` and `2.5-flash`) to understand user commands.
+-   **Robust Deployment**: Fully configured for continuous deployment on Render, including a Flask health check endpoint to ensure uptime.
+
+### Upcoming Features
+-   **Advanced Order Types**: Support for sell orders, conditional trades, and stop-loss/take-profit orders.
+-   **Secure Wallet Management**: A system for users to securely register and manage their wallet addresses.
+-   **Personalized Market Insights**: Proactive alerts, trend analysis, and portfolio-based recommendations.
+-   **On-Demand Education**: An integrated learning module to explain DeFi concepts on the fly.
 
 ## 🛠️ Tech Stack
 
--   **Backend**: Python, `asyncio`
--   **AI**: Google Gemini Pro & Flash
--   **Platform**: Telegram
+-   **Backend**: Python 3.9+, `asyncio`
+-   **AI & NLP**: Google Gemini 2.5 Pro & Flash
+-   **Bot Framework**: `python-telegram-bot`
+-   **Web Server**: Flask (for Render health checks)
 -   **Database**: PostgreSQL
--   **DEX Integration**: OKX DEX API
+-   **DEX Integration**: OKX DEX API v5
 -   **Deployment**: Render
+
+For a detailed technical breakdown, see [How It Works](./how-it-works.md).
 
 ## 🚀 Getting Started
 
@@ -29,9 +46,8 @@ Esther is a sophisticated, AI-powered trading agent that operates within Telegra
 -   Python 3.9+
 -   A Telegram Bot Token
 -   A Google Gemini API Key
--   An OKX DEX API Key (required for Phase 2+)
--   A NewsAPI.org API Key (required for Phase 4+)
--   A PostgreSQL instance (e.g., from Render's free tier)
+-   An OKX DEX API Key, Secret, and Passphrase
+-   A PostgreSQL database URL (e.g., from Render's free tier)
 
 ### Installation & Setup
 
@@ -49,31 +65,36 @@ Esther is a sophisticated, AI-powered trading agent that operates within Telegra
     ```
 
 3.  **Set up environment variables:**
-    Create a `.env` file in the root directory. For the current phase, only the first two are required:
-    ```
-    # Required for Phase 1
-    TELEGRAM_BOT_TOKEN=your_telegram_bot_token
-    GEMINI_API_KEY=your_gemini_api_key
+    Create a `.env` file in the root directory and populate it with your credentials.
+    ```dotenv
+    # Telegram and AI
+    TELEGRAM_BOT_TOKEN="your_telegram_bot_token"
+    GEMINI_API_KEY="your_gemini_api_key"
 
-    # Required for Phase 2 and beyond
-    OKX_API_KEY=your_okx_api_key
-    OKX_API_SECRET=your_okx_api_secret
-    OKX_API_PASSPHRASE=your_okx_api_passphrase
-    DATABASE_URL=your_postgresql_connection_string
-    ENCRYPTION_KEY=a_secure_random_32_byte_string
+    # OKX API Credentials
+    OKX_API_KEY="your_okx_api_key"
+    OKX_API_SECRET="your_okx_api_secret"
+    OKX_API_PASSPHRASE="your_okx_api_passphrase"
+
+    # Database
+    DATABASE_URL="your_postgresql_connection_string"
     
-    # Required for Phase 4 and beyond
-    NEWS_API_KEY=your_news_api_key
+    # A test wallet address for development
+    TEST_WALLET_ADDRESS="your_ethereum_test_wallet_address"
     ```
 
-4.  **Run the bot:**
+4.  **Initialize the database:**
+    The application will automatically create the necessary `users` table on startup if it doesn't exist.
+
+5.  **Run the bot:**
     ```bash
-    python main.py
+    python src/main.py
     ```
+    The bot will start polling for messages, and the Flask web server will run on port 8080 to handle health checks.
 
 ## 🤝 Contributing
 
-Contributions are welcome! Please feel free to submit a pull request or open an issue.
+Contributions are welcome! Please feel free to submit a pull request or open an issue to discuss proposed changes.
 
 ## 📄 License
 

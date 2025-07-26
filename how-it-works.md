@@ -57,14 +57,19 @@ Here is the step-by-step journey of a user command, from Telegram to execution a
 3.  **Core Logic Orchestration**: The **Core Logic Layer** receives the structured `intent` and `entities`.
     *   It retrieves the user's profile and encrypted API keys from the **PostgreSQL Database** via the **Data Access Layer**.
     *   **Command Pattern**: It instantiates a command object (e.g., `BuyCommand`) with the necessary data.
-4.  **Pre-execution & Confirmation**:
-    *   For transactional commands, the Core Logic Layer first calls the **External Services Layer** to fetch any required data (e.g., current price, estimated fees from the **OKX DEX API**).
-    *   It constructs a clear, human-readable confirmation message (e.g., "You are about to buy 0.5 ETH for approximately 1000 USDT. Confirm?").
-    *   This message is sent back to the user through the Telegram Bot Interface. The system then waits for the user's confirmation.
+4.  **Pre-execution & Confirmation (Conversation Flow)**:
+    *   For transactional commands like `buy_token`, the **Core Logic Layer** initiates a multi-step conversation using Telegram's `ConversationHandler`.
+    *   **Quote Fetch**: It first calls the **External Services Layer** to get a live quote from the **OKX DEX API**. This ensures the user sees up-to-date pricing.
+    *   **Confirmation Prompt**: A detailed confirmation message is constructed, including the estimated amount of the token to be received. This message is sent to the user with inline keyboard buttons ("✅ Confirm", "❌ Cancel").
+    *   **State Management**: The `ConversationHandler` transitions the user's chat into a specific state (`AWAIT_CONFIRMATION`). In this state, the bot will only listen for the user to click one of the confirmation buttons. The details of the pending swap are stored in the `context.user_data` dictionary to maintain state.
 5.  **Execution**:
-    *   Upon receiving confirmation, the Core Logic Layer executes the command.
-    *   The `BuyCommand` object calls the **External Services Layer**.
-    *   **Dry Run Mode**: By default, the system operates in a simulation mode. It will construct and send a request to get a live quote from the **OKX DEX API**, but it will **not** send a final transaction to be executed on the blockchain.
+    *   **User Action**: The user clicks either "Confirm" or "Cancel".
+    *   **Callback Handling**: A `CallbackQueryHandler` captures the user's choice.
+    *   **Swap Execution**: If the user confirms, the `confirm_swap` function is called. It retrieves the swap details from `context.user_data` and calls the `execute_swap` method in the **External Services Layer**.
+    *   **Dry Run vs. Live Mode**: The `DRY_RUN_MODE` flag determines the outcome.
+        *   If `True`, a simulated swap is performed by fetching a final quote.
+        *   If `False`, a real transaction is executed by sending a signed request to the `/api/v5/dex/aggregator/swap` endpoint of the **OKX DEX API**.
+    *   **Cancellation**: If the user cancels, the `cancel_swap` function is called, the conversation ends, and the stored swap details are cleared.
 6.  **Response and Logging**:
     *   The result of the quote API call is received.
     *   A final status message is sent to the user (e.g., "Trade executed successfully" or "Trade failed: Insufficient funds").
