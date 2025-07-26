@@ -38,15 +38,14 @@ def run_e2e_test():
     except Exception as e:
         print(f"    ❌ FAILURE: An exception occurred during the Gemini API test: {e}")
 
-    # --- Test 2: OKX DEX API Call ---
-    print("\n[2/2] Testing OKX DEX API connection and credential verification...")
-    try:
-        okx_client = OKXClient()
-        if not all([okx_client.api_key, okx_client.api_secret, okx_client.passphrase]):
-            print("    ❌ FAILURE: OKX credentials not found in .env file.")
-            return
+    # --- Test 2: OKX DEX API Quote Call ---
+    print("\n[2/3] Testing OKX DEX API connection and quote functionality...")
+    okx_client = OKXClient()
+    if not all([okx_client.api_key, okx_client.api_secret, okx_client.passphrase]):
+        print("    ❌ FAILURE: OKX credentials not found in .env file.")
+        return
 
-        # We now test by fetching a live quote for a common pair
+    try:
         print("    Query: Fetching a live quote for 1 USDC to ETH...")
         quote_result = okx_client.get_live_quote(
             from_token_address="0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48", # USDC
@@ -55,15 +54,42 @@ def run_e2e_test():
         )
         
         if quote_result.get("success"):
-            print("    ✅ SUCCESS: OKX DEX API responded with a valid quote. Credentials and connection are working.")
+            print("    ✅ SUCCESS: OKX DEX API responded with a valid quote.")
             print(f"    -> Quote Data: {quote_result.get('data')}")
         else:
             print("    ❌ FAILURE: OKX DEX API returned an error while fetching quote.")
             print(f"    -> Error: {quote_result.get('error')}")
 
     except Exception as e:
-        print(f"    ❌ FAILURE: An exception occurred during the OKX DEX API test: {e}")
-        
+        print(f"    ❌ FAILURE: An exception occurred during the OKX DEX quote test: {e}")
+
+    # --- Test 3: OKX DEX API Swap Simulation Call ---
+    print("\n[3/3] Testing OKX DEX API swap simulation...")
+    try:
+        wallet_address = os.getenv("TEST_WALLET_ADDRESS")
+        if not wallet_address:
+            print("    ❌ FAILURE: TEST_WALLET_ADDRESS not found in .env file.")
+            return
+
+        print(f"    Query: Simulating a swap of 1 USDC to ETH for wallet {wallet_address}...")
+        swap_result = okx_client.execute_swap(
+            from_token_address="0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48", # USDC
+            to_token_address="0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",   # ETH
+            amount="1000000", # 1 USDC (6 decimals)
+            wallet_address=wallet_address,
+            dry_run=True # Explicitly keep this as a dry run for safety
+        )
+
+        if swap_result.get("success") and swap_result.get("status") == "simulated":
+            print("    ✅ SUCCESS: OKX DEX API successfully simulated the swap.")
+            print(f"    -> Simulated Swap Data: {swap_result.get('data')}")
+        else:
+            print("    ❌ FAILURE: OKX DEX API returned an error during swap simulation.")
+            print(f"    -> Error: {swap_result.get('error')}")
+
+    except Exception as e:
+        print(f"    ❌ FAILURE: An exception occurred during the OKX DEX swap simulation test: {e}")
+
     print("\n--- End-to-End Test Finished ---")
 
 

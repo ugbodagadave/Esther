@@ -46,6 +46,7 @@ TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 from src.nlp import NLPClient
 from src.okx_client import OKXClient
 from src.database import get_db_connection
+from src.encryption import encrypt_data, decrypt_data
 
 # Initialize clients
 nlp_client = NLPClient()
@@ -53,9 +54,10 @@ okx_client = OKXClient()
 
 # --- Conversation Handler States ---
 AWAIT_CONFIRMATION = 1
+AWAIT_WALLET_NAME, AWAIT_WALLET_ADDRESS, AWAIT_PRIVATE_KEY = 2, 3, 4
 
-# Global flag for simulation mode
-DRY_RUN_MODE = True
+# Global flag for simulation mode, configurable via .env file
+DRY_RUN_MODE = os.getenv("DRY_RUN_MODE", "True").lower() in ("true", "1", "t")
 
 # A simple, hardcoded map for common token symbols to their Ethereum addresses
 TOKEN_ADDRESSES = {
@@ -287,8 +289,8 @@ def run_bot():
 
     application = Application.builder().token(TELEGRAM_BOT_TOKEN).build()
 
-    # --- Conversation Handler for Swaps ---
-    conv_handler = ConversationHandler(
+    # --- Conversation Handlers ---
+    swap_conv_handler = ConversationHandler(
         entry_points=[MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text)],
         states={
             AWAIT_CONFIRMATION: [
@@ -300,9 +302,24 @@ def run_bot():
         per_message=False,
     )
 
-    application.add_handler(conv_handler)
+    add_wallet_conv_handler = ConversationHandler(
+        entry_points=[CommandHandler("addwallet", add_wallet_start)],
+        states={
+            AWAIT_WALLET_NAME: [MessageHandler(filters.TEXT & ~filters.COMMAND, received_wallet_name)],
+            AWAIT_WALLET_ADDRESS: [MessageHandler(filters.TEXT & ~filters.COMMAND, received_wallet_address)],
+            AWAIT_PRIVATE_KEY: [MessageHandler(filters.TEXT & ~filters.COMMAND, received_private_key)],
+        },
+        fallbacks=[CommandHandler("start", start)],
+    )
+
+    application.add_handler(swap_conv_handler)
+    application.add_handler(add_wallet_conv_handler)
+    application.add_handler(CallbackQueryHandler(delete_wallet_callback, pattern="^delete_"))
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CommandHandler("help", help_command))
+    application.add_handler(CommandHandler("addwallet", add_wallet_start))
+    application.add_handler(CommandHandler("listwallets", list_wallets))
+    application.add_handler(CommandHandler("deletewallet", delete_wallet_start))
     
     logger.info("Starting bot polling...")
     application.run_polling()

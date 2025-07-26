@@ -1,6 +1,7 @@
 import unittest
 from unittest.mock import patch, MagicMock
 import os
+import requests
 from src.okx_client import OKXClient
 
 class TestOKXClient(unittest.TestCase):
@@ -73,6 +74,28 @@ class TestOKXClient(unittest.TestCase):
         
         self.assertTrue(result['success'])
         self.assertEqual(result['data']['txHash'], "0x12345")
+
+    @patch('requests.get', side_effect=requests.exceptions.HTTPError("500 Server Error"))
+    @patch('time.sleep', return_value=None) # Mock time.sleep to avoid delays
+    def test_get_live_quote_retry_logic(self, mock_sleep, mock_get):
+        """Test the retry logic for get_live_quote."""
+        client = OKXClient(max_retries=3, retry_delay=0.1)
+        result = client.get_live_quote("from", "to", "100")
+
+        self.assertFalse(result['success'])
+        self.assertEqual(result['error'], "Failed to fetch quote after multiple retries.")
+        self.assertEqual(mock_get.call_count, 3)
+
+    @patch('requests.post', side_effect=requests.exceptions.HTTPError("500 Server Error"))
+    @patch('time.sleep', return_value=None)
+    def test_execute_swap_retry_logic(self, mock_sleep, mock_post):
+        """Test the retry logic for execute_swap."""
+        client = OKXClient(max_retries=3, retry_delay=0.1)
+        result = client.execute_swap("from", "to", "100", "wallet_addr", dry_run=False)
+
+        self.assertFalse(result['success'])
+        self.assertEqual(result['error'], "Failed to execute swap after multiple retries.")
+        self.assertEqual(mock_post.call_count, 3)
 
 if __name__ == '__main__':
     unittest.main()

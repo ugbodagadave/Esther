@@ -3,6 +3,7 @@ import requests
 import logging
 import hmac
 import base64
+import time
 from datetime import datetime, timezone
 from dotenv import load_dotenv
 
@@ -23,11 +24,13 @@ def sign(message, secret_key):
     return base64.b64encode(mac.digest()).decode()
 
 class OKXClient:
-    def __init__(self):
+    def __init__(self, max_retries=3, retry_delay=2):
         self.base_url = "https://web3.okx.com"
         self.api_key = os.getenv("OKX_API_KEY")
         self.api_secret = os.getenv("OKX_API_SECRET")
         self.passphrase = os.getenv("OKX_API_PASSPHRASE")
+        self.max_retries = max_retries
+        self.retry_delay = retry_delay
 
     def _get_request_headers(self, method, request_path, body=''):
         timestamp = get_timestamp()
@@ -44,35 +47,42 @@ class OKXClient:
 
     def get_live_quote(self, from_token_address: str, to_token_address: str, amount: str, chain_index: int = 1) -> dict:
         """
-        Fetches a real swap quote from the OKX DEX aggregator.
+        Fetches a real swap quote from the OKX DEX aggregator with retry logic.
         """
-        try:
-            request_path = '/api/v5/dex/aggregator/quote'
-            params = {
-                "chainIndex": chain_index,
-                "amount": amount,
-                "toTokenAddress": to_token_address,
-                "fromTokenAddress": from_token_address
-            }
-            
-            query_string = '&'.join([f'{k}={v}' for k, v in params.items()])
-            full_request_path = f"{request_path}?{query_string}"
+        for attempt in range(self.max_retries):
+            try:
+                request_path = '/api/v5/dex/aggregator/quote'
+                params = {
+                    "chainIndex": chain_index,
+                    "amount": amount,
+                    "toTokenAddress": to_token_address,
+                    "fromTokenAddress": from_token_address
+                }
+                
+                query_string = '&'.join([f'{k}={v}' for k, v in params.items()])
+                full_request_path = f"{request_path}?{query_string}"
 
-            headers = self._get_request_headers('GET', full_request_path)
-            url = f"{self.base_url}{full_request_path}"
-            
-            response = requests.get(url, headers=headers)
-            response.raise_for_status()
-            data = response.json()
+                headers = self._get_request_headers('GET', full_request_path)
+                url = f"{self.base_url}{full_request_path}"
+                
+                response = requests.get(url, headers=headers, timeout=10)
+                response.raise_for_status()
+                data = response.json()
 
-            if data.get("code") == "0":
-                return {"success": True, "data": data.get("data", [{}])[0]}
-            else:
-                logger.error(f"Error fetching quote from OKX API: {data.get('msg')}")
-                return {"success": False, "error": data.get("msg")}
-        except requests.exceptions.RequestException as e:
-            logger.error(f"Error fetching quote: {e}")
-            return {"success": False, "error": str(e)}
+                if data.get("code") == "0":
+                    return {"success": True, "data": data.get("data", [{}])[0]}
+                else:
+                    error_msg = data.get("msg", "Unknown API error")
+                    logger.error(f"Error fetching quote from OKX API: {error_msg}")
+                    return {"success": False, "error": f"API Error: {error_msg}"}
+            except requests.exceptions.HTTPError as e:
+                logger.warning(f"HTTP Error on attempt {attempt + 1}: {e}. Retrying in {self.retry_delay}s...")
+                time.sleep(self.retry_delay)
+            except requests.exceptions.RequestException as e:
+                logger.error(f"Error fetching quote: {e}")
+                return {"success": False, "error": f"A network error occurred: {e}"}
+        
+        return {"success": False, "error": "Failed to fetch quote after multiple retries."}
 
     def execute_swap(self, from_token_address: str, to_token_address: str, amount: str, wallet_address: str, slippage: str = "1", dry_run: bool = True) -> dict:
         """
@@ -94,33 +104,40 @@ class OKXClient:
                 return quote_response # Propagate the error from get_live_quote
         else:
             logger.info(f"Executing REAL swap for wallet {wallet_address}")
-            try:
-                request_path = '/api/v5/dex/aggregator/swap'
-                body = {
-                    "fromTokenAddress": from_token_address,
-                    "toTokenAddress": to_token_address,
-                    "amount": amount,
-                    "walletAddress": wallet_address,
-                    "slippage": slippage,
-                    "chainIndex": 1
-                }
-                
-                headers = self._get_request_headers('POST', request_path, str(body))
-                url = f"{self.base_url}{request_path}"
-                
-                response = requests.post(url, headers=headers, json=body)
-                response.raise_for_status()
-                data = response.json()
+            for attempt in range(self.max_retries):
+                try:
+                    request_path = '/api/v5/dex/aggregator/swap'
+                    body = {
+                        "fromTokenAddress": from_token_address,
+                        "toTokenAddress": to_token_address,
+                        "amount": amount,
+                        "walletAddress": wallet_address,
+                        "slippage": slippage,
+                        "chainIndex": 1
+                    }
+                    
+                    headers = self._get_request_headers('POST', request_path, str(body))
+                    url = f"{self.base_url}{request_path}"
+                    
+                    response = requests.post(url, headers=headers, json=body, timeout=15)
+                    response.raise_for_status()
+                    data = response.json()
 
-                if data.get("code") == "0":
-                    logger.info(f"Successfully executed swap: {data.get('msg')}")
-                    return {"success": True, "data": data.get("data", [{}])[0]}
-                else:
-                    logger.error(f"Error executing swap on OKX API: {data.get('msg')}")
-                    return {"success": False, "error": data.get("msg")}
-            except requests.exceptions.RequestException as e:
-                logger.error(f"Error executing swap: {e}")
-                return {"success": False, "error": str(e)}
+                    if data.get("code") == "0":
+                        logger.info(f"Successfully executed swap: {data.get('msg')}")
+                        return {"success": True, "data": data.get("data", [{}])[0]}
+                    else:
+                        error_msg = data.get("msg", "Unknown API error")
+                        logger.error(f"Error executing swap on OKX API: {error_msg}")
+                        return {"success": False, "error": f"API Error: {error_msg}"}
+                except requests.exceptions.HTTPError as e:
+                    logger.warning(f"HTTP Error on attempt {attempt + 1}: {e}. Retrying in {self.retry_delay}s...")
+                    time.sleep(self.retry_delay)
+                except requests.exceptions.RequestException as e:
+                    logger.error(f"Error executing swap: {e}")
+                    return {"success": False, "error": f"A network error occurred: {e}"}
+            
+            return {"success": False, "error": "Failed to execute swap after multiple retries."}
 
 
 if __name__ == '__main__':

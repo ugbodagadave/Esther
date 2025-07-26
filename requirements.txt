@@ -4,3 +4,4 @@ requests
 google-generativeai
 psycopg2-binary
 Flask
+cryptography

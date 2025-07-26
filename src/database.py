@@ -57,6 +57,18 @@ def initialize_database():
                     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
                 );
             """)
+
+            # Create wallets table
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS wallets (
+                    id SERIAL PRIMARY KEY,
+                    user_id INTEGER NOT NULL REFERENCES users(id),
+                    name VARCHAR(255) NOT NULL,
+                    address VARCHAR(255) UNIQUE NOT NULL,
+                    encrypted_private_key TEXT NOT NULL,
+                    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+                );
+            """)
             
             conn.commit()
             logger.info("Database tables initialized successfully.")

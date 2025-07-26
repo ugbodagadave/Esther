@@ -36,7 +36,7 @@ class TestDatabase(unittest.TestCase):
         database.initialize_database()
 
         # Check that the correct CREATE TABLE queries were executed
-        self.assertEqual(mock_cursor.execute.call_count, 2)
+        self.assertEqual(mock_cursor.execute.call_count, 3)
         mock_cursor.execute.assert_any_call(unittest.mock.ANY) # Check if execute was called
         mock_conn.commit.assert_called_once()
         mock_conn.close.assert_called_once()
