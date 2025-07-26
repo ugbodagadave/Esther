@@ -739,49 +739,41 @@ def run_bot():
 
     application = Application.builder().token(TELEGRAM_BOT_TOKEN).build()
 
-    # --- Conversation Handlers ---
-    swap_conv_handler = ConversationHandler(
-        entry_points=[MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text)],
+    # --- Main Conversation Handler ---
+    conv_handler = ConversationHandler(
+        entry_points=[
+            CommandHandler("addwallet", add_wallet_start),
+            CommandHandler("addalert", add_alert_start),
+            MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text),
+        ],
         states={
+            # States for trading conversations
             AWAIT_CONFIRMATION: [
                 CallbackQueryHandler(confirm_swap, pattern="^confirm_swap$"),
                 CallbackQueryHandler(cancel_swap, pattern="^cancel_swap$"),
             ],
-        },
-        fallbacks=[CommandHandler("start", start)],
-        per_message=False,
-    )
-
-    add_wallet_conv_handler = ConversationHandler(
-        entry_points=[CommandHandler("addwallet", add_wallet_start)],
-        states={
+            # States for adding a wallet
             AWAIT_WALLET_NAME: [MessageHandler(filters.TEXT & ~filters.COMMAND, received_wallet_name)],
             AWAIT_WALLET_ADDRESS: [MessageHandler(filters.TEXT & ~filters.COMMAND, received_wallet_address)],
             AWAIT_PRIVATE_KEY: [MessageHandler(filters.TEXT & ~filters.COMMAND, received_private_key)],
-        },
-        fallbacks=[CommandHandler("start", start)],
-    )
-
-    add_alert_conv_handler = ConversationHandler(
-        entry_points=[CommandHandler("addalert", add_alert_start)],
-        states={
+            # States for adding an alert
             AWAIT_ALERT_SYMBOL: [MessageHandler(filters.TEXT & ~filters.COMMAND, received_alert_symbol)],
             AWAIT_ALERT_CONDITION: [CallbackQueryHandler(received_alert_condition, pattern="^alert_")],
             AWAIT_ALERT_PRICE: [MessageHandler(filters.TEXT & ~filters.COMMAND, received_alert_price)],
         },
         fallbacks=[CommandHandler("start", start)],
+        per_message=False,
     )
 
-    application.add_handler(swap_conv_handler)
-    application.add_handler(add_wallet_conv_handler)
-    application.add_handler(add_alert_conv_handler)
-    application.add_handler(CallbackQueryHandler(delete_wallet_callback, pattern="^delete_"))
+    application.add_handler(conv_handler)
+    
+    # Add other handlers that are not part of conversations
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CommandHandler("help", help_command))
     application.add_handler(CommandHandler("listwallets", list_wallets))
-    application.add_handler(CommandHandler("deletewallet", delete_wallet_start))
-    application.add_handler(CommandHandler("addalert", add_alert_start))
     application.add_handler(CommandHandler("listalerts", list_alerts))
+    application.add_handler(CommandHandler("deletewallet", delete_wallet_start))
+    application.add_handler(CallbackQueryHandler(delete_wallet_callback, pattern="^delete_"))
     
     logger.info("Starting bot polling...")
     application.run_polling(
