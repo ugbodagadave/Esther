@@ -63,9 +63,10 @@ Here is the step-by-step journey of a user command, from Telegram to execution a
     *   This message is sent back to the user through the Telegram Bot Interface. The system then waits for the user's confirmation.
 5.  **Execution**:
     *   Upon receiving confirmation, the Core Logic Layer executes the command.
-    *   The `BuyCommand` object calls the **External Services Layer**, which constructs and sends the final, signed transaction request to the **OKX DEX API**.
+    *   The `BuyCommand` object calls the **External Services Layer**.
+    *   **Dry Run Mode**: By default, the system operates in a simulation mode. It will construct and send a request to get a live quote from the **OKX DEX API**, but it will **not** send a final transaction to be executed on the blockchain.
 6.  **Response and Logging**:
-    *   The result of the API call (success or failure) is received.
+    *   The result of the quote API call is received.
     *   A final status message is sent to the user (e.g., "Trade executed successfully" or "Trade failed: Insufficient funds").
     *   The transaction details are logged in the **PostgreSQL Database** for the user's history.
 

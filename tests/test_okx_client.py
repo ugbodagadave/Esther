@@ -1,6 +1,5 @@
 import unittest
 from unittest.mock import patch, MagicMock
-import requests
 import os
 from src.okx_client import OKXClient
 
@@ -12,46 +11,8 @@ class TestOKXClient(unittest.TestCase):
         "OKX_API_PASSPHRASE": "test_passphrase"
     })
     @patch('requests.get')
-    def test_verify_credentials_success(self, mock_get):
-        """Test successful credential verification."""
-        mock_response = MagicMock()
-        mock_response.status_code = 200
-        mock_response.json.return_value = {"code": "0", "data": "Credentials are valid."}
-        mock_get.return_value = mock_response
-
-        client = OKXClient()
-        result = client.verify_credentials()
-
-        self.assertTrue(result['success'])
-        self.assertEqual(result['data'], "Credentials are valid.")
-
-    @patch.dict(os.environ, {
-        "OKX_API_KEY": "test_key",
-        "OKX_API_SECRET": "test_secret",
-        "OKX_API_PASSPHRASE": "test_passphrase"
-    })
-    @patch('requests.get')
-    def test_verify_credentials_failure(self, mock_get):
-        """Test failed credential verification due to API error."""
-        mock_response = MagicMock()
-        mock_response.status_code = 200
-        mock_response.json.return_value = {"code": "50001", "msg": "Invalid API Key"}
-        mock_get.return_value = mock_response
-
-        client = OKXClient()
-        result = client.verify_credentials()
-
-        self.assertFalse(result['success'])
-        self.assertEqual(result['error'], "Invalid API Key")
-
-    @patch.dict(os.environ, {
-        "OKX_API_KEY": "test_key",
-        "OKX_API_SECRET": "test_secret",
-        "OKX_API_PASSPHRASE": "test_passphrase"
-    })
-    @patch('requests.get')
-    def test_get_quote_success(self, mock_get):
-        """Test successful fetching of a swap quote."""
+    def test_get_live_quote_success(self, mock_get):
+        """Test successful fetching of a live swap quote."""
         mock_response = MagicMock()
         mock_response.status_code = 200
         mock_response.json.return_value = {
@@ -61,10 +22,47 @@ class TestOKXClient(unittest.TestCase):
         mock_get.return_value = mock_response
 
         client = OKXClient()
-        result = client.get_quote("from_addr", "to_addr", "100")
+        result = client.get_live_quote("from_addr", "to_addr", "100")
 
         self.assertTrue(result['success'])
         self.assertEqual(result['data']['toTokenAmount'], "3000000000")
+
+    @patch.object(OKXClient, 'get_live_quote')
+    def test_execute_swap_dry_run_success(self, mock_get_live_quote):
+        """Test a successful dry run swap."""
+        mock_get_live_quote.return_value = {
+            "success": True,
+            "data": {"toTokenAmount": "500"}
+        }
+        
+        client = OKXClient()
+        result = client.execute_swap("from", "to", "100", dry_run=True)
+
+        self.assertTrue(result['success'])
+        self.assertEqual(result['status'], 'simulated')
+        self.assertEqual(result['data']['toTokenAmount'], '500')
+        mock_get_live_quote.assert_called_once_with("from", "to", "100")
+
+    @patch.object(OKXClient, 'get_live_quote')
+    def test_execute_swap_dry_run_quote_fails(self, mock_get_live_quote):
+        """Test a dry run swap where the initial quote fails."""
+        mock_get_live_quote.return_value = {
+            "success": False,
+            "error": "Insufficient liquidity"
+        }
+
+        client = OKXClient()
+        result = client.execute_swap("from", "to", "100", dry_run=True)
+
+        self.assertFalse(result['success'])
+        self.assertEqual(result['error'], "Insufficient liquidity")
+
+    def test_execute_swap_real_run_not_implemented(self):
+        """Test that a real swap returns a 'not implemented' error."""
+        client = OKXClient()
+        result = client.execute_swap("from", "to", "100", dry_run=False)
+        self.assertFalse(result['success'])
+        self.assertEqual(result['error'], "Real swap execution is not implemented.")
 
 if __name__ == '__main__':
     unittest.main()

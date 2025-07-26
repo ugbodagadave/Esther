@@ -43,6 +43,9 @@ from src.database import get_db_connection
 nlp_client = NLPClient()
 okx_client = OKXClient()
 
+# Global flag for simulation mode
+DRY_RUN_MODE = True
+
 # A simple, hardcoded map for common token symbols to their Ethereum addresses
 TOKEN_ADDRESSES = {
     "ETH": "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
@@ -130,10 +133,10 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         currency = entities.get("currency")
 
         if not all([symbol, amount, currency]):
-            await update.message.reply_text("To buy a token, please tell me the amount, symbol, and currency.")
+            await update.message.reply_text("To buy a token, please tell me the amount, the token symbol, and the currency to use (e.g., 'buy 0.5 ETH with USDT').")
             return
         
-        await update.message.reply_text(f"Getting a quote to buy {amount} {symbol.upper()} with {currency.upper()}...")
+        await update.message.reply_text(f"[DRY RUN] Simulating a swap of {amount} {currency.upper()} for {symbol.upper()}...")
         
         from_token_address = TOKEN_ADDRESSES.get(currency.upper())
         to_token_address = TOKEN_ADDRESSES.get(symbol.upper())
@@ -142,20 +145,30 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
             await update.message.reply_text(f"Sorry, I don't have the address for one of the tokens.")
             return
 
-        amount_in_smallest_unit = str(int(float(amount) * 10**6))
+        # This is a huge simplification. Amount needs to be converted based on the 'from' token's decimals.
+        amount_in_smallest_unit = str(int(float(amount) * 10**6)) # Assuming 6 decimals for USDC/USDT
 
-        quote_response = okx_client.get_quote(
+        swap_response = okx_client.execute_swap(
             from_token_address=from_token_address,
             to_token_address=to_token_address,
-            amount=amount_in_smallest_unit
+            amount=amount_in_smallest_unit,
+            dry_run=DRY_RUN_MODE
         )
 
-        if quote_response.get("success"):
-            quote_data = quote_response["data"]
-            to_amount = float(quote_data.get('toTokenAmount', 0)) / 10**18
-            await update.message.reply_text(f"Quote: To buy {to_amount:.6f} {symbol.upper()}, it will cost {amount} {currency.upper()}. Please confirm to proceed.")
+        if swap_response.get("success"):
+            # This is a simulation, so we show the simulated result
+            simulated_data = swap_response["data"]
+            to_amount = float(simulated_data.get('toTokenAmount', 0)) / 10**18 # Assuming 18 decimals for ETH/WBTC
+            
+            response_message = (
+                f"[DRY RUN] ✅ Swap Simulated Successfully!\n\n"
+                f"➡️ From: {amount} {currency.upper()}\n"
+                f"⬅️ To (Estimated): {to_amount:.6f} {symbol.upper()}\n\n"
+                f"This was a simulation. No real transaction was executed."
+            )
+            await update.message.reply_text(response_message)
         else:
-            await update.message.reply_text(f"Sorry, I couldn't get a quote. Error: {quote_response.get('error')}")
+            await update.message.reply_text(f"[DRY RUN] ❌ Simulation Failed. Error: {swap_response.get('error')}")
     
     elif intent == "greeting":
         await update.message.reply_text("Hello! How can I assist you with your trades today?")

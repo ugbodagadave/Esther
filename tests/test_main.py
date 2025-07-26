@@ -108,9 +108,10 @@ class TestMainHandlers(unittest.TestCase):
             "intent": "buy_token",
             "entities": {"amount": "100", "symbol": "ETH", "currency": "USDC"}
         }
-        # Mock OKX response
-        mock_okx_client.get_quote.return_value = {
+        # Mock OKX response for the dry run swap
+        mock_okx_client.execute_swap.return_value = {
             "success": True,
+            "status": "simulated",
             "data": {"toTokenAmount": "33000000000000000"} # 0.033 ETH
         }
 
@@ -123,8 +124,10 @@ class TestMainHandlers(unittest.TestCase):
         import asyncio
         asyncio.run(handle_message(update, context))
 
-        # Check that the confirmation message is sent correctly
-        self.assertIn("Quote: To buy 0.033000 ETH, it will cost 100 USDC. Please confirm to proceed.", update.message.reply_text.call_args[0][0])
+        # Check that the final simulation message is sent correctly
+        self.assertIn("[DRY RUN] ✅ Swap Simulated Successfully!", update.message.reply_text.call_args[0][0])
+        self.assertIn("From: 100 USDC", update.message.reply_text.call_args[0][0])
+        self.assertIn("To (Estimated): 0.033000 ETH", update.message.reply_text.call_args[0][0])
 
 if __name__ == '__main__':
     # Set dummy env var for NLPClient initialization during tests

@@ -99,6 +99,17 @@ The initial scope focuses on core OKX DEX functionalities, augmented by Google G
     - **Alert Accuracy**: >99% of alerts are triggered correctly based on user-defined conditions.
     - **Customization Depth**: >20% of alerts created are complex conditional alerts.
 
+### 4.8. Dry Run / Simulation Mode
+- **Description**: A mode that allows users to simulate trading without executing real transactions on the blockchain. This is essential for demos, testing strategies, and user onboarding.
+- **Functionality**:
+    - **Live Data**: The simulation will use live, real-time quotes from the OKX DEX API.
+    - **No Execution**: No transaction will ever be sent to the blockchain while in dry run mode.
+    - **Clear Indication**: All messages related to simulated transactions will be clearly marked as "[DRY RUN]" or "[SIMULATION]" to avoid user confusion.
+    - **Toggleable**: While the default for the initial build will be `dry_run=True`, the architecture will support making this a toggleable feature for users in the future.
+- **Success Metrics**:
+    - **Simulation Accuracy**: The simulated output (e.g., estimated amount of token received) should match the data from the live quote.
+    - **User Clarity**: 100% of simulation-related messages must contain a clear "dry run" indicator.
+
 ## 5. Technical Requirements
 - **Core Technologies**: Python, Telegram Bot API, OKX DEX API, Google Gemini (Pro & Flash), MongoDB.
 - **Integrations**: News APIs (e.g., NewsAPI, CryptoCompare), Blockchain Explorers (e.g., Etherscan, Solscan).

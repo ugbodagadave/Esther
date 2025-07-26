@@ -42,42 +42,7 @@ class OKXClient:
             'Content-Type': 'application/json'
         }
 
-    def verify_credentials(self):
-        """
-        Verifies API credentials by making a read-only, authenticated request to a DEX endpoint.
-        We will try to get a quote for a tiny amount of a common pair.
-        """
-        try:
-            # Using the quote endpoint as a read-only way to verify keys
-            request_path = '/api/v5/dex/aggregator/quote'
-            params = {
-                "chainIndex": 1, # Ethereum
-                "amount": "1", # A tiny amount
-                "toTokenAddress": "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48", # USDC
-                "fromTokenAddress": "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee" # ETH
-            }
-            
-            # The GET request with params needs the params to be part of the request_path for signing
-            query_string = '&'.join([f'{k}={v}' for k, v in params.items()])
-            full_request_path = f"{request_path}?{query_string}"
-
-            headers = self._get_request_headers('GET', full_request_path)
-            url = f"{self.base_url}{full_request_path}"
-            
-            response = requests.get(url, headers=headers)
-            response.raise_for_status()
-            data = response.json()
-
-            if data.get("code") == "0":
-                return {"success": True, "data": "Credentials are valid."}
-            else:
-                logger.error(f"Credential verification failed. OKX API Error: {data.get('msg')}")
-                return {"success": False, "error": data.get("msg")}
-        except requests.exceptions.RequestException as e:
-            logger.error(f"Error during credential verification: {e}")
-            return {"success": False, "error": str(e)}
-
-    def get_quote(self, from_token_address: str, to_token_address: str, amount: str, chain_index: int = 1) -> dict:
+    def get_live_quote(self, from_token_address: str, to_token_address: str, amount: str, chain_index: int = 1) -> dict:
         """
         Fetches a real swap quote from the OKX DEX aggregator.
         """
@@ -101,7 +66,6 @@ class OKXClient:
             data = response.json()
 
             if data.get("code") == "0":
-                # The actual quote data is in the first element of the 'data' list
                 return {"success": True, "data": data.get("data", [{}])[0]}
             else:
                 logger.error(f"Error fetching quote from OKX API: {data.get('msg')}")
@@ -109,6 +73,28 @@ class OKXClient:
         except requests.exceptions.RequestException as e:
             logger.error(f"Error fetching quote: {e}")
             return {"success": False, "error": str(e)}
+
+    def execute_swap(self, from_token_address: str, to_token_address: str, amount: str, dry_run: bool = True) -> dict:
+        """
+        Executes a swap. If dry_run is True, it only fetches the quote and simulates the transaction.
+        """
+        if dry_run:
+            logger.info(f"Executing DRY RUN swap from {from_token_address} to {to_token_address}")
+            quote_response = self.get_live_quote(from_token_address, to_token_address, amount)
+            
+            if quote_response.get("success"):
+                return {
+                    "success": True,
+                    "status": "simulated",
+                    "data": quote_response["data"],
+                    "message": "✅ Swap simulated successfully (no real transaction)"
+                }
+            else:
+                return quote_response # Propagate the error from get_live_quote
+        else:
+            # This is where the real swap execution logic will go in the future.
+            logger.info("Real swap execution is not yet implemented.")
+            return {"success": False, "error": "Real swap execution is not implemented."}
 
 
 if __name__ == '__main__':
@@ -118,7 +104,12 @@ if __name__ == '__main__':
     if not all([client.api_key, client.api_secret, client.passphrase]):
         print("OKX credentials not found in .env file.")
     else:
-        verification_result = client.verify_credentials()
+        # Using get_live_quote for verification now
+        verification_result = client.get_live_quote(
+            from_token_address="0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+            to_token_address="0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48",
+            amount="1"
+        )
         if verification_result.get("success"):
             print("Successfully connected to OKX DEX API. Credentials are valid.")
         else:
