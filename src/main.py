@@ -2,6 +2,7 @@ import os
 import logging
 import threading
 import sys
+import asyncio
 from pathlib import Path
 
 # Add project root to the Python path
@@ -163,10 +164,14 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         await update.message.reply_text("I'm not sure how to help with that. You can ask me for the price of a token.")
 
 def run_bot():
-    """Runs the Telegram bot's polling loop."""
+    """Runs the Telegram bot's polling loop in a dedicated asyncio event loop."""
     if not TELEGRAM_BOT_TOKEN:
         logger.error("TELEGRAM_BOT_TOKEN not found in environment variables.")
         return
+
+    # Create a new event loop for this thread
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
 
     application = Application.builder().token(TELEGRAM_BOT_TOKEN).build()
     application.add_handler(CommandHandler("start", start))
