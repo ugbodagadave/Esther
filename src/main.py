@@ -630,24 +630,7 @@ def health_check():
 @app.route('/webhook', methods=['POST'])
 async def webhook():
     """Handles incoming updates from Telegram."""
-    await application.update_queue.put(Update.de_json(await request.json(), application.bot))
+    update_data = await request.get_json()
+    update = Update.de_json(update_data, application.bot)
+    await application.process_update(update)
     return '', 200
-
-async def main():
-    """Sets up and runs the bot with webhooks."""
-    webhook_url = os.getenv("RENDER_EXTERNAL_URL")
-    if not webhook_url:
-        raise ValueError("RENDER_EXTERNAL_URL not found in environment variables.")
-    
-    await application.bot.set_webhook(url=f"{webhook_url}/webhook")
-    
-    # The web server is run by gunicorn in production, so we don't need to run it here.
-    # This part is for local testing if needed.
-    if __name__ == "__main__":
-        # We are not running the bot polling here, just the web server.
-        port = int(os.environ.get('PORT', 8080))
-        logger.info(f"Starting Flask web server on port {port}...")
-        app.run(host='0.0.0.0', port=port)
-
-if __name__ == "__main__":
-    asyncio.run(main())

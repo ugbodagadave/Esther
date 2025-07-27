@@ -6,8 +6,8 @@ services:
     name: esther-bot
     env: python
     plan: free # Specifies the free instance type
-    buildCommand: "pip install -r requirements.txt"
-    startCommand: "python src/main.py"
+    buildCommand: "pip install -r requirements.txt && python setup_webhook.py"
+    startCommand: "gunicorn src.main:app"
     envVars:
       # The DATABASE_URL is automatically provided by Render from the linked database service.
       - key: DATABASE_URL
