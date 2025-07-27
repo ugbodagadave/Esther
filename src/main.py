@@ -11,6 +11,7 @@ project_root = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(project_root))
 
 from flask import Flask, request
+from asgiref.wsgi import WsgiToAsgi
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
     Application,
@@ -27,7 +28,8 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # --- Flask App for Render Health Checks ---
-app = Flask(__name__)
+flask_app = Flask(__name__)
+app = WsgiToAsgi(flask_app)
 
 # --- Telegram Bot Logic ---
 # Enable logging
@@ -623,11 +625,11 @@ application.add_handler(CommandHandler("listalerts", list_alerts))
 application.add_handler(CommandHandler("deletewallet", delete_wallet_start))
 application.add_handler(CallbackQueryHandler(delete_wallet_callback, pattern="^delete_"))
 
-@app.route('/')
+@flask_app.route('/')
 def health_check():
     return "Bot is running.", 200
 
-@app.route('/webhook', methods=['POST'])
+@flask_app.route('/webhook', methods=['POST'])
 async def webhook():
     """Handles incoming updates from Telegram."""
     update_data = await request.get_json()
