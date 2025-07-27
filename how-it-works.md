@@ -53,7 +53,7 @@ Here is the step-by-step journey of a user command, from Telegram to execution a
 2.  **NLP Processing**: The message is passed to the **NLP Module**.
     *   A preliminary check determines the likely complexity of the query.
     *   **Strategy Pattern**: Based on complexity, the system selects either **Gemini Flash** (for simple requests like "price of ETH") or **Gemini Pro** (for complex requests like "buy 0.5 ETH if...").
-    *   The chosen Gemini model processes the text, returning a structured object containing the user's `intent` (e.g., `buy_token`, `sell_token`) and `entities` (e.g., `{token: 'ETH', amount: 0.5, currency: 'USDT'}`).
+    *   The chosen Gemini model processes the text, returning a structured object containing the user's `intent` (e.g., `buy_token`, `sell_token`, `set_stop_loss`) and `entities` (e.g., `{token: 'ETH', amount: 0.5, currency: 'USDT'}`).
 3.  **Core Logic Orchestration**: The **Core Logic Layer** receives the structured `intent` and `entities`.
     *   It retrieves the user's profile and encrypted API keys from the **PostgreSQL Database** via the **Data Access Layer**.
     *   **Command Pattern**: It instantiates a command object (e.g., `BuyCommand`) with the necessary data.

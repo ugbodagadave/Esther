@@ -15,6 +15,8 @@ The world of Decentralized Finance (DeFi) is powerful but complex. Esther's miss
 -   **Conversational Trading**:
     -   **Get Live Quotes**: Ask for the price of any token (e.g., "What's the price of ETH?").
     -   **Execute Swaps**: Initiate token swaps with simple commands (e.g., "Buy 0.1 ETH with USDC" or "Sell 0.5 ETH for USDT").
+    -   **Advanced Orders**: Set stop-loss and take-profit orders (e.g., "set a stop-loss for BTC at 60000").
+-   **Personalized Market Insights**: Get personalized market insights and recommendations with the `/insights` command.
 -   **Secure Confirmation Flow**: All transactions require explicit user confirmation via interactive buttons, preventing accidental trades.
 -   **Real-time Price Alerts**: Set up custom price alerts for any token (e.g., "/addalert BTC above 70000").
 -   **Dry Run Mode**: A global simulation mode that uses live market data to demonstrate trading functionality without executing real on-chain transactions. Perfect for safe testing and demos.
@@ -24,8 +26,6 @@ The world of Decentralized Finance (DeFi) is powerful but complex. Esther's miss
 -   **Robust Deployment**: Fully configured for continuous deployment on Render, including a Flask health check endpoint to ensure uptime.
 
 ### Upcoming Features
--   **Advanced Order Types**: Support for conditional trades and stop-loss/take-profit orders.
--   **Personalized Market Insights**: Proactive trend analysis and portfolio-based recommendations.
 -   **On-Demand Education**: An integrated learning module to explain DeFi concepts on the fly.
 
 ## 🛠️ Tech Stack

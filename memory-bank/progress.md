@@ -18,11 +18,13 @@ The project is in its initial phase. The focus is on establishing a complete and
 - **Real-time Price Alerts**: A background service (`src/monitoring.py`) is implemented to monitor and notify users of price alerts.
 - **Dry Run Mode**: A simulation mode is fully implemented, allowing for safe, realistic demos using live market data without executing real trades.
 - **Deployment**: The application is fully configured for deployment on Render's free tier, with all known issues resolved. The deployment now uses a stable polling-based architecture, with the Flask web server running in a background thread.
+- **Advanced Orders**: The NLP model can now understand `set_stop_loss` and `set_take_profit` intents.
+- **Personalized Market Insights**: A new `/insights` command provides users with personalized market analysis and recommendations.
 
 ## 3. What's Left to Build
-- **Advanced NLP**: Expand the NLP module to handle more complex queries, such as conditional orders (e.g., "buy 0.1 ETH if the price is below $2000").
+- **On-Demand Education**: An integrated learning module to explain DeFi concepts on the fly.
 - **Refine and Document `DRY_RUN_MODE`**: Ensure the `DRY_RUN_MODE` is consistently applied across all new features and document its usage.
-- **Remaining Phases**: All features outlined in the development plan, including enhanced market analysis, personalization, and custom alerts.
+- **Real-time Notifications**: Begin work on the observer pattern for real-time market alerts.
 
 ## 4. Known Issues & Blockers
 - **No known issues at this time.**
