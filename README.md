@@ -1,116 +1,116 @@
-# Esther: The OKX DEX AI Trading Agent
+# Esther: Your AI-Powered Crypto Trading Assistant
 
 <div align="center">
   <img src="https://placehold.co/600x300/000000/FFFFFF/png?text=Esther+AI" alt="Esther AI Trading Agent Banner">
 </div>
 
-**Esther** is a sophisticated, AI-powered trading agent that operates within Telegram. It provides a seamless, conversational interface to the OKX Decentralized Exchange (DEX), empowering users to trade, analyze the market, and manage their portfolio using natural language.
+**Esther** is a smart, AI-powered assistant that lives in your Telegram chat. It makes trading on the OKX Decentralized Exchange (DEX) easy and accessible for everyone. With Esther, you can trade, get market updates, and manage your crypto portfolio just by having a conversation.
 
-## 🌟 Core Philosophy
-The world of Decentralized Finance (DeFi) is powerful but complex. Esther's mission is to democratize access to DeFi by abstracting away the technical hurdles. It serves as an intelligent, trustworthy, and educational co-pilot for both novice investors and experienced traders.
+## 🌟 Our Goal
+Decentralized Finance (DeFi) can be confusing. Our goal with Esther is to make it simple. Esther is designed to be a helpful and trustworthy guide for both beginners and experienced traders in the world of crypto.
 
-## ✨ Features
+## ✨ What Esther Can Do
 
-### Current Features
--   **Conversational Trading**:
-    -   **Get Live Quotes**: Ask for the price of any token (e.g., "What's the price of ETH?").
-    -   **Execute Swaps**: Initiate token swaps with simple commands (e.g., "Buy 0.1 ETH with USDC" or "Sell 0.5 ETH for USDT").
-    -   **Advanced Orders**: Set stop-loss and take-profit orders (e.g., "set a stop-loss for BTC at 60000").
--   **Personalized Market Insights**: Get personalized market insights and recommendations with the `/insights` command.
--   **Secure Confirmation Flow**: All transactions require explicit user confirmation via interactive buttons, preventing accidental trades.
--   **Real-time Price Alerts**: Set up custom price alerts for any token (e.g., "/addalert BTC above 70000").
--   **Dry Run Mode**: A global simulation mode that uses live market data to demonstrate trading functionality without executing real on-chain transactions. Perfect for safe testing and demos.
--   **User Account Management**: Automatically creates and manages user profiles in a secure PostgreSQL database.
--   **Secure Wallet Management**: Add, list, and delete your wallet addresses securely. Private keys are encrypted before being stored.
--   **Intelligent Intent Parsing**: Powered by Google's Gemini models (`2.5-pro` and `2.5-flash`) to understand user commands.
--   **Robust Deployment**: Fully configured for continuous deployment on Render, including a Flask health check endpoint to ensure uptime.
+### Key Features
+-   **Trade with Simple Chat Commands**:
+    -   **Check Prices**: "What's the price of ETH?"
+    -   **Buy and Sell Tokens**: "Buy 0.1 ETH with USDC" or "Sell 0.5 ETH for USDT".
+    -   **Set Smart Orders**: "Set a stop-loss for BTC at 60000" or "Set a take-profit for ETH at 3500".
+-   **Get Smart Insights**: Use the `/insights` command to get personalized advice and analysis on your crypto holdings.
+-   **Trade Safely**: Every trade must be confirmed by you, so you never have to worry about accidental transactions.
+-   **Stay Updated with Price Alerts**: Set custom alerts for any cryptocurrency (e.g., "/addalert BTC above 70000").
+-   **Practice with a Demo Mode**: A "Dry Run" mode lets you practice trading with real market data without using real money.
+-   **Manage Your Account**: Esther automatically creates and manages your user profile.
+-   **Keep Your Wallet Secure**: You can add, view, and delete your wallet addresses with confidence, as your private keys are always encrypted.
+-   **Powered by Advanced AI**: Esther uses Google's Gemini models to understand your commands and provide intelligent responses.
+-   **Reliable and Always On**: Esther is deployed on Render, a modern and reliable cloud platform, with a health check to ensure it's always running.
 
-### Upcoming Features
--   **On-Demand Education**: An integrated learning module to explain DeFi concepts on the fly.
+### What's Coming Next
+-   **Learn as You Go**: An in-app guide to help you understand DeFi concepts.
 
-## 🛠️ Tech Stack
+## 🛠️ The Technology Behind Esther
 
--   **Backend**: Python 3.9+, `asyncio`
--   **AI & NLP**: Google Gemini 2.5 Pro & Flash
+-   **Programming Language**: Python
+-   **AI and Language Processing**: Google Gemini 2.5 Pro & Flash
 -   **Bot Framework**: `python-telegram-bot`
--   **Web Server**: Flask (for Render health checks)
+-   **Web Server**: Flask
 -   **Database**: PostgreSQL
--   **DEX Integration**: OKX DEX API v5
--   **Deployment**: Render
+-   **Crypto Exchange**: OKX DEX API
+-   **Cloud Hosting**: Render
 
-For a detailed technical breakdown, see [How It Works](./how-it-works.md).
+For a more technical look at how Esther works, check out our [How It Works](./how-it-works.md) guide.
 
-## 🚀 Getting Started
+## 🚀 How to Get Started
 
-### Prerequisites
+### What You'll Need
 
--   Python 3.9+
+-   Python (version 3.9 or higher)
 -   A Telegram Bot Token
 -   A Google Gemini API Key
 -   An OKX DEX API Key, Secret, and Passphrase
--   A PostgreSQL database URL (e.g., from Render's free tier)
+-   A PostgreSQL database URL (you can get one for free from Render)
 
-### Installation & Setup
+### Step-by-Step Setup
 
-1.  **Clone the repository:**
+1.  **Download the Code:**
     ```bash
     git clone https://github.com/ugbodagadave/Esther.git
     cd Esther
     ```
 
-2.  **Create a virtual environment and install dependencies:**
+2.  **Set Up Your Workspace and Install a Few Things:**
     ```bash
     python -m venv venv
     source venv/bin/activate  # On Windows, use `venv\Scripts\activate`
     pip install -r requirements.txt
     ```
 
-3.  **Set up environment variables:**
-    Create a `.env` file in the root directory and populate it with your credentials.
+3.  **Add Your Secret Keys:**
+    Create a file named `.env` in the main folder and add your secret keys, like this:
     ```dotenv
-    # Telegram and AI
+    # For Telegram and the AI
     TELEGRAM_BOT_TOKEN="your_telegram_bot_token"
     GEMINI_API_KEY="your_gemini_api_key"
 
-    # OKX API Credentials
+    # For the OKX Crypto Exchange
     OKX_API_KEY="your_okx_api_key"
     OKX_API_SECRET="your_okx_api_secret"
     OKX_API_PASSPHRASE="your_okx_api_passphrase"
 
-    # Database
+    # For the Database
     DATABASE_URL="your_postgresql_connection_string"
     
-    # A test wallet address for development
+    # A test wallet for practice
     TEST_WALLET_ADDRESS="your_ethereum_test_wallet_address"
     ```
 
-4.  **Initialize the database:**
-    The application will automatically create the necessary `users` table on startup if it doesn't exist.
+4.  **Set Up the Database:**
+    The app will automatically create the tables it needs when you run it for the first time.
 
-5.  **Run the bot:**
+5.  **Start the Bot:**
     ```bash
     python src/main.py
     ```
-    This will start the bot in polling mode and run the Flask web server in a background thread to handle health checks.
+    This will start the bot, and it will begin listening for your commands in Telegram.
 
-## ⚙️ Configuration
+## ⚙️ Settings
 
-### Dry Run Mode
-For safe testing and development, the bot includes a `DRY_RUN_MODE`. When enabled, all swap transactions are simulated using live market data, but no real on-chain transactions are executed. This is the default behavior.
+### Demo Mode ("Dry Run")
+For safe practice, Esther has a "Dry Run" mode. When it's on, you can simulate trades with real market data without spending any real money. This is the default setting.
 
-To enable or disable Dry Run Mode, set the `DRY_RUN_MODE` variable in your `.env` file:
+To turn demo mode on or off, change the `DRY_RUN_MODE` setting in your `.env` file:
 ```dotenv
-# Set to "True" to simulate all transactions (default and recommended for testing)
+# Set to "True" to practice without real money (this is the default)
 DRY_RUN_MODE="True"
 
-# Set to "False" to execute real transactions on the blockchain
+# Set to "False" to make real trades on the crypto exchange
 # DRY_RUN_MODE="False"
 ```
 
-## 🤝 Contributing
+## 🤝 Want to Help?
 
-Contributions are welcome! Please feel free to submit a pull request or open an issue to discuss proposed changes.
+We welcome contributions! If you have an idea for a new feature or a bug fix, please open an issue or submit a pull request.
 
 ## 📄 License
 
-This project is licensed under the MIT License. See the `LICENSE` file for details.
+This project is licensed under the MIT License. You can find the full license text in the `LICENSE` file.
