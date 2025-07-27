@@ -262,6 +262,25 @@ class TestMainHandlers(unittest.TestCase):
         update.message.reply_text.assert_called_once_with("I've set a take-profit for ETH at $3000. I will notify you if the price rises to this level.")
         self.assertEqual(result, ConversationHandler.END)
 
+    @patch('src.main.insights_client')
+    def test_insights_command(self, mock_insights_client):
+        """Test the /insights command."""
+        mock_insights_client.generate_insights.return_value = "Here are your personalized insights."
+
+        update = MagicMock()
+        update.effective_user = MagicMock(id=123)
+        update.message = MagicMock()
+        update.message.reply_text = AsyncMock()
+        context = MagicMock()
+
+        import asyncio
+        from src.main import insights
+        asyncio.run(insights(update, context))
+
+        update.message.reply_text.assert_any_call("Generating your personalized market insights... This may take a moment.")
+        update.message.reply_text.assert_any_call("Here are your personalized insights.")
+        mock_insights_client.generate_insights.assert_called_once_with(123)
+
 if __name__ == '__main__':
     # Set dummy env var for NLPClient initialization during tests
     os.environ["GEMINI_API_KEY"] = "test_key"
