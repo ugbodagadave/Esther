@@ -143,7 +143,7 @@ async def get_price_intent(update: Update, context: ContextTypes.DEFAULT_TYPE, e
 
     amount_in_wei = "1000000000000000000" # 1 ETH for price check
 
-    quote_response = okx_client.get_quote(
+    quote_response = okx_client.get_live_quote(
         from_token_address=from_token_address,
         to_token_address=to_token_address,
         amount=amount_in_wei
@@ -186,7 +186,7 @@ async def buy_token_intent(update: Update, context: ContextTypes.DEFAULT_TYPE, e
     amount_in_smallest_unit = str(int(float(amount) * 10**6)) # Assuming 6 decimals for USDC/USDT
 
     # Get a quote to show the user
-    quote_response = okx_client.get_quote(
+    quote_response = okx_client.get_live_quote(
         from_token_address=from_token_address,
         to_token_address=to_token_address,
         amount=amount_in_smallest_unit
@@ -307,7 +307,7 @@ async def sell_token_intent(update: Update, context: ContextTypes.DEFAULT_TYPE, 
     amount_in_smallest_unit = str(int(float(amount) * 10**18)) # Assuming 18 decimals for ETH/WBTC
 
     # Get a quote to show the user
-    quote_response = okx_client.get_quote(
+    quote_response = okx_client.get_live_quote(
         from_token_address=from_token_address,
         to_token_address=to_token_address,
         amount=amount_in_smallest_unit
@@ -581,67 +581,73 @@ async def list_alerts(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
         if conn:
             conn.close()
 
-def run_bot():
-    """Runs the Telegram bot's polling loop in a dedicated asyncio event loop."""
-    if not TELEGRAM_BOT_TOKEN:
-        logger.error("TELEGRAM_BOT_TOKEN not found in environment variables.")
-        return
+# --- Bot Setup ---
+if not TELEGRAM_BOT_TOKEN:
+    raise ValueError("TELEGRAM_BOT_TOKEN not found in environment variables.")
 
-    # Create a new event loop for this thread
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
+application = Application.builder().token(TELEGRAM_BOT_TOKEN).build()
 
-    application = Application.builder().token(TELEGRAM_BOT_TOKEN).build()
-
-    # --- Main Conversation Handler ---
-    conv_handler = ConversationHandler(
-        entry_points=[
-            CommandHandler("addwallet", add_wallet_start),
-            CommandHandler("addalert", add_alert_start),
-            MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text),
+# --- Main Conversation Handler ---
+conv_handler = ConversationHandler(
+    entry_points=[
+        CommandHandler("addwallet", add_wallet_start),
+        CommandHandler("addalert", add_alert_start),
+        MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text),
+    ],
+    states={
+        # States for trading conversations
+        AWAIT_CONFIRMATION: [
+            CallbackQueryHandler(confirm_swap, pattern="^confirm_swap$"),
+            CallbackQueryHandler(cancel_swap, pattern="^cancel_swap$"),
         ],
-        states={
-            # States for trading conversations
-            AWAIT_CONFIRMATION: [
-                CallbackQueryHandler(confirm_swap, pattern="^confirm_swap$"),
-                CallbackQueryHandler(cancel_swap, pattern="^cancel_swap$"),
-            ],
-            # States for adding a wallet
-            AWAIT_WALLET_NAME: [MessageHandler(filters.TEXT & ~filters.COMMAND, received_wallet_name)],
-            AWAIT_WALLET_ADDRESS: [MessageHandler(filters.TEXT & ~filters.COMMAND, received_wallet_address)],
-            AWAIT_PRIVATE_KEY: [MessageHandler(filters.TEXT & ~filters.COMMAND, received_private_key)],
-            # States for adding an alert
-            AWAIT_ALERT_SYMBOL: [MessageHandler(filters.TEXT & ~filters.COMMAND, received_alert_symbol)],
-            AWAIT_ALERT_CONDITION: [CallbackQueryHandler(received_alert_condition, pattern="^alert_")],
-            AWAIT_ALERT_PRICE: [MessageHandler(filters.TEXT & ~filters.COMMAND, received_alert_price)],
-        },
-        fallbacks=[CommandHandler("start", start)],
-        per_message=False,
-    )
+        # States for adding a wallet
+        AWAIT_WALLET_NAME: [MessageHandler(filters.TEXT & ~filters.COMMAND, received_wallet_name)],
+        AWAIT_WALLET_ADDRESS: [MessageHandler(filters.TEXT & ~filters.COMMAND, received_wallet_address)],
+        AWAIT_PRIVATE_KEY: [MessageHandler(filters.TEXT & ~filters.COMMAND, received_private_key)],
+        # States for adding an alert
+        AWAIT_ALERT_SYMBOL: [MessageHandler(filters.TEXT & ~filters.COMMAND, received_alert_symbol)],
+        AWAIT_ALERT_CONDITION: [CallbackQueryHandler(received_alert_condition, pattern="^alert_")],
+        AWAIT_ALERT_PRICE: [MessageHandler(filters.TEXT & ~filters.COMMAND, received_alert_price)],
+    },
+    fallbacks=[CommandHandler("start", start)],
+    per_message=False,
+)
 
-    application.add_handler(conv_handler)
+application.add_handler(conv_handler)
+
+# Add other handlers that are not part of conversations
+application.add_handler(CommandHandler("start", start))
+application.add_handler(CommandHandler("help", help_command))
+application.add_handler(CommandHandler("listwallets", list_wallets))
+application.add_handler(CommandHandler("listalerts", list_alerts))
+application.add_handler(CommandHandler("deletewallet", delete_wallet_start))
+application.add_handler(CallbackQueryHandler(delete_wallet_callback, pattern="^delete_"))
+
+@app.route('/')
+def health_check():
+    return "Bot is running.", 200
+
+@app.route('/webhook', methods=['POST'])
+async def webhook():
+    """Handles incoming updates from Telegram."""
+    await application.update_queue.put(Update.de_json(await request.json(), application.bot))
+    return '', 200
+
+async def main():
+    """Sets up and runs the bot with webhooks."""
+    webhook_url = os.getenv("RENDER_EXTERNAL_URL")
+    if not webhook_url:
+        raise ValueError("RENDER_EXTERNAL_URL not found in environment variables.")
     
-    # Add other handlers that are not part of conversations
-    application.add_handler(CommandHandler("start", start))
-    application.add_handler(CommandHandler("help", help_command))
-    application.add_handler(CommandHandler("listwallets", list_wallets))
-    application.add_handler(CommandHandler("listalerts", list_alerts))
-    application.add_handler(CommandHandler("deletewallet", delete_wallet_start))
-    application.add_handler(CallbackQueryHandler(delete_wallet_callback, pattern="^delete_"))
+    await application.bot.set_webhook(url=f"{webhook_url}/webhook")
     
-    logger.info("Starting bot polling...")
-    application.run_polling(
-        drop_pending_updates=True,
-        close_loop=False,
-        stop_signals=None  # This disables signal handling
-    )
+    # The web server is run by gunicorn in production, so we don't need to run it here.
+    # This part is for local testing if needed.
+    if __name__ == "__main__":
+        # We are not running the bot polling here, just the web server.
+        port = int(os.environ.get('PORT', 8080))
+        logger.info(f"Starting Flask web server on port {port}...")
+        app.run(host='0.0.0.0', port=port)
 
 if __name__ == "__main__":
-    # Start the bot in a separate thread
-    bot_thread = threading.Thread(target=run_bot)
-    bot_thread.start()
-    
-    # Run the Flask app in the main thread
-    port = int(os.environ.get('PORT', 8080))
-    logger.info(f"Starting Flask web server on port {port}...")
-    app.run(host='0.0.0.0', port=port)
+    asyncio.run(main())

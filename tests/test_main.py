@@ -70,7 +70,7 @@ class TestMainHandlers(unittest.TestCase):
             "entities": {"symbol": "ETH"}
         }
         # Mock OKX response
-        mock_okx_client.get_quote.return_value = {
+        mock_okx_client.get_live_quote.return_value = {
             "success": True,
             "data": {"toTokenAmount": "3000000000"}
         }
