@@ -5,7 +5,4 @@ google-generativeai
 psycopg2-binary
 Flask[async]
 cryptography
-gunicorn
-uvicorn
 pytest
-asgiref

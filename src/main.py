@@ -10,8 +10,7 @@ from pathlib import Path
 project_root = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(project_root))
 
-from flask import Flask, request
-from asgiref.wsgi import WsgiToAsgi
+from flask import Flask
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
     Application,
@@ -28,8 +27,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # --- Flask App for Render Health Checks ---
-flask_app = Flask(__name__)
-app = WsgiToAsgi(flask_app)
+app = Flask(__name__)
 
 # --- Telegram Bot Logic ---
 # Enable logging
@@ -625,14 +623,19 @@ application.add_handler(CommandHandler("listalerts", list_alerts))
 application.add_handler(CommandHandler("deletewallet", delete_wallet_start))
 application.add_handler(CallbackQueryHandler(delete_wallet_callback, pattern="^delete_"))
 
-@flask_app.route('/')
+@app.route('/')
 def health_check():
     return "Bot is running.", 200
 
-@flask_app.route('/webhook', methods=['POST'])
-async def webhook():
-    """Handles incoming updates from Telegram."""
-    update_data = await request.get_json()
-    update = Update.de_json(update_data, application.bot)
-    await application.process_update(update)
-    return '', 200
+def main() -> None:
+    """Start the bot."""
+    # Start the Flask app in a separate thread
+    flask_thread = threading.Thread(target=lambda: app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 8080))))
+    flask_thread.daemon = True
+    flask_thread.start()
+
+    # Run the bot in polling mode
+    application.run_polling()
+
+if __name__ == "__main__":
+    main()
