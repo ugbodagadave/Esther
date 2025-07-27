@@ -1,8 +1,14 @@
 import unittest
 from unittest.mock import AsyncMock, MagicMock, patch
-from telegram.ext import ConversationHandler
-from src.main import start, help_command, handle_text, confirm_swap, cancel_swap, AWAIT_CONFIRMATION
 import os
+import warnings
+from telegram.ext import ConversationHandler
+from telegram.warnings import PTBUserWarning
+
+# Suppress the specific PTBUserWarning at the module level, before it's triggered
+warnings.filterwarnings("ignore", category=PTBUserWarning)
+
+from src.main import start, help_command, handle_text, confirm_swap, cancel_swap, AWAIT_CONFIRMATION
 
 class TestMainHandlers(unittest.TestCase):
 
@@ -217,6 +223,44 @@ class TestMainHandlers(unittest.TestCase):
         self.assertIn("Please confirm the following swap:", update.message.reply_text.call_args[0][0])
         self.assertEqual(result, AWAIT_CONFIRMATION)
         self.assertIn('swap_details', context.user_data)
+
+    @patch('src.main.nlp_client')
+    def test_handle_text_set_stop_loss(self, mock_nlp_client):
+        mock_nlp_client.parse_intent.return_value = {
+            "intent": "set_stop_loss",
+            "entities": {"symbol": "BTC", "price": "60000"}
+        }
+
+        update = MagicMock()
+        update.message = MagicMock()
+        update.message.text = "set a stop-loss for BTC at 60000"
+        update.message.reply_text = AsyncMock()
+        context = MagicMock()
+
+        import asyncio
+        result = asyncio.run(handle_text(update, context))
+        
+        update.message.reply_text.assert_called_once_with("I've set a stop-loss for BTC at $60000. I will notify you if the price drops to this level.")
+        self.assertEqual(result, ConversationHandler.END)
+
+    @patch('src.main.nlp_client')
+    def test_handle_text_set_take_profit(self, mock_nlp_client):
+        mock_nlp_client.parse_intent.return_value = {
+            "intent": "set_take_profit",
+            "entities": {"symbol": "ETH", "price": "3000"}
+        }
+
+        update = MagicMock()
+        update.message = MagicMock()
+        update.message.text = "set a take-profit for ETH at 3000"
+        update.message.reply_text = AsyncMock()
+        context = MagicMock()
+
+        import asyncio
+        result = asyncio.run(handle_text(update, context))
+        
+        update.message.reply_text.assert_called_once_with("I've set a take-profit for ETH at $3000. I will notify you if the price rises to this level.")
+        self.assertEqual(result, ConversationHandler.END)
 
 if __name__ == '__main__':
     # Set dummy env var for NLPClient initialization during tests

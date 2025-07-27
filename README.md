@@ -33,7 +33,7 @@ The world of Decentralized Finance (DeFi) is powerful but complex. Esther's miss
 -   **Backend**: Python 3.9+, `asyncio`
 -   **AI & NLP**: Google Gemini 2.5 Pro & Flash
 -   **Bot Framework**: `python-telegram-bot`
--   **Web Server**: Gunicorn with Uvicorn workers
+-   **Web Server**: Flask (for Render health checks)
 -   **Database**: PostgreSQL
 -   **DEX Integration**: OKX DEX API v5
 -   **Deployment**: Render
@@ -89,9 +89,9 @@ For a detailed technical breakdown, see [How It Works](./how-it-works.md).
 
 5.  **Run the bot:**
     ```bash
-    gunicorn -w 4 -k uvicorn.workers.UvicornWorker src.main:app
+    python src/main.py
     ```
-    This will start the Gunicorn server with Uvicorn workers, which is the production-ready way to run the application. The bot will be available at the webhook URL you set up in the `setup_webhook.py` script.
+    This will start the bot in polling mode and run the Flask web server in a background thread to handle health checks.
 
 ## ⚙️ Configuration
 

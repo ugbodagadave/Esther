@@ -119,6 +119,12 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int
     elif intent == "sell_token":
         return await sell_token_intent(update, context, entities)
 
+    elif intent == "set_stop_loss":
+        return await set_stop_loss_intent(update, context, entities)
+
+    elif intent == "set_take_profit":
+        return await set_take_profit_intent(update, context, entities)
+
     elif intent == "greeting":
         await update.message.reply_text("Hello! How can I assist you with your trades today?")
         return ConversationHandler.END
@@ -341,6 +347,34 @@ async def sell_token_intent(update: Update, context: ContextTypes.DEFAULT_TYPE, 
     await update.message.reply_text(response_message, reply_markup=reply_markup, parse_mode='Markdown')
 
     return AWAIT_CONFIRMATION
+
+async def set_stop_loss_intent(update: Update, context: ContextTypes.DEFAULT_TYPE, entities: dict) -> int:
+    """Handles the set_stop_loss intent and starts the confirmation conversation."""
+    symbol = entities.get("symbol")
+    price = entities.get("price")
+
+    if not all([symbol, price]):
+        await update.message.reply_text("To set a stop-loss, please tell me the token symbol and the price (e.g., 'set a stop-loss for BTC at 60000').")
+        return ConversationHandler.END
+
+    # In a real app, you would create a conditional order here.
+    # For now, we will just confirm with the user.
+    await update.message.reply_text(f"I've set a stop-loss for {symbol.upper()} at ${price}. I will notify you if the price drops to this level.")
+    return ConversationHandler.END
+
+async def set_take_profit_intent(update: Update, context: ContextTypes.DEFAULT_TYPE, entities: dict) -> int:
+    """Handles the set_take_profit intent and starts the confirmation conversation."""
+    symbol = entities.get("symbol")
+    price = entities.get("price")
+
+    if not all([symbol, price]):
+        await update.message.reply_text("To set a take-profit, please tell me the token symbol and the price (e.g., 'set a take-profit for ETH at 3000').")
+        return ConversationHandler.END
+
+    # In a real app, you would create a conditional order here.
+    # For now, we will just confirm with the user.
+    await update.message.reply_text(f"I've set a take-profit for {symbol.upper()} at ${price}. I will notify you if the price rises to this level.")
+    return ConversationHandler.END
 
 # --- Wallet Management ---
 async def add_wallet_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:

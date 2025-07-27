@@ -49,7 +49,7 @@ graph TD
 
 Here is the step-by-step journey of a user command, from Telegram to execution and back:
 
-1.  **Message Reception**: The **Telegram Bot Interface**, running behind a Gunicorn server with Uvicorn workers, receives a message from a user via a webhook.
+1.  **Message Reception**: The **Telegram Bot Interface**, using a long-polling mechanism, receives a message from a user. This is managed by the `python-telegram-bot` library's `Application.run_polling()` method.
 2.  **NLP Processing**: The message is passed to the **NLP Module**.
     *   A preliminary check determines the likely complexity of the query.
     *   **Strategy Pattern**: Based on complexity, the system selects either **Gemini Flash** (for simple requests like "price of ETH") or **Gemini Pro** (for complex requests like "buy 0.5 ETH if...").

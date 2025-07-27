@@ -74,5 +74,49 @@ class TestNLPClient(unittest.TestCase):
         with self.assertRaises(ValueError):
             NLPClient()
 
+    @patch('google.generativeai.GenerativeModel')
+    def test_parse_intent_set_stop_loss(self, mock_gen_model):
+        """Test parsing a 'set_stop_loss' intent."""
+        mock_pro_instance = MagicMock()
+        mock_pro_instance.generate_content.return_value = MagicMock(text='{"intent": "set_stop_loss", "entities": {"symbol": "BTC", "price": "60000"}}')
+
+        def model_side_effect(model_name):
+            if 'pro' in model_name:
+                return mock_pro_instance
+            return MagicMock()
+        
+        mock_gen_model.side_effect = model_side_effect
+
+        with patch.dict(os.environ, {"GEMINI_API_KEY": "test_key"}):
+            nlp_client = NLPClient()
+            result = nlp_client.parse_intent("set a stop-loss for BTC at 60000", model_type='pro')
+
+        self.assertEqual(result['intent'], 'set_stop_loss')
+        self.assertEqual(result['entities']['symbol'], 'BTC')
+        self.assertEqual(result['entities']['price'], '60000')
+        mock_pro_instance.generate_content.assert_called_once()
+
+    @patch('google.generativeai.GenerativeModel')
+    def test_parse_intent_set_take_profit(self, mock_gen_model):
+        """Test parsing a 'set_take_profit' intent."""
+        mock_pro_instance = MagicMock()
+        mock_pro_instance.generate_content.return_value = MagicMock(text='{"intent": "set_take_profit", "entities": {"symbol": "ETH", "price": "3000"}}')
+
+        def model_side_effect(model_name):
+            if 'pro' in model_name:
+                return mock_pro_instance
+            return MagicMock()
+        
+        mock_gen_model.side_effect = model_side_effect
+
+        with patch.dict(os.environ, {"GEMINI_API_KEY": "test_key"}):
+            nlp_client = NLPClient()
+            result = nlp_client.parse_intent("set a take-profit for ETH at 3000", model_type='pro')
+
+        self.assertEqual(result['intent'], 'set_take_profit')
+        self.assertEqual(result['entities']['symbol'], 'ETH')
+        self.assertEqual(result['entities']['price'], '3000')
+        mock_pro_instance.generate_content.assert_called_once()
+
 if __name__ == '__main__':
     unittest.main()
