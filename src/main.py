@@ -43,10 +43,12 @@ from src.nlp import NLPClient
 from src.okx_client import OKXClient
 from src.database import get_db_connection
 from src.encryption import encrypt_data, decrypt_data
+from src.insights import InsightsClient
 
 # Initialize clients
 nlp_client = NLPClient()
 okx_client = OKXClient()
+insights_client = InsightsClient()
 
 # --- Conversation Handler States ---
 AWAIT_CONFIRMATION = 1
@@ -376,6 +378,17 @@ async def set_take_profit_intent(update: Update, context: ContextTypes.DEFAULT_T
     await update.message.reply_text(f"I've set a take-profit for {symbol.upper()} at ${price}. I will notify you if the price rises to this level.")
     return ConversationHandler.END
 
+async def insights(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Provides personalized market insights."""
+    user = update.effective_user
+    await update.message.reply_text("Generating your personalized market insights... This may take a moment.")
+    
+    # In a real app, you would fetch the user's ID from the database
+    user_id = user.id
+    
+    insights_text = insights_client.generate_insights(user_id)
+    await update.message.reply_text(insights_text)
+
 # --- Wallet Management ---
 async def add_wallet_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Starts the conversation to add a new wallet."""
@@ -652,6 +665,7 @@ application.add_handler(conv_handler)
 # Add other handlers that are not part of conversations
 application.add_handler(CommandHandler("start", start))
 application.add_handler(CommandHandler("help", help_command))
+application.add_handler(CommandHandler("insights", insights))
 application.add_handler(CommandHandler("listwallets", list_wallets))
 application.add_handler(CommandHandler("listalerts", list_alerts))
 application.add_handler(CommandHandler("deletewallet", delete_wallet_start))
