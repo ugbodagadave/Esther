@@ -5,7 +5,7 @@ The current focus is wrapping up the initial development phase and preparing for
 
 ## 2. Recent Changes & Decisions
 - **Database Switch**: The project was successfully migrated from a planned MongoDB implementation to PostgreSQL to better leverage Render's free tier.
-- **Deployment Issues Resolved**: A series of deployment issues on Render were diagnosed and fixed, resulting in a stable deployment configuration (`render.yaml`) and startup script (`src/main.py`).
+- **Deployment Issues Resolved**: A series of deployment issues on Render were diagnosed and fixed, resulting in a stable deployment configuration (`render.yaml`) and startup script (`src/main.py`). The application now uses a webhook-based approach with a Gunicorn server and Uvicorn workers, which is a more robust and scalable solution.
 - **Live API Integration**: The OKX DEX and Gemini APIs have been successfully integrated and tested with live credentials.
 - **Dry Run Mode Implemented**: A critical "dry run" feature was implemented to allow for safe, realistic demos using live market data without executing real transactions. This was prioritized to facilitate investor demos.
 - **Model Names Corrected**: The Gemini model names were corrected to `gemini-2.5-pro` and `gemini-2.5-flash` as per the user's explicit instructions and official documentation.

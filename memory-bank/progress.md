@@ -17,7 +17,7 @@ The project is in its initial phase. The focus is on establishing a complete and
 - **Error Handling**: Implemented retry logic for API calls to enhance resilience.
 - **Real-time Price Alerts**: A background service (`src/monitoring.py`) is implemented to monitor and notify users of price alerts.
 - **Dry Run Mode**: A simulation mode is fully implemented, allowing for safe, realistic demos using live market data without executing real trades.
-- **Deployment**: The application is fully configured for deployment on Render's free tier, with all known issues resolved.
+- **Deployment**: The application is fully configured for deployment on Render's free tier, with all known issues resolved. The deployment now uses a webhook-based architecture with a Gunicorn server and Uvicorn workers for improved scalability and reliability.
 
 ## 3. What's Left to Build
 - **Advanced NLP**: Expand the NLP module to handle more complex queries, such as conditional orders (e.g., "buy 0.1 ETH if the price is below $2000").
