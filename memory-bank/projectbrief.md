@@ -1,7 +1,7 @@
 # Project Brief: Esther - The OKX DEX AI Agent
 
 ## 1. Project Vision
-To create Esther, a sophisticated AI Agent operating on Telegram. Esther will simplify decentralized trading on the OKX DEX by providing a conversational interface, intelligent market analysis, and personalized portfolio management, making DeFi accessible to a global audience.
+To create Esther, a sophisticated AI Agent operating on Telegram. Esther will simplify decentralized trading by integrating with the OKX DEX aggregator, providing a conversational interface, intelligent market analysis, and personalized portfolio management, making DeFi accessible to a global audience.
 
 ## 2. Core Problem
 Decentralized exchanges (DEXs) are powerful but often complex and intimidating for many users. The core problems Esther aims to solve are:

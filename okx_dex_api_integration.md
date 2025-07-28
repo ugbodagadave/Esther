@@ -4,7 +4,7 @@ This document provides a detailed overview of how the Esther AI Agent integrates
 
 ## 1. OKX DEX API Integration
 
-The OKX DEX API is the core of Esther's trading functionality. It allows the AI Agent to perform a variety of actions on the OKX Decentralized Exchange, including fetching market data, getting live quotes, and executing trades.
+The OKX DEX API is the core of Esther's trading functionality. It allows the AI Agent to perform a variety of actions on the OKX DEX aggregator, including fetching market data, getting live quotes, and executing trades.
 
 ### A. Authentication
 
