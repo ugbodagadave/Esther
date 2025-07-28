@@ -1,7 +1,7 @@
 # Esther: Your AI-Powered Crypto Trading Assistant
 
 <div align="center">
-  <img src="https://placehold.co/600x300/000000/FFFFFF/png?text=Esther+AI" alt="Esther AI Trading Agent Banner">
+  <img src="esther-banner.png" alt="Esther AI Trading Agent Banner">
 </div>
 
 **Esther** is a smart, AI-powered assistant that lives in your Telegram chat. It makes trading on the OKX Decentralized Exchange (DEX) easy and accessible for everyone. With Esther, you can trade, get market updates, and manage your crypto portfolio just by having a conversation.
