@@ -1,10 +1,10 @@
-# Esther: Your AI-Powered Crypto Trading Assistant
+# Esther: Your AI Crypto Trading Agent
 
 <div align="center">
   <img src="esther-banner.png" alt="Esther AI Trading Agent Banner">
 </div>
 
-**Esther** is a smart, AI-powered assistant that lives in your Telegram chat. It makes trading on the OKX Decentralized Exchange (DEX) easy and accessible for everyone. With Esther, you can trade, get market updates, and manage your crypto portfolio just by having a conversation.
+**Esther** is an AI Agent that lives in your Telegram chat. It makes trading on the OKX Decentralized Exchange (DEX) easy and accessible for everyone. With Esther, you can trade, get market updates, and manage your crypto portfolio just by having a conversation.
 
 ## 🌟 Our Goal
 Decentralized Finance (DeFi) can be confusing. Our goal with Esther is to make it simple. Esther is designed to be a helpful and trustworthy guide for both beginners and experienced traders in the world of crypto.
@@ -39,6 +39,8 @@ Decentralized Finance (DeFi) can be confusing. Our goal with Esther is to make i
 -   **Cloud Hosting**: Render
 
 For a more technical look at how Esther works, check out our [How It Works](./how-it-works.md) guide.
+
+For a detailed explanation of how we integrated the OKX DEX API, see our [OKX DEX API Integration Guide](./okx_dex_api_integration.md).
 
 ## 🚀 How to Get Started
 
@@ -107,9 +109,6 @@ DRY_RUN_MODE="True"
 # DRY_RUN_MODE="False"
 ```
 
-## 🤝 Want to Help?
-
-We welcome contributions! If you have an idea for a new feature or a bug fix, please open an issue or submit a pull request.
 
 ## 📄 License
 

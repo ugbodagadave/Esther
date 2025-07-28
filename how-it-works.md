@@ -1,7 +1,7 @@
 # How It Works: A Technical Deep Dive into Esther
 
 ## 1. Introduction
-This document provides a detailed technical explanation of Esther's architecture, data flow, and core components. It is intended for developers and technical stakeholders to understand the inner workings of the system.
+This document provides a detailed technical explanation of the Esther AI Agent's architecture, data flow, and core components. It is intended for developers and technical stakeholders to understand the inner workings of the system.
 
 ## 2. Architectural Overview
 Esther is a modular, asynchronous Python application designed for scalability and maintainability. The architecture separates concerns into distinct layers, ensuring that each part of the system has a single responsibility.

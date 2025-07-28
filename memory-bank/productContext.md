@@ -9,7 +9,7 @@ The world of Decentralized Finance (DeFi) holds immense promise, but its potenti
 Esther is being built to address these pain points directly by creating a single, intelligent, and conversational access point to the OKX DEX.
 
 ## 2. The Solution: A Conversational AI Agent
-Esther's core purpose is to act as an intelligent intermediary between the user and the complexities of decentralized trading. By leveraging the conversational power of Telegram and the analytical prowess of Google Gemini, Esther will:
+Esther's core purpose is to act as an intelligent AI Agent between the user and the complexities of decentralized trading. By leveraging the conversational power of Telegram and the analytical prowess of Google Gemini, Esther will:
 - **Democratize Access**: Abstract away the technical jargon and intricate steps of trading, allowing users to interact with DeFi using simple, natural language.
 - **Enhance Decision-Making**: Aggregate and synthesize market data, news, and sentiment into personalized, actionable insights.
 - **Automate and Optimize**: Enable users to execute complex and conditional trading strategies that would be difficult or impossible to manage manually through a standard interface.
