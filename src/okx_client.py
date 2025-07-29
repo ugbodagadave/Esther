@@ -84,14 +84,14 @@ class OKXClient:
         
         return {"success": False, "error": "Failed to fetch quote after multiple retries."}
 
-    def execute_swap(self, from_token_address: str, to_token_address: str, amount: str, wallet_address: str, slippage: str = "1", dry_run: bool = True) -> dict:
+    def execute_swap(self, from_token_address: str, to_token_address: str, amount: str, wallet_address: str, chain_index: int = 1, slippage: str = "1", dry_run: bool = True) -> dict:
         """
         Executes a swap. If dry_run is True, it only fetches the quote and simulates the transaction.
         If dry_run is False, it executes a real swap on the blockchain.
         """
         if dry_run:
             logger.info(f"Executing DRY RUN swap from {from_token_address} to {to_token_address}")
-            quote_response = self.get_live_quote(from_token_address, to_token_address, amount)
+            quote_response = self.get_live_quote(from_token_address, to_token_address, amount, chain_index)
             
             if quote_response.get("success"):
                 return {
@@ -113,7 +113,7 @@ class OKXClient:
                         "amount": amount,
                         "walletAddress": wallet_address,
                         "slippage": slippage,
-                        "chainIndex": 1
+                        "chainIndex": chain_index
                     }
                     
                     headers = self._get_request_headers('POST', request_path, str(body))

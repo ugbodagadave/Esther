@@ -42,7 +42,7 @@ class TestOKXClient(unittest.TestCase):
         self.assertTrue(result['success'])
         self.assertEqual(result['status'], 'simulated')
         self.assertEqual(result['data']['toTokenAmount'], '500')
-        mock_get_live_quote.assert_called_once_with("from", "to", "100")
+        mock_get_live_quote.assert_called_once_with("from", "to", "100", 1)
 
     @patch.object(OKXClient, 'get_live_quote')
     def test_execute_swap_dry_run_quote_fails(self, mock_get_live_quote):
