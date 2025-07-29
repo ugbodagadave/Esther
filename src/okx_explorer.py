@@ -52,13 +52,17 @@ class OKXExplorer:
     def _headers(self, method: str, request_path: str, body: str = "") -> dict:
         ts = _timestamp()
         signature = _sign(ts + method + request_path + body, self.api_secret or "")
-        return {
+        headers = {
             "OK-ACCESS-KEY": self.api_key or "",
             "OK-ACCESS-SIGN": signature,
             "OK-ACCESS-TIMESTAMP": ts,
             "OK-ACCESS-PASSPHRASE": self.passphrase or "",
             "Content-Type": "application/json",
         }
+        project = os.getenv("OKX_PROJECT_ID") or os.getenv("OK_ACCESS_PROJECT")
+        if project:
+            headers["OK-ACCESS-PROJECT"] = project
+        return headers
 
     def _get(self, request_path: str, params: dict | None = None) -> dict:
         """Generic GET with retry and unified response shape."""
