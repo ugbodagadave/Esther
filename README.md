@@ -16,6 +16,7 @@ Decentralized Finance (DeFi) can be confusing. Our goal with Esther is to make i
     -   **Check Prices**: "What's the price of ETH?"
     -   **Buy and Sell Tokens**: "Buy 0.1 ETH with USDC" or "Sell 0.5 ETH for USDT".
     -   **Set Smart Orders**: "Set a stop-loss for BTC at 60000" or "Set a take-profit for ETH at 3500".
+    -   **Track & Rebalance Portfolio**: `/portfolio` shows live balances + USD value; automated rebalance suggestions coming soon.
 -   **Get Smart Insights**: Use the `/insights` command to get personalized advice and analysis on your crypto holdings.
 -   **Trade Safely**: Every trade must be confirmed by you, so you never have to worry about accidental transactions.
 -   **Stay Updated with Price Alerts**: Set custom alerts for any cryptocurrency (e.g., "/addalert BTC above 70000").

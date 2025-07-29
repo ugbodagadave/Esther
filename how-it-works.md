@@ -102,3 +102,68 @@ Security is paramount. The following measures are integral to the design:
 -   **Database Encryption**: User-specific sensitive data, particularly OKX DEX API keys, are encrypted using a strong algorithm (e.g., AES-256) before being stored in the PostgreSQL database. The encryption key itself is managed as a secure environment variable.
 -   **Immutable Transaction Confirmation**: The pre-execution confirmation step is a mandatory, non-skippable part of the workflow for any action that modifies a user's assets.
 -   **Principle of Least Privilege**: The OKX DEX API keys requested from the user should have the minimum required permissions for the bot's functionality.
+
+## 6. Portfolio Management Pipeline
+
+Esther now keeps a real-time view of every user’s on-chain balances **without requiring a separate paid worker on Render**.
+
+1. **Balance Discovery**
+   * A thin wrapper `src/okx_explorer.py` calls these OKX Explorer endpoints:
+     * `/api/v5/explorer/address/balance` – native coin balance
+     * `/api/v5/explorer/address/token_balance` – ERC-20 & equivalents
+   * Results are normalised into a common schema and pushed into the `holdings` table (one row per token, per user).
+2. **Valuation**
+   * During sync the wrapper hits `/api/v5/explorer/market/token_ticker` once per symbol to pull a USDT price.
+   * Total USD value and per-asset value are stored so expensive price calls are *not* needed when users run `/portfolio`.
+3. **Scheduling**
+   * The existing background process `src/monitoring.py` now has a coroutine `sync_all_portfolios()`.
+   * It runs every **10 minutes** (configurable via `PORTFOLIO_SYNC_INTERVAL`) inside the same Render worker that checks price alerts—so no extra dyno.
+4. **User Query Flow** (`/portfolio`)
+   * Telegram handler → calls `PortfolioService.sync_balances()` (best-effort) → `PortfolioService.get_snapshot()`
+   * A Markdown table is returned summarising quantity and USD value of each asset along with a grand total.
+
+### Diversification & Performance Analytics
+* `get_diversification()` – returns a `{symbol: %}` map based on last valuation.
+* `get_roi(window_days)` – naive ROI using the first candle from `/market/kline` vs current value.
+
+## 7. Rebalance Engine
+
+`PortfolioService.suggest_rebalance()` generates a **one-hop trade plan** to align the portfolio with a target allocation:
+
+```python
+plan = service.suggest_rebalance(
+    user_id,
+    target_alloc={"ETH": 50, "USDC": 50}
+)
+# ➜ [{'from': 'ETH', 'to': 'USDC', 'usd_amount': 500.0}]
+```
+
+Algorithm (greedy, USD based):
+1. Compute current % weight per symbol.
+2. Determine over-weight (> target) and under-weight (< target).
+3. Send overflow USD from each over-weight token to the single most under-weight token.
+
+A future iteration will translate the plan into a sequence of OKX aggregator swaps with the existing confirmation workflow.
+
+## 8. Updated Component Diagram
+
+```mermaid
+graph TD
+    subgraph Background Services
+        M[monitoring.py]
+        S[sync_all_portfolios]
+    end
+    subgraph Data
+        DB[(PostgreSQL)]
+    end
+    subgraph Application Core
+        PortfolioService
+        OKXExplorer
+    end
+
+    M --> S
+    S --> PortfolioService
+    PortfolioService --> OKXExplorer
+    PortfolioService --> DB
+    OKXExplorer -->|Explorer & Market Endpoints| OKXDEX[(OKX Web3 API)]
+```

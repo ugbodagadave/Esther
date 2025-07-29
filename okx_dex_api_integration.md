@@ -19,7 +19,20 @@ The `src/okx_client.py` module is responsible for all interactions with the OKX 
 -   **`get_live_quote`**: This function fetches a real-time swap quote from the `/api/v5/dex/aggregator/quote` endpoint. It takes the addresses of the "from" and "to" tokens, the amount to be swapped, and an optional `chain_index` as input. This allows for fetching quotes for swaps on different blockchains. It returns a detailed quote that includes the estimated amount of the "to" token that will be received.
 -   **`execute_swap`**: This function executes a trade on the OKX DEX. It uses the `/api/v5/dex/aggregator/swap` endpoint to submit a signed transaction to the blockchain. It also accepts an optional `chain_index` to specify the blockchain for the swap. The function includes a "dry run" mode that allows for safe, realistic demos using live market data without executing real transactions.
 
-### C. Error Handling
+### C. Explorer & Market Endpoints (Read-Only)
+
+Alongside trading endpoints, Esther now consumes OKX **Web3 Explorer** APIs to power portfolio tracking:
+
+| Endpoint | Purpose |
+|----------|---------|
+| `/api/v5/explorer/address/balance` | Native coin balance for an address on any supported chain |
+| `/api/v5/explorer/address/token_balance` | ERC-20 (and equivalents) balances |
+| `/api/v5/explorer/market/token_ticker` | Spot price vs USDT, used for USD valuation |
+| `/api/v5/explorer/market/kline` | Historical candles used for ROI calculation |
+
+These calls are **GET** requests signed with the same HMAC flow as trading requests, so no additional credential management is required.
+
+### D. Error Handling
 
 The `OKXClient` includes robust error handling to manage potential issues with the API, such as network errors or invalid requests. It uses a retry mechanism to automatically resubmit failed requests, which makes the bot more resilient and reliable.
 
