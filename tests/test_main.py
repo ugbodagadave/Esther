@@ -319,6 +319,30 @@ class TestMainHandlers(unittest.TestCase):
             chainId=42161
         )
 
+    @patch('src.main.portfolio_service')
+    def test_portfolio_command(self, mock_portfolio_service):
+        mock_portfolio_service.sync_balances.return_value = True
+        mock_portfolio_service.get_snapshot.return_value = {
+            'total_value_usd': 100,
+            'assets': [
+                {'symbol': 'ETH', 'quantity': 1.0, 'value_usd': 100}
+            ]
+        }
+
+        update = MagicMock()
+        update.effective_user = MagicMock(id=123)
+        update.message = MagicMock()
+        update.message.reply_text = AsyncMock()
+        context = MagicMock()
+        import asyncio
+        from src.main import portfolio
+        asyncio.run(portfolio(update, context))
+
+        # Expect at least two reply_text calls (syncing + result)
+        self.assertGreaterEqual(update.message.reply_text.call_count, 2)
+        args_list = [call.args[0] for call in update.message.reply_text.call_args_list]
+        self.assertTrue(any("Your Portfolio" in msg for msg in args_list))
+
 if __name__ == '__main__':
     # Set dummy env var for NLPClient initialization during tests
     os.environ["GEMINI_API_KEY"] = "test_key"

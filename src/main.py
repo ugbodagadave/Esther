@@ -44,11 +44,13 @@ from src.okx_client import OKXClient
 from src.database import get_db_connection
 from src.encryption import encrypt_data, decrypt_data
 from src.insights import InsightsClient
+from src.portfolio import PortfolioService
 
 # Initialize clients
 nlp_client = NLPClient()
 okx_client = OKXClient()
 insights_client = InsightsClient()
+portfolio_service = PortfolioService()
 
 # --- Conversation Handler States ---
 AWAIT_CONFIRMATION = 1
@@ -422,6 +424,30 @@ async def insights(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     insights_text = insights_client.generate_insights(user_id)
     await update.message.reply_text(insights_text)
 
+# --- Portfolio Command ---
+async def portfolio(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Synchronize and display the user's portfolio."""
+    user = update.effective_user
+
+    await update.message.reply_text("Syncing your portfolio... this could take a few seconds.")
+
+    # Attempt to sync balances; even if it fails, we still try snapshot
+    portfolio_service.sync_balances(user.id)
+
+    snapshot = portfolio_service.get_snapshot(user.id)
+    if not snapshot or not snapshot.get("assets"):
+        await update.message.reply_text("I couldn't retrieve your portfolio at this time.")
+        return
+
+    total = snapshot.get("total_value_usd", 0)
+    assets = snapshot.get("assets", [])
+
+    lines = [f"📊 *Your Portfolio* (≈ ${total:,.2f})", ""]
+    for asset in assets:
+        lines.append(f"• {asset['symbol']}: {asset['quantity']:.4f} (~${asset['value_usd']:.2f})")
+
+    await update.message.reply_text("\n".join(lines), parse_mode='Markdown')
+
 # --- Wallet Management ---
 async def add_wallet_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Starts the conversation to add a new wallet."""
@@ -699,6 +725,7 @@ application.add_handler(conv_handler)
 application.add_handler(CommandHandler("start", start))
 application.add_handler(CommandHandler("help", help_command))
 application.add_handler(CommandHandler("insights", insights))
+application.add_handler(CommandHandler("portfolio", portfolio))
 application.add_handler(CommandHandler("listwallets", list_wallets))
 application.add_handler(CommandHandler("listalerts", list_alerts))
 application.add_handler(CommandHandler("deletewallet", delete_wallet_start))
