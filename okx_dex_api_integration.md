@@ -8,9 +8,18 @@ The OKX DEX API is the core of Esther's trading functionality. It allows the AI 
 
 ### A. Authentication
 
-All requests to the OKX DEX API are authenticated using a combination of an API key, a secret key, and a passphrase. These credentials are securely stored as environment variables and are used to generate a unique signature for each request.
+All requests to the OKX Web3 APIs (DEX, Explorer, Market) require **four** pieces of information:
 
-The signature is created by combining the timestamp, the HTTP method, the request path, and the request body into a single string, and then signing it with the secret key using the HMAC-SHA256 algorithm. This ensures that all requests are authentic and have not been tampered with.
+* `OKX_API_KEY`
+* `OKX_API_SECRET`
+* `OKX_API_PASSPHRASE`
+* `OKX_PROJECT_ID` – identifies the *Project* that groups your keys and allocates quota.
+
+The first three values go into the regular `OK-ACCESS-*` headers used across all OKX APIs. The
+`OKX_PROJECT_ID` is injected as the additional header `OK-ACCESS-PROJECT`. If this header is missing
+the Explorer & Market endpoints respond with `40401 URL not found` even when the path is correct.
+
+All four credentials are stored in a `.env` file and loaded at runtime.
 
 ### B. Core Functionality
 
@@ -30,7 +39,7 @@ Alongside trading endpoints, Esther now consumes OKX **Web3 Explorer** APIs to p
 | `/api/v5/explorer/market/token_ticker` | Spot price vs USDT, used for USD valuation |
 | `/api/v5/explorer/market/kline` | Historical candles used for ROI calculation |
 
-These calls are **GET** requests signed with the same HMAC flow as trading requests, so no additional credential management is required.
+These calls are **GET** requests signed with the same HMAC flow as trading requests and **must** include the `OK-ACCESS-PROJECT` header described above.
 
 ### D. Error Handling
 

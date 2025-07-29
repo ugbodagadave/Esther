@@ -111,6 +111,10 @@ Esther now keeps a real-time view of every user’s on-chain balances **without 
    * A thin wrapper `src/okx_explorer.py` calls these OKX Explorer endpoints:
      * `/api/v5/explorer/address/balance` – native coin balance
      * `/api/v5/explorer/address/token_balance` – ERC-20 & equivalents
+     * `/api/v5/explorer/market/token_ticker` – spot price for valuation
+    * All requests include the **`OK-ACCESS-PROJECT`** header. The value comes from the
+      `OKX_PROJECT_ID` environment variable you obtain in the OKX *Developer Center → Projects* page.
+      Without this header the Explorer gateway returns HTTP 404 (`code=40401`).
    * Results are normalised into a common schema and pushed into the `holdings` table (one row per token, per user).
 2. **Valuation**
    * During sync the wrapper hits `/api/v5/explorer/market/token_ticker` once per symbol to pull a USDT price.
