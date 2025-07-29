@@ -97,5 +97,41 @@ class TestOKXClient(unittest.TestCase):
         self.assertEqual(result['error'], "Failed to execute swap after multiple retries.")
         self.assertEqual(mock_post.call_count, 3)
 
+    @patch.dict(os.environ, {
+        "OKX_API_KEY": "test_key",
+        "OKX_API_SECRET": "test_secret",
+        "OKX_API_PASSPHRASE": "test_passphrase"
+    })
+    @patch('requests.get')
+    def test_get_live_quote_with_chain_index(self, mock_get):
+        """Test get_live_quote with a specific chain_index."""
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {
+            "code": "0",
+            "data": [{"toTokenAmount": "12345"}]
+        }
+        mock_get.return_value = mock_response
+
+        client = OKXClient()
+        client.get_live_quote("from_addr", "to_addr", "100", chain_index=42)
+
+        mock_get.assert_called_once()
+        called_url = mock_get.call_args[0][0]
+        self.assertIn("chainIndex=42", called_url)
+
+    @patch.object(OKXClient, 'get_live_quote')
+    def test_execute_swap_with_chain_index(self, mock_get_live_quote):
+        """Test execute_swap passes chain_index to get_live_quote."""
+        mock_get_live_quote.return_value = {
+            "success": True,
+            "data": {"toTokenAmount": "500"}
+        }
+        
+        client = OKXClient()
+        client.execute_swap("from", "to", "100", "wallet_addr", chain_index=42, dry_run=True)
+
+        mock_get_live_quote.assert_called_once_with("from", "to", "100", 42)
+
 if __name__ == '__main__':
     unittest.main()
