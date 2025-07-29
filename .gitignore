@@ -117,3 +117,4 @@ dmypy.json
 # Cline
 .clinerules/
 memory-bank/
+CROSS_CHAIN_SWAP_TESTING_GUIDE.md
