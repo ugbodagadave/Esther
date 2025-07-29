@@ -34,8 +34,8 @@ class NLPClient:
             The possible intents are: 'buy_token', 'sell_token', 'get_price', 'set_stop_loss', 'set_take_profit', 'greeting', 'help', 'unknown'.
             
             - For 'get_price', extract the 'symbol' (e.g., BTC, ETH).
-            - For 'buy_token', extract the 'amount', 'symbol', and the 'currency' to buy with.
-            - For 'sell_token', extract the 'amount', 'symbol', and the 'currency' to sell for.
+            - For 'buy_token', extract 'amount', 'symbol', 'currency', and optionally 'source_chain' and 'destination_chain'.
+            - For 'sell_token', extract 'amount', 'symbol', 'currency', and optionally 'source_chain' and 'destination_chain'.
             - For 'set_stop_loss', extract the 'symbol' and the 'price'.
             - For 'set_take_profit', extract the 'symbol' and the 'price'.
 
@@ -44,6 +44,7 @@ class NLPClient:
             Respond ONLY with a valid JSON object in the format {{"intent": "...", "entities": {{...}}}}.
             Example for get_price: {{"intent": "get_price", "entities": {{"symbol": "BTC"}}}}
             Example for buy_token: {{"intent": "buy_token", "entities": {{"amount": "0.5", "symbol": "ETH", "currency": "USDT"}}}}
+            Example for cross-chain buy_token: {{"intent": "buy_token", "entities": {{"amount": "0.5", "symbol": "ETH", "currency": "USDC", "source_chain": "Arbitrum", "destination_chain": "Polygon"}}}}
             Example for sell_token: {{"intent": "sell_token", "entities": {{"amount": "10", "symbol": "SOL", "currency": "USDC"}}}}
             Example for set_stop_loss: {{"intent": "set_stop_loss", "entities": {{"symbol": "BTC", "price": "60000"}}}}
             Example for set_take_profit: {{"intent": "set_take_profit", "entities": {{"symbol": "ETH", "price": "3000"}}}}

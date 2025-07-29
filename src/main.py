@@ -66,6 +66,12 @@ TOKEN_ADDRESSES = {
     "WBTC": "0x2260fac5e5542a773aa44fbcfedf7c193bc2c599",
 }
 
+CHAIN_ID_MAP = {
+    "ethereum": 1,
+    "arbitrum": 42161,
+    "polygon": 137,
+}
+
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handles the /start command, registers the user if they don't exist."""
     user = update.effective_user
@@ -169,6 +175,8 @@ async def buy_token_intent(update: Update, context: ContextTypes.DEFAULT_TYPE, e
     symbol = entities.get("symbol")
     amount = entities.get("amount")
     currency = entities.get("currency")
+    source_chain = entities.get("source_chain", "ethereum").lower()
+    destination_chain = entities.get("destination_chain", "ethereum").lower()
 
     if not all([symbol, amount, currency]):
         await update.message.reply_text("To buy a token, please tell me the amount, the token symbol, and the currency to use (e.g., 'buy 0.5 ETH with USDT').")
@@ -176,9 +184,15 @@ async def buy_token_intent(update: Update, context: ContextTypes.DEFAULT_TYPE, e
 
     from_token_address = TOKEN_ADDRESSES.get(currency.upper())
     to_token_address = TOKEN_ADDRESSES.get(symbol.upper())
+    source_chain_id = CHAIN_ID_MAP.get(source_chain)
+    destination_chain_id = CHAIN_ID_MAP.get(destination_chain)
 
     if not from_token_address or not to_token_address:
         await update.message.reply_text(f"Sorry, I don't have the address for one of the tokens.")
+        return ConversationHandler.END
+
+    if not source_chain_id or not destination_chain_id:
+        await update.message.reply_text(f"Sorry, I don't support one of the specified chains.")
         return ConversationHandler.END
 
     # Store details in context for later use
@@ -188,6 +202,10 @@ async def buy_token_intent(update: Update, context: ContextTypes.DEFAULT_TYPE, e
         "from_token_address": from_token_address,
         "to_token_address": to_token_address,
         "amount": amount,
+        "source_chain": source_chain,
+        "destination_chain": destination_chain,
+        "source_chain_id": source_chain_id,
+        "destination_chain_id": destination_chain_id,
     }
 
     # This is a huge simplification. Amount needs to be converted based on the 'from' token's decimals.
@@ -197,7 +215,8 @@ async def buy_token_intent(update: Update, context: ContextTypes.DEFAULT_TYPE, e
     quote_response = okx_client.get_live_quote(
         from_token_address=from_token_address,
         to_token_address=to_token_address,
-        amount=amount_in_smallest_unit
+        amount=amount_in_smallest_unit,
+        chain_index=source_chain_id
     )
 
     if not quote_response.get("success"):
@@ -220,8 +239,8 @@ async def buy_token_intent(update: Update, context: ContextTypes.DEFAULT_TYPE, e
 
     response_message = (
         f"Please confirm the following swap:\n\n"
-        f"➡️ **From:** {amount} {currency.upper()}\n"
-        f"⬅️ **To (Estimated):** {to_amount:.6f} {symbol.upper()}\n\n"
+        f"➡️ **From:** {amount} {currency.upper()} on {source_chain.title()}\n"
+        f"⬅️ **To (Estimated):** {to_amount:.6f} {symbol.upper()} on {destination_chain.title()}\n\n"
         f"This transaction will be executed on the blockchain."
     )
     
@@ -249,6 +268,7 @@ async def confirm_swap(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
         to_token_address=swap_details['to_token_address'],
         amount=swap_details['amount_in_smallest_unit'],
         wallet_address=wallet_address,
+        chain_index=swap_details['source_chain_id'],
         dry_run=DRY_RUN_MODE
     )
 
@@ -290,6 +310,8 @@ async def sell_token_intent(update: Update, context: ContextTypes.DEFAULT_TYPE, 
     symbol = entities.get("symbol")
     amount = entities.get("amount")
     currency = entities.get("currency")
+    source_chain = entities.get("source_chain", "ethereum").lower()
+    destination_chain = entities.get("destination_chain", "ethereum").lower()
 
     if not all([symbol, amount, currency]):
         await update.message.reply_text("To sell a token, please tell me the amount, the token symbol, and the currency to sell for (e.g., 'sell 0.5 ETH for USDT').")
@@ -297,9 +319,15 @@ async def sell_token_intent(update: Update, context: ContextTypes.DEFAULT_TYPE, 
 
     from_token_address = TOKEN_ADDRESSES.get(symbol.upper())
     to_token_address = TOKEN_ADDRESSES.get(currency.upper())
+    source_chain_id = CHAIN_ID_MAP.get(source_chain)
+    destination_chain_id = CHAIN_ID_MAP.get(destination_chain)
 
     if not from_token_address or not to_token_address:
         await update.message.reply_text(f"Sorry, I don't have the address for one of the tokens.")
+        return ConversationHandler.END
+
+    if not source_chain_id or not destination_chain_id:
+        await update.message.reply_text(f"Sorry, I don't support one of the specified chains.")
         return ConversationHandler.END
 
     # Store details in context for later use
@@ -309,6 +337,10 @@ async def sell_token_intent(update: Update, context: ContextTypes.DEFAULT_TYPE, 
         "from_token_address": from_token_address,
         "to_token_address": to_token_address,
         "amount": amount,
+        "source_chain": source_chain,
+        "destination_chain": destination_chain,
+        "source_chain_id": source_chain_id,
+        "destination_chain_id": destination_chain_id,
     }
 
     # This is a huge simplification. Amount needs to be converted based on the 'from' token's decimals.
@@ -318,7 +350,8 @@ async def sell_token_intent(update: Update, context: ContextTypes.DEFAULT_TYPE, 
     quote_response = okx_client.get_live_quote(
         from_token_address=from_token_address,
         to_token_address=to_token_address,
-        amount=amount_in_smallest_unit
+        amount=amount_in_smallest_unit,
+        chain_index=source_chain_id
     )
 
     if not quote_response.get("success"):
@@ -341,8 +374,8 @@ async def sell_token_intent(update: Update, context: ContextTypes.DEFAULT_TYPE, 
 
     response_message = (
         f"Please confirm the following swap:\n\n"
-        f"➡️ **From:** {amount} {symbol.upper()}\n"
-        f"⬅️ **To (Estimated):** {to_amount:.6f} {currency.upper()}\n\n"
+        f"➡️ **From:** {amount} {symbol.upper()} on {source_chain.title()}\n"
+        f"⬅️ **To (Estimated):** {to_amount:.6f} {currency.upper()} on {destination_chain.title()}\n\n"
         f"This transaction will be executed on the blockchain."
     )
     

@@ -161,7 +161,8 @@ class TestMainHandlers(unittest.TestCase):
                 "from_token_address": "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48",
                 "to_token_address": "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
                 "amount": "100",
-                "amount_in_smallest_unit": "100000000"
+                "amount_in_smallest_unit": "100000000",
+                "source_chain_id": 1
             }
         }
 
