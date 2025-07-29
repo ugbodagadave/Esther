@@ -23,7 +23,7 @@ class TestOKXExplorer(unittest.TestCase):
         mock_resp.json.return_value = {"code": "0", "data": [{"balance": "123"}]}
         mock_get.return_value = mock_resp
 
-        result = self.explorer.get_native_balance("0xabc", chain_id=1)
+        result = self.explorer.get_native_balance("0xabc", chain=1)
         self.assertTrue(result["success"])
         self.assertEqual(result["data"], [{"balance": "123"}])
 

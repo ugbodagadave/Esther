@@ -87,19 +87,34 @@ class OKXExplorer:
     # ------------------------------------------------------------------
     # Public API methods
     # ------------------------------------------------------------------
-    def get_native_balance(self, address: str, chain_id: int = 1) -> dict:
-        """Return native coin balance (e.g. ETH on chain_id 1)."""
-        return self._get(
-            "/api/v5/explorer/address/balance",
-            {"address": address, "chainId": chain_id},
-        )
+    def _chain_param(self, chain: int | str) -> dict:
+        """Translate *chain* into the expected query param accepted by OKX Explorer.
 
-    def get_token_balances(self, address: str, chain_id: int = 1) -> dict:
-        """Return list of ERC-20 (or chain equivalent) balances for an address."""
-        return self._get(
-            "/api/v5/explorer/address/token_balance",
-            {"address": address, "chainId": chain_id},
-        )
+        The public docs are sparse, but empirically the explorer endpoints accept
+        *either* ``chainShortName`` (ETH, BSC, etc.) **or** the numeric
+        ``chainId``.  Supplying the wrong param leads to HTTP 404.
+
+        To be future-proof we send *both* – servers ignore the unknown field.
+        """
+        mapping = {1: "ETH", 56: "BSC", 137: "POL", 43114: "AVAX"}
+        if isinstance(chain, int):
+            return {"chainId": chain, "chainShortName": mapping.get(chain, "")}
+        # str path – assume caller already passed short name
+        return {"chainShortName": chain}
+
+    def get_native_balance(self, address: str, chain: int | str = 1) -> dict:
+        """Return native coin balance (e.g. ETH or BNB).
+
+        ``chain`` may be the numeric chainId (1 = Ethereum) or the
+        ``chainShortName`` string used by OKX ("ETH", "BSC", …).
+        """
+        params = {"address": address} | self._chain_param(chain)
+        return self._get("/api/v5/explorer/address/balance", params)
+
+    def get_token_balances(self, address: str, chain: int | str = 1) -> dict:
+        """Return list of ERC-20 (or chain equivalent) balances for *address*."""
+        params = {"address": address} | self._chain_param(chain)
+        return self._get("/api/v5/explorer/address/token_balance", params)
 
     def get_spot_price(self, symbol: str) -> dict:
         """Return latest spot price vs USDT."""
