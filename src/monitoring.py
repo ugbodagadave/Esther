@@ -5,6 +5,7 @@ import asyncio
 from telegram import Bot
 from src.database import get_db_connection
 from src.okx_client import OKXClient
+from src.portfolio import PortfolioService
 
 # Enable logging
 logging.basicConfig(
@@ -15,6 +16,43 @@ logger = logging.getLogger(__name__)
 # Initialize clients
 okx_client = OKXClient()
 bot = Bot(token=os.getenv("TELEGRAM_BOT_TOKEN"))
+portfolio_service = PortfolioService()
+
+# Interval (seconds) for full portfolio sync across all users – default 10 min
+PORTFOLIO_SYNC_INTERVAL = int(os.getenv("PORTFOLIO_SYNC_INTERVAL", "600"))
+
+async def sync_all_portfolios():
+    """Iterate over every user and call PortfolioService.sync_balances.
+
+    Runs quickly and ignores individual failures so the worker keeps going.
+    """
+    logger.info("Starting portfolio sync for all users ...")
+
+    conn = get_db_connection()
+    if conn is None:
+        logger.error("Database connection failed – cannot sync portfolios.")
+        return
+
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SELECT telegram_id FROM users;")
+            user_rows = cur.fetchall()
+
+        total = len(user_rows)
+        success = 0
+        for (telegram_id,) in user_rows:
+            try:
+                if portfolio_service.sync_balances(telegram_id):
+                    success += 1
+            except Exception as exc:
+                logger.warning("Portfolio sync failed for %s: %s", telegram_id, exc)
+
+        logger.info("Portfolio sync done – %s/%s users updated", success, total)
+    except Exception as e:
+        logger.error("Error during portfolio sync: %s", e)
+    finally:
+        if conn:
+            conn.close()
 
 async def check_alerts():
     """Checks for triggered price alerts and sends notifications."""
@@ -67,10 +105,18 @@ async def check_alerts():
 
 async def main():
     """Main loop for the monitoring service."""
+    last_portfolio_run = 0
     while True:
-        logger.info("Checking for price alerts...")
+        now = time.time()
+
+        # Portfolio sync (runs every PORTFOLIO_SYNC_INTERVAL seconds)
+        if now - last_portfolio_run >= PORTFOLIO_SYNC_INTERVAL:
+            await sync_all_portfolios()
+            last_portfolio_run = now
+
+        # Price alert check (every minute)
         await check_alerts()
-        await asyncio.sleep(60) # Check every 60 seconds
+        await asyncio.sleep(60)  # sleep 1 minute between alert scans
 
 if __name__ == '__main__':
     # This is a placeholder for the TOKEN_ADDRESSES map. In a real implementation, this would be shared.
