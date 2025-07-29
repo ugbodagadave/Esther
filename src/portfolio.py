@@ -124,6 +124,46 @@ class PortfolioService:
             conn.close()
 
     # ------------------------------------------------------------------
+    # Analytics helpers
+    # ------------------------------------------------------------------
+    def get_diversification(self, telegram_id: int) -> Dict:
+        """Return portfolio allocation per token symbol (percentage of USD value)."""
+        snap = self.get_snapshot(telegram_id)
+        total = snap.get("total_value_usd", 0)
+        assets = snap.get("assets", [])
+        if total == 0:
+            return {}
+        alloc = {a["symbol"]: round(a["value_usd"] / total * 100, 2) for a in assets}
+        return alloc
+
+    def get_roi(self, telegram_id: int, window_days: int = 30) -> float:
+        """Calculate simple ROI over *window_days* based on historical price data.
+
+        ROI = (current_value - past_value) / past_value
+        This is a naive implementation for illustration/testing.
+        """
+        snap = self.get_snapshot(telegram_id)
+        current_total = Decimal(str(snap.get("total_value_usd", 0)))
+        if current_total == 0:
+            return 0.0
+
+        past_total = Decimal("0")
+        for asset in snap.get("assets", []):
+            symbol = asset["symbol"]
+            qty = Decimal(str(asset["quantity"]))
+
+            price_resp = self.explorer.get_kline(symbol, bar="1D", limit=window_days + 1)
+            if price_resp.get("success") and price_resp["data"]:
+                # Use the first element (earliest) as past price open
+                past_price = Decimal(str(price_resp["data"][0].get("open", "0")))
+                past_total += qty * past_price
+
+        if past_total == 0:
+            return 0.0
+        roi = (current_total - past_total) / past_total
+        return float(round(roi, 4))
+
+    # ------------------------------------------------------------------
     # Internals
     # ------------------------------------------------------------------
     def _upsert_holding(self, cur, portfolio_id: int, chain_id: int, entry: dict):
