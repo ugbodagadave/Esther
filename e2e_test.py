@@ -83,7 +83,7 @@ def run_e2e_test():
         print(f"    ❌ FAILURE: An exception occurred during the OKX DEX quote test: {e}")
 
     # --- Test 4: OKX DEX API Swap Simulation Call ---
-    print("\n[4/4] Testing OKX DEX API swap simulation...")
+    print("\n[4/5] Testing OKX DEX API swap simulation...")
     try:
         wallet_address = os.getenv("TEST_WALLET_ADDRESS")
         if not wallet_address:
@@ -108,6 +108,34 @@ def run_e2e_test():
 
     except Exception as e:
         print(f"    ❌ FAILURE: An exception occurred during the OKX DEX swap simulation test: {e}")
+
+    # --- Test 5: Cross-Chain Swap Simulation ---
+    print("\n[5/5] Testing Cross-Chain Swap Simulation...")
+    try:
+        wallet_address = os.getenv("TEST_WALLET_ADDRESS")
+        if not wallet_address:
+            print("    ❌ FAILURE: TEST_WALLET_ADDRESS not found in .env file.")
+            return
+
+        print("    Query: Simulating a swap of 0.01 ETH on Arbitrum for USDC on Polygon...")
+        swap_result = okx_client.execute_swap(
+            from_token_address="0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",  # ETH on Arbitrum
+            to_token_address="0x2791bca1f2de4661ed88a30c99a7a9449aa84174",  # USDC on Polygon
+            amount="10000000000000000",  # 0.01 ETH
+            wallet_address=wallet_address,
+            chain_index=16,  # Arbitrum
+            dry_run=True
+        )
+
+        if swap_result.get("success") and swap_result.get("status") == "simulated":
+            print("    ✅ SUCCESS: OKX DEX API successfully simulated the cross-chain swap.")
+            print(f"    -> Simulated Swap Data: {swap_result.get('data')}")
+        else:
+            print("    ❌ FAILURE: OKX DEX API returned an error during cross-chain swap simulation.")
+            print(f"    -> Error: {swap_result.get('error')}")
+
+    except Exception as e:
+        print(f"    ❌ FAILURE: An exception occurred during the cross-chain swap simulation test: {e}")
 
     print("\n--- End-to-End Test Finished ---")
 
