@@ -62,12 +62,12 @@ class PortfolioService:
 
                 for (wallet_address,) in wallet_rows:
                     # 3a native balance
-                    native_resp = self.explorer.get_native_balance(wallet_address, chain_id=chain_id)
+                    native_resp = self.explorer.get_native_balance(wallet_address, chain=chain_id)
                     if native_resp.get("success"):
                         for entry in native_resp["data"]:
                             self._upsert_holding(cur, portfolio_id, chain_id, entry)
                     # 3b token balances
-                    tok_resp = self.explorer.get_token_balances(wallet_address, chain_id=chain_id)
+                    tok_resp = self.explorer.get_token_balances(wallet_address, chain=chain_id)
                     if tok_resp.get("success"):
                         for entry in tok_resp["data"]:
                             self._upsert_holding(cur, portfolio_id, chain_id, entry)
