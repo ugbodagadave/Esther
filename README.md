@@ -21,6 +21,7 @@ Decentralized Finance (DeFi) can be confusing. Our goal with Esther is to make i
 -   **Stay Updated with Price Alerts**: Set custom alerts for any cryptocurrency (e.g., "/addalert BTC above 70000").
 -   **Practice with a Demo Mode**: A "Dry Run" mode lets you practice trading with real market data without using real money.
 -   **Manage Your Account**: Esther automatically creates and manages your user profile.
+-   **Cross-Chain Swaps**: Swap tokens across different blockchains, like from Ethereum to Polygon, with a single command.
 -   **Keep Your Wallet Secure**: You can add, view, and delete your wallet addresses with confidence, as your private keys are always encrypted.
 -   **Powered by Advanced AI**: Esther uses Google's Gemini models to understand your commands and provide intelligent responses.
 -   **Reliable and Always On**: Esther is deployed on Render, a modern and reliable cloud platform, with a health check to ensure it's always running.

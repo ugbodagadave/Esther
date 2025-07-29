@@ -16,8 +16,8 @@ The signature is created by combining the timestamp, the HTTP method, the reques
 
 The `src/okx_client.py` module is responsible for all interactions with the OKX DEX API. It includes the following key functions:
 
--   **`get_live_quote`**: This function fetches a real-time swap quote from the `/api/v5/dex/aggregator/quote` endpoint. It takes the addresses of the "from" and "to" tokens and the amount to be swapped as input, and it returns a detailed quote that includes the estimated amount of the "to" token that will be received.
--   **`execute_swap`**: This function executes a trade on the OKX DEX. It uses the `/api/v5/dex/aggregator/swap` endpoint to submit a signed transaction to the blockchain. The function includes a "dry run" mode that allows for safe, realistic demos using live market data without executing real transactions.
+-   **`get_live_quote`**: This function fetches a real-time swap quote from the `/api/v5/dex/aggregator/quote` endpoint. It takes the addresses of the "from" and "to" tokens, the amount to be swapped, and an optional `chain_index` as input. This allows for fetching quotes for swaps on different blockchains. It returns a detailed quote that includes the estimated amount of the "to" token that will be received.
+-   **`execute_swap`**: This function executes a trade on the OKX DEX. It uses the `/api/v5/dex/aggregator/swap` endpoint to submit a signed transaction to the blockchain. It also accepts an optional `chain_index` to specify the blockchain for the swap. The function includes a "dry run" mode that allows for safe, realistic demos using live market data without executing real transactions.
 
 ### C. Error Handling
 
