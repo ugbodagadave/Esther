@@ -118,5 +118,30 @@ class TestNLPClient(unittest.TestCase):
         self.assertEqual(result['entities']['price'], '3000')
         mock_pro_instance.generate_content.assert_called_once()
 
+    @patch('google.generativeai.GenerativeModel')
+    def test_parse_intent_cross_chain_swap(self, mock_gen_model):
+        """Test parsing a cross-chain 'buy_token' intent."""
+        mock_pro_instance = MagicMock()
+        mock_pro_instance.generate_content.return_value = MagicMock(text='{"intent": "buy_token", "entities": {"amount": "0.5", "symbol": "ETH", "currency": "USDC", "source_chain": "Arbitrum", "destination_chain": "Polygon"}}')
+
+        def model_side_effect(model_name):
+            if 'pro' in model_name:
+                return mock_pro_instance
+            return MagicMock()
+        
+        mock_gen_model.side_effect = model_side_effect
+
+        with patch.dict(os.environ, {"GEMINI_API_KEY": "test_key"}):
+            nlp_client = NLPClient()
+            result = nlp_client.parse_intent("buy 0.5 ETH on Polygon with USDC from Arbitrum", model_type='pro')
+
+        self.assertEqual(result['intent'], 'buy_token')
+        self.assertEqual(result['entities']['amount'], '0.5')
+        self.assertEqual(result['entities']['symbol'], 'ETH')
+        self.assertEqual(result['entities']['currency'], 'USDC')
+        self.assertEqual(result['entities']['source_chain'], 'Arbitrum')
+        self.assertEqual(result['entities']['destination_chain'], 'Polygon')
+        mock_pro_instance.generate_content.assert_called_once()
+
 if __name__ == '__main__':
     unittest.main()
