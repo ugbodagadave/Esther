@@ -35,7 +35,8 @@ class OKXExplorer:
     """
 
     def __init__(self, max_retries: int = 3, retry_delay: int = 2):
-        self.base_url = os.getenv("OKX_BASE_URL", "https://web3.okx.com")
+        # Explorer endpoints are served from the main okx.com host (not web3.okx.com)
+        self.base_url = os.getenv("OKX_BASE_URL", "https://www.okx.com")
         self.api_key = os.getenv("OKX_API_KEY")
         self.api_secret = os.getenv("OKX_API_SECRET")
         self.passphrase = os.getenv("OKX_API_PASSPHRASE")

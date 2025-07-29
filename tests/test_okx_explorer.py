@@ -36,4 +36,8 @@ class TestOKXExplorer(unittest.TestCase):
 
         result = self.explorer.get_spot_price("BAD")
         self.assertFalse(result["success"])
-        self.assertIn("Invalid symbol", result["error"]) 
+        self.assertIn("Invalid symbol", result["error"])
+
+    def test_default_base_url(self):
+        explorer = OKXExplorer()
+        self.assertTrue(explorer.base_url.startswith("https://www.okx.com")) 
