@@ -164,6 +164,63 @@ class PortfolioService:
         return float(round(roi, 4))
 
     # ------------------------------------------------------------------
+    def suggest_rebalance(self, telegram_id: int, target_alloc: Dict[str, float] | None = None) -> List[Dict]:
+        """Generate a naïve rebalance plan to reach *target_alloc*.
+
+        target_alloc – mapping symbol -> desired % allocation (sums to 100).
+        If None, assume equal weight across existing tokens.
+
+        Returns list of trades of the form
+        {"from": symbol_a, "to": symbol_b, "usd_amount": value}.
+        Only single hop suggestions are returned; caller can translate into swaps.
+        """
+        snap = self.get_snapshot(telegram_id)
+        total = Decimal(str(snap.get("total_value_usd", 0)))
+        if total == 0:
+            return []
+
+        assets = {a["symbol"]: Decimal(str(a["value_usd"])) for a in snap["assets"]}
+
+        if not target_alloc:
+            # Equal allocation among current holdings
+            count = len(assets)
+            if count == 0:
+                return []
+            target_alloc = {sym: 100 / count for sym in assets}
+
+        # Ensure target percentages sum to 100
+        total_target = sum(target_alloc.values())
+        if abs(total_target - 100) > 0.01:
+            # Normalise
+            target_alloc = {k: v * 100 / total_target for k, v in target_alloc.items()}
+
+        diffs: Dict[str, Decimal] = {}
+        for sym, usd_value in assets.items():
+            current_pct = (usd_value / total) * 100
+            desired = Decimal(str(target_alloc.get(sym, 0)))
+            diffs[sym] = current_pct - desired  # positive -> overweight
+
+        # Tokens not currently held but in target => underweight
+        for sym, pct in target_alloc.items():
+            if sym not in diffs:
+                diffs[sym] = Decimal("-") + Decimal(str(pct))
+
+        # Build lists
+        over = {s: d for s, d in diffs.items() if d > 0}
+        under = {s: -d for s, d in diffs.items() if d < 0}
+        if not under or not over:
+            return []  # already balanced
+
+        plan: List[Dict] = []
+        # Simple greedy: convert each overweight token into the single most underweight token
+        most_under_symbol = max(under, key=under.get)
+        for sym, pct_excess in over.items():
+            usd_excess = (pct_excess / 100) * total
+            plan.append({"from": sym, "to": most_under_symbol, "usd_amount": float(round(usd_excess, 2))})
+
+        return plan
+
+    # ------------------------------------------------------------------
     # Internals
     # ------------------------------------------------------------------
     def _upsert_holding(self, cur, portfolio_id: int, chain_id: int, entry: dict):
