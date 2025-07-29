@@ -45,7 +45,7 @@ class OKXClient:
             'Content-Type': 'application/json'
         }
 
-    def get_live_quote(self, from_token_address: str, to_token_address: str, amount: str, chain_index: int = 1) -> dict:
+    def get_live_quote(self, from_token_address: str, to_token_address: str, amount: str, chainId: int = 1) -> dict:
         """
         Fetches a real swap quote from the OKX DEX aggregator with retry logic.
         """
@@ -53,7 +53,7 @@ class OKXClient:
             try:
                 request_path = '/api/v5/dex/aggregator/quote'
                 params = {
-                    "chainIndex": chain_index,
+                    "chainId": chainId,
                     "amount": amount,
                     "toTokenAddress": to_token_address,
                     "fromTokenAddress": from_token_address
@@ -84,14 +84,14 @@ class OKXClient:
         
         return {"success": False, "error": "Failed to fetch quote after multiple retries."}
 
-    def execute_swap(self, from_token_address: str, to_token_address: str, amount: str, wallet_address: str, chain_index: int = 1, slippage: str = "1", dry_run: bool = True) -> dict:
+    def execute_swap(self, from_token_address: str, to_token_address: str, amount: str, wallet_address: str, chainId: int = 1, slippage: str = "1", dry_run: bool = True) -> dict:
         """
         Executes a swap. If dry_run is True, it only fetches the quote and simulates the transaction.
         If dry_run is False, it executes a real swap on the blockchain.
         """
         if dry_run:
             logger.info(f"Executing DRY RUN swap from {from_token_address} to {to_token_address}")
-            quote_response = self.get_live_quote(from_token_address, to_token_address, amount, chain_index)
+            quote_response = self.get_live_quote(from_token_address, to_token_address, amount, chainId)
             
             if quote_response.get("success"):
                 return {
@@ -113,7 +113,7 @@ class OKXClient:
                         "amount": amount,
                         "walletAddress": wallet_address,
                         "slippage": slippage,
-                        "chainIndex": chain_index
+                        "chainId": chainId
                     }
                     
                     headers = self._get_request_headers('POST', request_path, str(body))

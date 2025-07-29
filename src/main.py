@@ -216,7 +216,7 @@ async def buy_token_intent(update: Update, context: ContextTypes.DEFAULT_TYPE, e
         from_token_address=from_token_address,
         to_token_address=to_token_address,
         amount=amount_in_smallest_unit,
-        chain_index=source_chain_id
+        chainId=source_chain_id
     )
 
     if not quote_response.get("success"):
@@ -268,7 +268,7 @@ async def confirm_swap(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
         to_token_address=swap_details['to_token_address'],
         amount=swap_details['amount_in_smallest_unit'],
         wallet_address=wallet_address,
-        chain_index=swap_details['source_chain_id'],
+        chainId=swap_details['source_chain_id'],
         dry_run=DRY_RUN_MODE
     )
 
@@ -351,7 +351,7 @@ async def sell_token_intent(update: Update, context: ContextTypes.DEFAULT_TYPE, 
         from_token_address=from_token_address,
         to_token_address=to_token_address,
         amount=amount_in_smallest_unit,
-        chain_index=source_chain_id
+        chainId=source_chain_id
     )
 
     if not quote_response.get("success"):

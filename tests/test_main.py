@@ -312,6 +312,12 @@ class TestMainHandlers(unittest.TestCase):
         self.assertIn('swap_details', context.user_data)
         self.assertEqual(context.user_data['swap_details']['source_chain'], 'arbitrum')
         self.assertEqual(context.user_data['swap_details']['destination_chain'], 'polygon')
+        mock_okx_client.get_live_quote.assert_called_once_with(
+            from_token_address=unittest.mock.ANY,
+            to_token_address=unittest.mock.ANY,
+            amount=unittest.mock.ANY,
+            chainId=42161
+        )
 
 if __name__ == '__main__':
     # Set dummy env var for NLPClient initialization during tests

@@ -117,13 +117,13 @@ def run_e2e_test():
             print("    ❌ FAILURE: TEST_WALLET_ADDRESS not found in .env file.")
             return
 
-        print("    Query: Simulating a swap of 0.01 ETH on Arbitrum for USDC on Polygon...")
+        print("    Query: Simulating a swap of 0.01 ETH on Arbitrum for USDT on Arbitrum...")
         swap_result = okx_client.execute_swap(
             from_token_address="0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",  # ETH on Arbitrum
-            to_token_address="0x2791bca1f2de4661ed88a30c99a7a9449aa84174",  # USDC on Polygon
+            to_token_address="0xfd086bc7cd5c481dcc9c85ebe478a1c0b69fcbb9",  # USDT on Arbitrum
             amount="10000000000000000",  # 0.01 ETH
             wallet_address=wallet_address,
-            chain_index=16,  # Arbitrum
+            chainId=42161,  # Arbitrum
             dry_run=True
         )
 
