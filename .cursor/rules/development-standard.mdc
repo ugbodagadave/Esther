@@ -1,0 +1,36 @@
+---
+description: This is to be used at the start of every session
+alwaysApply: false
+---
+# Global Coding Standards
+
+## Code Style
+
+-   Always use 4 spaces for indentation.
+-   Limit line length to 120 characters.
+-   Use descriptive variable and function names.
+
+## Testing
+
+-   All new features must have corresponding unit tests.
+- Once a change is made, ensure to run tests on the codebase to ensure nothing was broken
+-   Ensure test coverage is above 80% for critical modules.
+- Ensure all requirements are clearly defined, unambiguous, and testable from the outset
+- Verify designs (system, architectural, module) against their respective requirements before implementation begins
+- Prioritize thorough unit testing for individual components and integration testing for modules and subsystems.
+- Support system-level testing to validate the complete integrated system against functional and non-functional requirements, and assist in user acceptance testing (UAT).
+Maintain clear traceability between requirements, design elements, code, and test cases throughout the development process.
+
+# Security Guidelines
+
+## Sensitive Data
+
+-   Never hardcode API keys or credentials.
+-   Always use environment variables for sensitive configurations.
+
+# Documentation Requirements
+
+## README.md
+
+-   Keep `README.md` well detailed and updated with project setup and usage instructions.
+-   Include examples for common tasks.

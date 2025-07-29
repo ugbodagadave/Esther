@@ -82,6 +82,40 @@ def initialize_database():
                     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
                 );
             """)
+
+            # Create portfolios table
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS portfolios (
+                    id SERIAL PRIMARY KEY,
+                    user_id INTEGER NOT NULL REFERENCES users(id),
+                    last_synced TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+                );
+            """)
+
+            # Create holdings table
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS holdings (
+                    id SERIAL PRIMARY KEY,
+                    portfolio_id INTEGER NOT NULL REFERENCES portfolios(id) ON DELETE CASCADE,
+                    chain_id INTEGER,
+                    token_address TEXT,
+                    symbol VARCHAR(255),
+                    amount NUMERIC,
+                    decimals INTEGER,
+                    value_usd NUMERIC,
+                    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+                );
+            """)
+
+            # Create prices table
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS prices (
+                    id SERIAL PRIMARY KEY,
+                    symbol VARCHAR(255),
+                    timestamp TIMESTAMP WITH TIME ZONE NOT NULL,
+                    price_usd NUMERIC NOT NULL
+                );
+            """)
             
             conn.commit()
             logger.info("Database tables initialized successfully.")
