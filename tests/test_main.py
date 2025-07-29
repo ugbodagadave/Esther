@@ -282,6 +282,37 @@ class TestMainHandlers(unittest.TestCase):
         update.message.reply_text.assert_any_call("Here are your personalized insights.")
         mock_insights_client.generate_insights.assert_called_once_with(123)
 
+    @patch('src.main.nlp_client')
+    @patch('src.main.okx_client')
+    def test_handle_text_cross_chain_buy_token_starts_conversation(self, mock_okx_client, mock_nlp_client):
+        # Mock NLP response
+        mock_nlp_client.parse_intent.return_value = {
+            "intent": "buy_token",
+            "entities": {"amount": "100", "symbol": "ETH", "currency": "USDC", "source_chain": "Arbitrum", "destination_chain": "Polygon"}
+        }
+        # Mock OKX quote response
+        mock_okx_client.get_live_quote.return_value = {
+            "success": True,
+            "data": {"toTokenAmount": "33000000000000000"} # 0.033 ETH
+        }
+
+        update = MagicMock()
+        update.message = MagicMock()
+        update.message.text = "buy 100 USDC worth of ETH on Polygon from Arbitrum"
+        update.message.reply_text = AsyncMock()
+        context = MagicMock()
+        context.user_data = {}
+
+        import asyncio
+        result = asyncio.run(handle_text(update, context))
+
+        # Check that the confirmation message is sent and we are in the right state
+        self.assertIn("Please confirm the following swap:", update.message.reply_text.call_args[0][0])
+        self.assertEqual(result, AWAIT_CONFIRMATION)
+        self.assertIn('swap_details', context.user_data)
+        self.assertEqual(context.user_data['swap_details']['source_chain'], 'arbitrum')
+        self.assertEqual(context.user_data['swap_details']['destination_chain'], 'polygon')
+
 if __name__ == '__main__':
     # Set dummy env var for NLPClient initialization during tests
     os.environ["GEMINI_API_KEY"] = "test_key"
