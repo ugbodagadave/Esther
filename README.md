@@ -88,6 +88,7 @@ For a detailed explanation of how we integrated the OKX DEX API, see our [OKX DE
     
     # A test wallet for practice
     TEST_WALLET_ADDRESS="your_ethereum_test_wallet_address"
+    TEST_WALLET_PRIVATE_KEY="your_ethereum_test_wallet_private_key"
     ```
 
 4.  **Set Up the Database:**
@@ -113,6 +114,8 @@ DRY_RUN_MODE="True"
 # DRY_RUN_MODE="False"
 ```
 
+### Admin Secret Key
+This key is used to protect the new admin endpoint for clearing the database during development.
 
 ## 📄 License
 

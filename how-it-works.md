@@ -169,3 +169,20 @@ graph TD
     PortfolioService --> DB
     OKXExplorer -->|DEX & Market Endpoints| OKXDEX[(OKX Web3 API)]
 ```
+
+## 9. Temporary Admin Tools (For Development)
+During development, you may need to clear the PostgreSQL database to reset all users, wallets, and portfolio data. A temporary, secure endpoint has been added for this purpose.
+
+To clear the database:
+1.  Ensure you have set the `ADMIN_SECRET_KEY` environment variable in your `.env` file or in your Render dashboard. This should be a long, random string.
+2.  Make a `POST` request to the following URL (e.g., using `curl` or a tool like Postman):
+    `https://esther-bot.onrender.com/admin/clear-database/<your_secret_key>`
+    
+    Replace `<your_secret_key>` with the secret key you set.
+
+**Example using `curl`:**
+```bash
+curl -X POST https://esther-bot.onrender.com/admin/clear-database/your_super_secret_key_here
+```
+
+**IMPORTANT**: This endpoint is intended for development and testing only. It drops all tables and re-initializes the schema. It should be protected and used with caution.

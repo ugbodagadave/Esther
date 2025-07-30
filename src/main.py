@@ -38,6 +38,7 @@ logger = logging.getLogger(__name__)
 
 # Get the token from environment variables
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
+ADMIN_SECRET_KEY = os.getenv("ADMIN_SECRET_KEY")
 
 from src.nlp import NLPClient
 from src.okx_client import OKXClient
@@ -731,9 +732,45 @@ application.add_handler(CommandHandler("listalerts", list_alerts))
 application.add_handler(CommandHandler("deletewallet", delete_wallet_start))
 application.add_handler(CallbackQueryHandler(delete_wallet_callback, pattern="^delete_"))
 
+
 @app.route('/')
 def health_check():
     return "Bot is running.", 200
+
+
+@app.route('/admin/clear-database/<secret_key>', methods=['POST'])
+def clear_database(secret_key):
+    """(Admin) Clears and re-initializes the PostgreSQL database."""
+    if not ADMIN_SECRET_KEY or secret_key != ADMIN_SECRET_KEY:
+        return "Unauthorized", 401
+
+    try:
+        conn = get_db_connection()
+        if conn is None:
+            return "Database connection failed", 500
+        
+        with conn.cursor() as cur:
+            # Drop all tables
+            cur.execute("""
+                DO $$ DECLARE
+                    r RECORD;
+                BEGIN
+                    FOR r IN (SELECT tablename FROM pg_tables WHERE schemaname = 'public') LOOP
+                        EXECUTE 'DROP TABLE IF EXISTS ' || quote_ident(r.tablename) || ' CASCADE';
+                    END LOOP;
+                END $$;
+            """)
+        conn.commit()
+        conn.close()
+
+        # Re-initialize the schema
+        initialize_database()
+
+        return "Database cleared and re-initialized successfully.", 200
+    except Exception as e:
+        logger.error(f"Error clearing database: {e}")
+        return "An internal error occurred", 500
+
 
 def main() -> None:
     """Start the bot."""
