@@ -432,12 +432,15 @@ async def portfolio(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
     await update.message.reply_text("Syncing your portfolio... this could take a few seconds.")
 
-    # Attempt to sync balances; even if it fails, we still try snapshot
-    portfolio_service.sync_balances(user.id)
+    # Attempt to sync balances and check the result
+    synced_ok = portfolio_service.sync_balances(user.id)
+    if not synced_ok:
+        await update.message.reply_text("I couldn't sync your portfolio due to an API error. Please try again later.")
+        return
 
     snapshot = portfolio_service.get_snapshot(user.id)
     if not snapshot or not snapshot.get("assets"):
-        await update.message.reply_text("I couldn't retrieve your portfolio at this time.")
+        await update.message.reply_text("Your portfolio was synced successfully, but I couldn't find any assets in your wallet(s). Have you funded your wallet yet?")
         return
 
     total = snapshot.get("total_value_usd", 0)
