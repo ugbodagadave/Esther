@@ -51,7 +51,7 @@ For a detailed explanation of how we integrated the OKX DEX API, see our [OKX DE
 -   Python (version 3.9 or higher)
 -   A Telegram Bot Token
 -   A Google Gemini API Key
--   An OKX DEX API Key, Secret, Passphrase **and Project ID** (required for Explorer & Market endpoints)
+-   An OKX DEX API Key, Secret, Passphrase **and Project ID** (required for DEX portfolio and market data endpoints)
 -   A PostgreSQL database URL (you can get one for free from Render)
 
 ### Step-by-Step Setup

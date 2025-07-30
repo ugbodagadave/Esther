@@ -108,16 +108,14 @@ Security is paramount. The following measures are integral to the design:
 Esther now keeps a real-time view of every user’s on-chain balances **without requiring a separate paid worker on Render**.
 
 1. **Balance Discovery**
-   * A thin wrapper `src/okx_explorer.py` calls these OKX Explorer endpoints:
-     * `/api/v5/explorer/address/balance` – native coin balance
-     * `/api/v5/explorer/address/token_balance` – ERC-20 & equivalents
-     * `/api/v5/explorer/market/token_ticker` – spot price for valuation
-    * All requests include the **`OK-ACCESS-PROJECT`** header. The value comes from the
-      `OKX_PROJECT_ID` environment variable you obtain in the OKX *Developer Center → Projects* page.
-      Without this header the Explorer gateway returns HTTP 404 (`code=40401`).
+   * A thin wrapper `src/okx_explorer.py` calls the OKX Web3 DEX API. The primary endpoint used is:
+     * `/api/v5/dex/balance/all-token-balances-by-address` – This single endpoint provides a consolidated list of native and token balances, along with their USD prices, across multiple chains.
+   * All requests include the **`OK-ACCESS-PROJECT`** header. The value comes from the
+     `OKX_PROJECT_ID` environment variable you obtain in the OKX *Developer Center → Projects* page.
+     Without this header the API gateway returns an error.
    * Results are normalised into a common schema and pushed into the `holdings` table (one row per token, per user).
 2. **Valuation**
-   * During sync the wrapper hits `/api/v5/explorer/market/token_ticker` once per symbol to pull a USDT price.
+   * The `all-token-balances-by-address` endpoint conveniently includes the USDT spot price for each token, so no separate API calls are needed for valuation.
    * Total USD value and per-asset value are stored so expensive price calls are *not* needed when users run `/portfolio`.
 3. **Scheduling**
    * The existing background process `src/monitoring.py` now has a coroutine `sync_all_portfolios()`.
@@ -128,7 +126,7 @@ Esther now keeps a real-time view of every user’s on-chain balances **without 
 
 ### Diversification & Performance Analytics
 * `get_diversification()` – returns a `{symbol: %}` map based on last valuation.
-* `get_roi(window_days)` – naive ROI using the first candle from `/market/kline` vs current value.
+* `get_roi(window_days)` – naive ROI using the first candle from `/api/v5/dex/market/candlesticks-history` vs current value.
 
 ## 7. Rebalance Engine
 
@@ -169,5 +167,5 @@ graph TD
     S --> PortfolioService
     PortfolioService --> OKXExplorer
     PortfolioService --> DB
-    OKXExplorer -->|Explorer & Market Endpoints| OKXDEX[(OKX Web3 API)]
+    OKXExplorer -->|DEX & Market Endpoints| OKXDEX[(OKX Web3 API)]
 ```
