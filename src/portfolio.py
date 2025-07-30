@@ -63,7 +63,7 @@ class PortfolioService:
 
                 # We can query all wallets and chains in a single API call.
                 all_addresses = [row[0] for row in wallet_rows]
-                all_chains = sorted(list(set(row[1] for row in wallet_rows)))
+                all_chains = sorted(list(set(str(row[1]) for row in wallet_rows)))
 
                 for address in all_addresses:
                     resp = self.explorer.get_all_balances(address, chains=all_chains)
