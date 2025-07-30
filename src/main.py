@@ -772,6 +772,40 @@ def clear_database(secret_key):
         return "An internal error occurred", 500
 
 
+@app.route('/admin/clear-db-page/<secret_key>', methods=['GET'])
+def show_clear_database_page(secret_key):
+    """(Admin) Displays a page with a button to clear the database."""
+    if not ADMIN_SECRET_KEY or secret_key != ADMIN_SECRET_KEY:
+        return "Unauthorized", 401
+    
+    # Simple HTML page with a form that POSTs to the clear_database endpoint
+    html_content = f"""
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Admin - Clear Database</title>
+        <style>
+            body {{ font-family: sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; flex-direction: column; }}
+            .container {{ text-align: center; border: 1px solid #ccc; padding: 30px; border-radius: 8px; }}
+            button {{ background-color: #dc3545; color: white; padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer; font-size: 16px; }}
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <h1>Confirm Database Clearing</h1>
+            <p>Clicking this button will permanently delete all data.</p>
+            <form action="/admin/clear-database/{secret_key}" method="post">
+                <button type="submit">Clear Database Now</button>
+            </form>
+        </div>
+    </body>
+    </html>
+    """
+    return html_content
+
+
 def main() -> None:
     """Start the bot."""
     # Initialize the database first to ensure all tables and columns are created
