@@ -10,46 +10,76 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 class NLPClient:
+    """A client for interacting with the Gemini API for NLP tasks."""
+
     def __init__(self):
-        self.api_key = os.getenv("GEMINI_API_KEY")
-        if not self.api_key:
+        """Initializes the NLP client by configuring the Gemini API."""
+        api_key = os.getenv("GEMINI_API_KEY")
+        if not api_key:
             raise ValueError("GEMINI_API_KEY not found in environment variables.")
-        genai.configure(api_key=self.api_key)
+        genai.configure(api_key=api_key)
         
-        # Initialize both models as per the PRD and official documentation
-        self.flash_model = genai.GenerativeModel('gemini-2.5-flash')
-        self.pro_model = genai.GenerativeModel('gemini-2.5-pro')
+        # Use lazy initialization for the models
+        self._flash_model = None
+        self._pro_model = None
+
+    @property
+    def flash_model(self):
+        """Lazy-loads and returns the Gemini Flash model."""
+        if self._flash_model is None:
+            self._flash_model = genai.GenerativeModel('gemini-1.5-flash-latest')
+        return self._flash_model
+
+    @property
+    def pro_model(self):
+        """Lazy-loads and returns the Gemini Pro model."""
+        if self._pro_model is None:
+            self._pro_model = genai.GenerativeModel('gemini-2.5-pro-latest')
+        return self._pro_model
 
     def parse_intent(self, text: str, model_type: str = 'flash') -> dict:
         """
-        Uses the specified Gemini model to parse the user's intent from a text message.
-        :param text: The user's message.
-        :param model_type: 'flash' or 'pro'. Defaults to 'flash'.
+        Parses the user's intent from a text query using the specified Gemini model.
         """
+        
+        # This is a standard string template, not an f-string.
+        prompt_template = """
+        You are an AI assistant for a crypto trading bot. Your task is to understand the user's intent and extract relevant entities from their message.
+        
+        Based on the user's message, identify one of the following intents.
+        - greeting: User says hello or similar.
+        - get_price: User asks for the price of a token.
+        - buy_token: User wants to buy a token.
+        - sell_token: User wants to sell a token.
+        - set_stop_loss: User wants to set a stop-loss order.
+        - set_take_profit: User wants to set a take-profit order.
+        - list_wallets: User wants to see their saved wallets.
+        - add_wallet: User wants to add a new wallet.
+        
+        For trading intents (buy, sell), extract the following entities if present:
+        - symbol: The token symbol (e.g., ETH, BTC).
+        - amount: The quantity of the token.
+        - currency: The currency to use for the transaction.
+        - source_chain: The source blockchain (if specified).
+        - destination_chain: The destination blockchain (if specified).
+
+        Return the output as a JSON object with "intent" and "entities" keys.
+
+        Example for get_price: {{"intent": "get_price", "entities": {{"symbol": "BTC"}}}}
+        Example for buy_token: {{"intent": "buy_token", "entities": {{"amount": "0.5", "symbol": "ETH", "currency": "USDT"}}}}
+        Example for set_stop_loss: {{"intent": "set_stop_loss", "entities": {{"symbol": "BTC", "price": "60000"}}}}
+        Example for set_take_profit: {{"intent": "set_take_profit", "entities": {{"symbol": "ETH", "price": "3000"}}}}
+        Example for list_wallets: {{"intent": "list_wallets", "entities": {{}}}}
+        Example for add_wallet: {{"intent": "add_wallet", "entities": {{}}}}
+
+        Query: "{text}"
+        """
+        
+        # Safely format the prompt with the user's text
+        prompt = prompt_template.format(text=text)
+
         try:
-            model = self.flash_model if model_type == 'flash' else self.pro_model
-            
-            prompt = f"""
-            From the following user query, extract the intent and any relevant entities.
-            The possible intents are: 'buy_token', 'sell_token', 'get_price', 'set_stop_loss', 'set_take_profit', 'greeting', 'help', 'unknown'.
-            
-            - For 'get_price', extract the 'symbol' (e.g., BTC, ETH).
-            - For 'buy_token', extract 'amount', 'symbol', 'currency', and optionally 'source_chain' and 'destination_chain'.
-            - For 'sell_token', extract 'amount', 'symbol', 'currency', and optionally 'source_chain' and 'destination_chain'.
-            - For 'set_stop_loss', extract the 'symbol' and the 'price'.
-            - For 'set_take_profit', extract the 'symbol' and the 'price'.
-
-            Query: "{text}"
-
-            Respond ONLY with a valid JSON object in the format {{"intent": "...", "entities": {{...}}}}.
-            Example for get_price: {{"intent": "get_price", "entities": {{"symbol": "BTC"}}}}
-            Example for buy_token: {{"intent": "buy_token", "entities": {{"amount": "0.5", "symbol": "ETH", "currency": "USDT"}}}}
-            Example for cross-chain buy_token: {{"intent": "buy_token", "entities": {{"amount": "0.5", "symbol": "ETH", "currency": "USDC", "source_chain": "Arbitrum", "destination_chain": "Polygon"}}}}
-            Example for sell_token: {{"intent": "sell_token", "entities": {{"amount": "10", "symbol": "SOL", "currency": "USDC"}}}}
-            Example for set_stop_loss: {{"intent": "set_stop_loss", "entities": {{"symbol": "BTC", "price": "60000"}}}}
-            Example for set_take_profit: {{"intent": "set_take_profit", "entities": {{"symbol": "ETH", "price": "3000"}}}}
-            """
-            
+            model = self.pro_model if model_type == 'pro' else self.flash_model
             response = model.generate_content(prompt)
             
             # Clean up the response to ensure it's valid JSON

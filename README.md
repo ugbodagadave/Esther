@@ -89,6 +89,7 @@ For a detailed explanation of how we integrated the OKX DEX API, see our [OKX DE
     # A test wallet for practice
     TEST_WALLET_ADDRESS="your_ethereum_test_wallet_address"
     TEST_WALLET_PRIVATE_KEY="your_ethereum_test_wallet_private_key"
+    ADMIN_SECRET_KEY="your_admin_secret_key"
     ```
 
 4.  **Set Up the Database:**
@@ -120,3 +121,18 @@ This key is used to protect the new admin endpoint for clearing the database dur
 ## 📄 License
 
 This project is licensed under the MIT License. You can find the full license text in the `LICENSE` file.
+
+## Temporary Admin Tools (For Development)
+During development, you may need to clear the PostgreSQL database to reset all users, wallets, and portfolio data. A temporary, secure admin page has been added for this purpose.
+
+To clear the database:
+1.  Ensure you have set the `ADMIN_SECRET_KEY` environment variable in your `.env` file or in your Render dashboard. This should be a long, random string.
+2.  Visit the following URL in your browser:
+    `https://esther-bot.onrender.com/admin/clear-db-page/<your_secret_key>`
+    
+    Replace `<your_secret_key>` with the secret key you set.
+3.  Click the "Clear Database Now" button on the page to confirm the action.
+
+### Running the End-to-End Test
+The `e2e_test.py` script is provided to perform live checks against the Gemini and OKX APIs.
+It requires the following environment variables to be set:
