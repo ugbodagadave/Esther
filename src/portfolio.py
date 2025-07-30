@@ -20,9 +20,10 @@ class PortfolioService:
     # ------------------------------------------------------------------
     # Public API
     # ------------------------------------------------------------------
-    def sync_balances(self, telegram_id: int, chain_id: int = 1) -> bool:
+    def sync_balances(self, telegram_id: int) -> bool:
         """Pull latest on-chain balances for every wallet of *telegram_id*.
 
+        This now consults the OKX DEX API, which can query multiple chains at once.
         Returns ``True`` on success, ``False`` otherwise.
         """
         conn = get_db_connection()
@@ -50,8 +51,8 @@ class PortfolioService:
                 else:
                     portfolio_id = row[0]
 
-                # 3. Fetch all user wallets
-                cur.execute("SELECT address FROM wallets WHERE user_id = %s;", (user_pk,))
+                # 3. Fetch all user wallets and chains
+                cur.execute("SELECT address, chain_id FROM wallets WHERE user_id = %s;", (user_pk,))
                 wallet_rows = cur.fetchall()
                 if not wallet_rows:
                     logger.info("User %s has no wallets – skipping sync", telegram_id)
@@ -60,17 +61,20 @@ class PortfolioService:
                 # Clear previous holdings (simple strategy)
                 cur.execute("DELETE FROM holdings WHERE portfolio_id = %s;", (portfolio_id,))
 
-                for (wallet_address,) in wallet_rows:
-                    # 3a native balance
-                    native_resp = self.explorer.get_native_balance(wallet_address, chain=chain_id)
-                    if native_resp.get("success"):
-                        for entry in native_resp["data"]:
-                            self._upsert_holding(cur, portfolio_id, chain_id, entry)
-                    # 3b token balances
-                    tok_resp = self.explorer.get_token_balances(wallet_address, chain=chain_id)
-                    if tok_resp.get("success"):
-                        for entry in tok_resp["data"]:
-                            self._upsert_holding(cur, portfolio_id, chain_id, entry)
+                # We can query all wallets and chains in a single API call.
+                all_addresses = [row[0] for row in wallet_rows]
+                all_chains = sorted(list(set(row[1] for row in wallet_rows)))
+
+                for address in all_addresses:
+                    resp = self.explorer.get_all_balances(address, chains=all_chains)
+                    if resp.get("success"):
+                        # The response is a list of chains, each with a list of assets
+                        for chain_data in resp["data"]:
+                            chain_id = int(chain_data.get("chainIndex"))
+                            for asset in chain_data.get("tokenAssets", []):
+                                self._upsert_holding(cur, portfolio_id, chain_id, asset)
+                    else:
+                        logger.error("Failed to fetch balances for %s: %s", address, resp.get("error"))
 
                 # Update last_synced timestamp
                 cur.execute(
@@ -224,24 +228,19 @@ class PortfolioService:
     # Internals
     # ------------------------------------------------------------------
     def _upsert_holding(self, cur, portfolio_id: int, chain_id: int, entry: dict):
-        """Insert single holding row derived from Explorer entry dict."""
-        symbol = entry.get("symbol") or entry.get("tokenSymbol") or "UNKNOWN"
-        token_address = entry.get("tokenAddress") or entry.get("address") or "0x"
-        balance_str = entry.get("balance") or entry.get("amount") or "0"
-        decimals = int(entry.get("tokenDecimal") or entry.get("decimals") or 18)
+        """Insert single holding row derived from DEX API balance entry."""
+        symbol = entry.get("symbol", "UNKNOWN")
+        token_address = entry.get("tokenContractAddress", "0x")
+        balance_str = entry.get("balance", "0")
+        # The new API does not provide decimals, so we have to assume a standard.
+        # This is a limitation, but for most major tokens 18 is correct.
+        decimals = 18
         try:
-            quantity = Decimal(balance_str)
+            quantity = Decimal(balance_str) * (Decimal(10) ** decimals) # Store as raw integer
         except Exception:
             quantity = Decimal("0")
 
-        # Fetch spot price once per symbol (could cache within sync run)
-        price_resp = self.explorer.get_spot_price(symbol)
-        price_usd = Decimal("0")
-        if price_resp.get("success") and price_resp["data"]:
-            try:
-                price_usd = Decimal(price_resp["data"][0].get("last", "0"))
-            except Exception:
-                price_usd = Decimal("0")
+        price_usd = Decimal(str(entry.get("tokenPrice", "0")))
         value_usd = (quantity / (Decimal(10) ** decimals)) * price_usd
 
         cur.execute(

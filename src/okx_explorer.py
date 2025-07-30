@@ -27,16 +27,15 @@ def _sign(message: str, secret_key: str) -> str:
 
 
 class OKXExplorer:
-    """Simple typed wrapper around OKX Web3 Explorer endpoints.
+    """Simple typed wrapper around OKX Web3 DEX & Market endpoints.
 
-    Only *read-only* endpoints are covered – no trading or swap execution here.
-    All methods return a dict with keys: ``success`` (bool) and either ``data`` or ``error``.
-    This mirrors the behaviour of :pyclass:`src.okx_client.OKXClient` for consistency.
+    Covers read-only endpoints for balance and price lookups. This class
+    abstracts the specific API paths and provides a consistent, simplified
+    interface for the rest of the application.
     """
 
     def __init__(self, max_retries: int = 3, retry_delay: int = 2):
-        # Explorer endpoints are served from the main okx.com host (not web3.okx.com)
-        self.base_url = os.getenv("OKX_BASE_URL", "https://www.okx.com")
+        self.base_url = os.getenv("OKX_BASE_URL", "https://web3.okx.com")
         self.api_key = os.getenv("OKX_API_KEY")
         self.api_secret = os.getenv("OKX_API_SECRET")
         self.passphrase = os.getenv("OKX_API_PASSPHRASE")
@@ -91,41 +90,23 @@ class OKXExplorer:
     # ------------------------------------------------------------------
     # Public API methods
     # ------------------------------------------------------------------
-    def _chain_param(self, chain: int | str) -> dict:
-        """Translate *chain* into the expected query param accepted by OKX Explorer.
+    def get_all_balances(self, address: str, chains: list[int] | None = None) -> dict:
+        """Return a consolidated list of all native and token balances.
 
-        The public docs are sparse, but empirically the explorer endpoints accept
-        *either* ``chainShortName`` (ETH, BSC, etc.) **or** the numeric
-        ``chainId``.  Supplying the wrong param leads to HTTP 404.
+        This single endpoint provides balances and USD prices, so no separate
+        price lookups are needed.
 
-        To be future-proof we send *both* – servers ignore the unknown field.
+        Args:
+            address: The wallet address to query.
+            chains: A list of numeric chain IDs (e.g., [1, 56]). Defaults to
+                    Ethereum mainnet.
         """
-        mapping = {1: "ETH", 56: "BSC", 137: "POL", 43114: "AVAX"}
-        if isinstance(chain, int):
-            return {"chainId": chain, "chainShortName": mapping.get(chain, "")}
-        # str path – assume caller already passed short name
-        return {"chainShortName": chain}
+        if chains is None:
+            chains = [1]
 
-    def get_native_balance(self, address: str, chain: int | str = 1) -> dict:
-        """Return native coin balance (e.g. ETH or BNB).
-
-        ``chain`` may be the numeric chainId (1 = Ethereum) or the
-        ``chainShortName`` string used by OKX ("ETH", "BSC", …).
-        """
-        params = {"address": address} | self._chain_param(chain)
-        return self._get("/api/v5/explorer/address/balance", params)
-
-    def get_token_balances(self, address: str, chain: int | str = 1) -> dict:
-        """Return list of ERC-20 (or chain equivalent) balances for *address*."""
-        params = {"address": address} | self._chain_param(chain)
-        return self._get("/api/v5/explorer/address/token_balance", params)
-
-    def get_spot_price(self, symbol: str) -> dict:
-        """Return latest spot price vs USDT."""
-        return self._get(
-            "/api/v5/explorer/market/token_ticker",
-            {"symbol": f"{symbol.upper()}-USDT"},
-        )
+        chain_list = ",".join(map(str, chains))
+        params = {"address": address, "chains": chain_list}
+        return self._get("/api/v5/dex/balance/all-token-balances-by-address", params)
 
     def get_kline(self, symbol: str, bar: str = "1D", limit: int = 30) -> dict:
         """Return historical candle data.
@@ -133,14 +114,16 @@ class OKXExplorer:
         ``bar`` examples: 1m, 5m, 1H, 1D etc.
         ``limit`` max 100.
         """
+        # Note: The DEX market API uses a different endpoint for candles
+        # than the generic "explorer" one.
         return self._get(
-            "/api/v5/explorer/market/kline",
-            {"symbol": f"{symbol.upper()}-USDT", "bar": bar, "limit": limit},
+            "/api/v5/dex/market/candlesticks-history",
+            {"instId": f"{symbol.upper()}-USDT", "bar": bar, "limit": limit},
         )
 
 
 if __name__ == "__main__":
     explorer = OKXExplorer()
     addr = os.getenv("TEST_WALLET_ADDRESS", "0x000000000000000000000000000000000000dead")
-    print("Checking native balance (dry run)...")
-    print(explorer.get_native_balance(addr)) 
+    print("Checking all balances (dry run)...")
+    print(explorer.get_all_balances(addr, chains=[1, 56])) # Check ETH and BSC 

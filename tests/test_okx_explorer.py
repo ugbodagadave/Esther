@@ -17,27 +17,36 @@ class TestOKXExplorer(unittest.TestCase):
         self.explorer = OKXExplorer()
 
     @patch("src.okx_explorer.requests.get")
-    def test_get_native_balance_success(self, mock_get):
+    def test_get_all_balances_success(self, mock_get):
         mock_resp = MagicMock()
         mock_resp.raise_for_status.return_value = None
-        mock_resp.json.return_value = {"code": "0", "data": [{"balance": "123"}]}
+        mock_resp.json.return_value = {
+            "code": "0",
+            "data": [
+                {
+                    "chainIndex": "1",
+                    "tokenAssets": [{"symbol": "ETH", "balance": "1.23", "tokenPrice": "3000"}]
+                }
+            ]
+        }
         mock_get.return_value = mock_resp
 
-        result = self.explorer.get_native_balance("0xabc", chain=1)
+        result = self.explorer.get_all_balances("0xabc", chains=[1])
         self.assertTrue(result["success"])
-        self.assertEqual(result["data"], [{"balance": "123"}])
+        self.assertEqual(len(result["data"]), 1)
+        self.assertEqual(result["data"][0]["tokenAssets"][0]["symbol"], "ETH")
 
     @patch("src.okx_explorer.requests.get")
-    def test_get_spot_price_failure(self, mock_get):
+    def test_get_kline_failure(self, mock_get):
         mock_resp = MagicMock()
         mock_resp.raise_for_status.return_value = None
-        mock_resp.json.return_value = {"code": "10002", "msg": "Invalid symbol"}
+        mock_resp.json.return_value = {"code": "51000", "msg": "Instrument not found"}
         mock_get.return_value = mock_resp
 
-        result = self.explorer.get_spot_price("BAD")
+        result = self.explorer.get_kline("NONEXISTENT")
         self.assertFalse(result["success"])
-        self.assertIn("Invalid symbol", result["error"])
+        self.assertIn("Instrument not found", result["error"])
 
     def test_default_base_url(self):
         explorer = OKXExplorer()
-        self.assertTrue(explorer.base_url.startswith("https://www.okx.com")) 
+        self.assertEqual(explorer.base_url, "https://web3.okx.com") 

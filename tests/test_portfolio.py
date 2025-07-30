@@ -18,7 +18,7 @@ class TestPortfolioService(unittest.TestCase):
             (100,), # inserted portfolio id
         ]
         # fetchall returns same wallets list for any call
-        cur.fetchall.return_value = [('0xabc',)]
+        cur.fetchall.return_value = [('0xabc', 1)] # address, chain_id
         conn.cursor.return_value.__enter__.return_value = cur
         return conn, cur
 
@@ -30,27 +30,27 @@ class TestPortfolioService(unittest.TestCase):
 
         # Arrange Explorer mocks
         explorer = MagicMock()
-        explorer.get_native_balance.return_value = {
+        explorer.get_all_balances.return_value = {
             'success': True,
-            'data': [{
-                'symbol': 'ETH',
-                'tokenAddress': '0xeeee',
-                'balance': '1000000000000000000',  # 1 ETH
-                'tokenDecimal': 18,
-            }]
-        }
-        explorer.get_token_balances.return_value = {
-            'success': True,
-            'data': [{
-                'tokenAddress': '0xa0b8',
-                'symbol': 'USDC',
-                'balance': '1000000',  # 1 USDC (6 decimals)
-                'decimals': 6,
-            }]
-        }
-        explorer.get_spot_price.return_value = {
-            'success': True,
-            'data': [{'last': '1'}]
+            'data': [
+                {
+                    "chainIndex": "1",
+                    "tokenAssets": [
+                        {
+                            'tokenContractAddress': '0xeeee',
+                            'symbol': 'ETH',
+                            'balance': '1.0',
+                            'tokenPrice': '2000.0'
+                        },
+                        {
+                            'tokenContractAddress': '0xa0b8',
+                            'symbol': 'USDC',
+                            'balance': '100.0',
+                            'tokenPrice': '1.0'
+                        }
+                    ]
+                }
+            ]
         }
 
         svc = PortfolioService(explorer=explorer)
@@ -60,9 +60,10 @@ class TestPortfolioService(unittest.TestCase):
 
         # Expect success path
         self.assertTrue(ok)
-        # Holdings insertion should be called
+        # Holdings insertion should be called twice
+        self.assertEqual(cur.execute.call_count, 8) # select user, select portfolio, insert portfolio, select wallets, delete holdings, insert holdings (x2), update portfolios
         executes = [c[0][0] for c in cur.execute.call_args_list]
-        assert any('INSERT INTO holdings' in sql for sql in executes)
+        self.assertEqual(len([s for s in executes if 'INSERT INTO holdings' in s]), 2)
 
     @patch('src.portfolio.get_db_connection')
     def test_get_snapshot(self, mock_get_conn):
