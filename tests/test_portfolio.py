@@ -50,7 +50,7 @@ class TestPortfolioService(unittest.TestCase):
         # --- Assert ---
         self.assertTrue(result)
         # Ensure the API was called with the correct wallet address and chain
-        explorer.get_all_balances.assert_called_once_with('0xWalletAddress', chains=[1])
+        explorer.get_all_balances.assert_called_once_with('0xWalletAddress', chains=['1'])
         # Check that the holdings were deleted and then the new holding was inserted
         delete_call = any('DELETE FROM holdings' in str(call) for call in cur.execute.call_args_list)
         insert_call = any('INSERT INTO holdings' in str(call) for call in cur.execute.call_args_list)
