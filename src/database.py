@@ -27,7 +27,8 @@ def get_db_connection():
 
 def initialize_database():
     """
-    Initializes the database by creating the necessary tables if they don't exist.
+    Initializes the database by creating the necessary tables if they don't exist
+    and adding any missing columns to existing tables.
     """
     conn = get_db_connection()
     if conn is None:
@@ -66,8 +67,22 @@ def initialize_database():
                     name VARCHAR(255) NOT NULL,
                     address VARCHAR(255) UNIQUE NOT NULL,
                     encrypted_private_key TEXT NOT NULL,
+                    chain_id INTEGER DEFAULT 1,
                     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
                 );
+            """)
+
+            # Add chain_id to wallets table if it doesn't exist (for backward compatibility)
+            cur.execute("""
+                DO $$
+                BEGIN
+                    IF NOT EXISTS (
+                        SELECT 1 FROM information_schema.columns 
+                        WHERE table_name='wallets' AND column_name='chain_id'
+                    ) THEN
+                        ALTER TABLE wallets ADD COLUMN chain_id INTEGER DEFAULT 1;
+                    END IF;
+                END$$;
             """)
 
             # Create alerts table
