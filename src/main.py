@@ -41,7 +41,7 @@ TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 
 from src.nlp import NLPClient
 from src.okx_client import OKXClient
-from src.database import get_db_connection
+from src.database import get_db_connection, initialize_database
 from src.encryption import encrypt_data, decrypt_data
 from src.insights import InsightsClient
 from src.portfolio import PortfolioService
@@ -737,6 +737,11 @@ def health_check():
 
 def main() -> None:
     """Start the bot."""
+    # Initialize the database first to ensure all tables and columns are created
+    logger.info("Initializing database...")
+    initialize_database()
+    logger.info("Database initialization complete.")
+
     # Start the Flask app in a separate thread
     flask_thread = threading.Thread(target=lambda: app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 8080))))
     flask_thread.daemon = True

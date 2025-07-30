@@ -7,79 +7,87 @@ from src.portfolio import PortfolioService
 
 class TestPortfolioService(unittest.TestCase):
 
-    def _mock_db(self):
-        """Return mocked connection + cursor matching sync_balances flow."""
-        conn = MagicMock()
-        cur = MagicMock()
-        # fetchone is called 3 times in sync_balances
-        cur.fetchone.side_effect = [
-            (1,),   # user id
-            None,   # portfolio id absent -> triggers insert
-            (100,), # inserted portfolio id
-        ]
-        # fetchall returns same wallets list for any call
-        cur.fetchall.return_value = [('0xabc', 1)] # address, chain_id
+    def _mock_db_conn(self):
+        """Helper to create a standard mock for the database connection and cursor."""
+        conn = MagicMock(name="Connection")
+        cur = MagicMock(name="Cursor")
         conn.cursor.return_value.__enter__.return_value = cur
         return conn, cur
 
     @patch('src.portfolio.get_db_connection')
-    def test_sync_balances_basic(self, mock_get_conn):
-        # Arrange DB mocks
-        conn, cur = self._mock_db()
+    def test_sync_balances_success(self, mock_get_conn):
+        """
+        Verify that sync_balances correctly processes API data and updates the database.
+        """
+        # --- Arrange ---
+        # Mock the database connection and cursor
+        conn, cur = self._mock_db_conn()
+        # Simulate resolving telegram_id to user_pk, then finding no portfolio, then getting new ID
+        cur.fetchone.side_effect = [(1,), None, (100,)]
+        # Simulate fetching one wallet for the user
+        cur.fetchall.return_value = [('0xWalletAddress', 1)]  # address, chain_id
         mock_get_conn.return_value = conn
 
-        # Arrange Explorer mocks
+        # Mock the OKX Explorer API client
         explorer = MagicMock()
         explorer.get_all_balances.return_value = {
             'success': True,
-            'data': [
-                {
-                    "chainIndex": "1",
-                    "tokenAssets": [
-                        {
-                            'tokenContractAddress': '0xeeee',
-                            'symbol': 'ETH',
-                            'balance': '1.0',
-                            'tokenPrice': '2000.0'
-                        },
-                        {
-                            'tokenContractAddress': '0xa0b8',
-                            'symbol': 'USDC',
-                            'balance': '100.0',
-                            'tokenPrice': '1.0'
-                        }
-                    ]
-                }
-            ]
+            'data': [{
+                "chainIndex": "1",
+                "tokenAssets": [{
+                    'symbol': 'ETH',
+                    'balance': '1.5',
+                    'tokenPrice': '3000.0',
+                    'tokenContractAddress': '0xeeee'
+                }]
+            }]
         }
+        service = PortfolioService(explorer=explorer)
 
-        svc = PortfolioService(explorer=explorer)
+        # --- Act ---
+        result = service.sync_balances(telegram_id=12345)
 
-        # Act
-        ok = svc.sync_balances(telegram_id=123)
-
-        # Expect success path
-        self.assertTrue(ok)
-        # Holdings insertion should be called twice
-        self.assertEqual(cur.execute.call_count, 8) # select user, select portfolio, insert portfolio, select wallets, delete holdings, insert holdings (x2), update portfolios
-        executes = [c[0][0] for c in cur.execute.call_args_list]
-        self.assertEqual(len([s for s in executes if 'INSERT INTO holdings' in s]), 2)
+        # --- Assert ---
+        self.assertTrue(result)
+        # Ensure the API was called with the correct wallet address and chain
+        explorer.get_all_balances.assert_called_once_with('0xWalletAddress', chains=[1])
+        # Check that the holdings were deleted and then the new holding was inserted
+        delete_call = any('DELETE FROM holdings' in str(call) for call in cur.execute.call_args_list)
+        insert_call = any('INSERT INTO holdings' in str(call) for call in cur.execute.call_args_list)
+        self.assertTrue(delete_call, "DELETE FROM holdings should have been called")
+        self.assertTrue(insert_call, "INSERT INTO holdings should have been called")
+        # Check that the transaction was committed
+        conn.commit.assert_called_once()
+        conn.close.assert_called_once()
 
     @patch('src.portfolio.get_db_connection')
-    def test_get_snapshot(self, mock_get_conn):
-        # Prepare mocked DB rows (symbol, amount, decimals, value_usd)
-        rows = [
-            ('ETH', Decimal('1000000000000000000'), 18, Decimal('2000')),
-            ('USDC', Decimal('1000000'), 6, Decimal('1')),
+    def test_get_snapshot_calculates_correctly(self, mock_get_conn):
+        """
+        Verify that get_snapshot correctly retrieves data and calculates portfolio value.
+        """
+        # --- Arrange ---
+        conn, cur = self._mock_db_conn()
+        # symbol, amount, decimals, value_usd
+        mock_rows = [
+            ('BTC', Decimal('50000000'), 8, Decimal('35000.0')),
+            ('ETH', Decimal('2000000000000000000'), 18, Decimal('6000.0')),
         ]
-        conn = MagicMock()
-        cur = MagicMock()
-        cur.fetchall.return_value = rows
-        conn.cursor.return_value.__enter__.return_value = cur
+        cur.fetchall.return_value = mock_rows
         mock_get_conn.return_value = conn
 
-        svc = PortfolioService(explorer=MagicMock())
-        snap = svc.get_snapshot(telegram_id=123)
+        service = PortfolioService(explorer=MagicMock())
 
-        self.assertAlmostEqual(snap['total_value_usd'], 2001.0, places=2)
-        self.assertEqual(len(snap['assets']), 2) 
+        # --- Act ---
+        snapshot = service.get_snapshot(telegram_id=12345)
+
+        # --- Assert ---
+        self.assertIn('total_value_usd', snapshot)
+        self.assertIn('assets', snapshot)
+        # Total value should be the sum of the 'value_usd' from the mock rows
+        self.assertAlmostEqual(snapshot['total_value_usd'], 41000.0)
+        self.assertEqual(len(snapshot['assets']), 2)
+        # Check if the quantity for BTC was calculated correctly (0.5)
+        self.assertAlmostEqual(snapshot['assets'][0]['quantity'], 0.5)
+        # Check if the quantity for ETH was calculated correctly (2.0)
+        self.assertAlmostEqual(snapshot['assets'][1]['quantity'], 2.0)
+        conn.close.assert_called_once() 
