@@ -17,7 +17,7 @@ All requests to the OKX Web3 APIs (DEX, Explorer, Market) require **four** piece
 
 The first three values go into the regular `OK-ACCESS-*` headers used across all OKX APIs. The
 `OKX_PROJECT_ID` is injected as the additional header `OK-ACCESS-PROJECT`. If this header is missing
-the Explorer & Market endpoints respond with `40401 URL not found` even when the path is correct.
+the DEX and Market endpoints respond with an error.
 
 All four credentials are stored in a `.env` file and loaded at runtime.
 
