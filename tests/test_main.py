@@ -139,5 +139,22 @@ class TestMainHandlers(unittest.IsolatedAsyncioTestCase):
         mock_add_wallet_start.assert_called_once_with(update, context)
         self.assertEqual(result, ConversationHandler.END)
 
+    @patch('src.main.portfolio')
+    @patch('src.main.nlp_client')
+    async def test_handle_text_show_portfolio(self, mock_nlp_client, mock_portfolio):
+        """Test that 'show_portfolio' intent calls the correct handler."""
+        # Arrange
+        update, context = await self._create_update_context("show my assets")
+        mock_nlp_client.parse_intent.return_value = {"intent": "show_portfolio", "entities": {}}
+        mock_portfolio.return_value = None # It's an async function
+
+        # Act
+        result = await handle_text(update, context)
+
+        # Assert
+        mock_nlp_client.parse_intent.assert_called_once_with("show my assets")
+        mock_portfolio.assert_called_once_with(update, context)
+        self.assertEqual(result, ConversationHandler.END)
+
 if __name__ == '__main__':
     unittest.main() 

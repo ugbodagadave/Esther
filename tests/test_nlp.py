@@ -73,5 +73,17 @@ class TestNLPClient(unittest.TestCase):
             
             self.assertEqual(parsed_intent['intent'], 'add_wallet')
 
+    def test_parse_intent_show_portfolio(self):
+        """Test parsing of the 'show_portfolio' intent."""
+        with patch('src.nlp.genai.GenerativeModel') as MockGenerativeModel:
+            mock_model_instance = MagicMock()
+            mock_model_instance.generate_content.return_value.text = '{"intent": "show_portfolio", "entities": {}}'
+            MockGenerativeModel.return_value = mock_model_instance
+            
+            client = NLPClient()
+            parsed_intent = client.parse_intent("show me my portfolio")
+            
+            self.assertEqual(parsed_intent['intent'], 'show_portfolio')
+
 if __name__ == '__main__':
     unittest.main()

@@ -55,6 +55,7 @@ class NLPClient:
         - set_take_profit: User wants to set a take-profit order.
         - list_wallets: User wants to see their saved wallets.
         - add_wallet: User wants to add a new wallet.
+        - show_portfolio: User wants to see their portfolio.
         
         For trading intents (buy, sell), extract the following entities if present:
         - symbol: The token symbol (e.g., ETH, BTC).
@@ -71,6 +72,7 @@ class NLPClient:
         Example for set_take_profit: {{"intent": "set_take_profit", "entities": {{"symbol": "ETH", "price": "3000"}}}}
         Example for list_wallets: {{"intent": "list_wallets", "entities": {{}}}}
         Example for add_wallet: {{"intent": "add_wallet", "entities": {{}}}}
+        Example for show_portfolio: {{"intent": "show_portfolio", "entities": {{}}}}
 
         Query: "{text}"
         """

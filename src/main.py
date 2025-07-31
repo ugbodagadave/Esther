@@ -76,20 +76,24 @@ CHAIN_ID_MAP = {
 }
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Handles the /start command, registers the user if they don't exist."""
+    """Handles the /start command, registers the user, and provides a friendly welcome."""
     user = update.effective_user
     logger.info(f"User {user.username} ({user.id}) started the bot.")
-    
+
+    # Keyboard for the 'What can I do?' prompt
+    keyboard = [[InlineKeyboardButton("What can I do?", callback_data='help')]]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+
     conn = get_db_connection()
     if conn is None:
         await update.message.reply_text("Sorry, I'm having trouble connecting to the database. Please try again later.")
         return
-        
+
     try:
         with conn.cursor() as cur:
             cur.execute("SELECT id FROM users WHERE telegram_id = %s;", (user.id,))
             result = cur.fetchone()
-            
+
             if result is None:
                 cur.execute(
                     "INSERT INTO users (telegram_id, username) VALUES (%s, %s);",
@@ -97,10 +101,16 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                 )
                 conn.commit()
                 logger.info(f"New user {user.username} ({user.id}) created.")
-                await update.message.reply_text("Welcome! I've created an account for you. How can I help you get started with trading on OKX DEX?")
+                await update.message.reply_text(
+                    "Hello! I'm Esther, your AI agent for navigating the world of decentralized finance.",
+                    reply_markup=reply_markup
+                )
             else:
                 logger.info(f"Existing user {user.username} ({user.id}) returned.")
-                await update.message.reply_text("Welcome back! How can I help you today?")
+                await update.message.reply_text(
+                    "Welcome back! How can I help you today?",
+                    reply_markup=reply_markup
+                )
     except Exception as e:
         logger.error(f"Database error during /start for user {user.id}: {e}")
         await update.message.reply_text("An error occurred while accessing your account.")
@@ -109,8 +119,26 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             conn.close()
 
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Sends a message when the command /help is issued."""
-    await update.message.reply_text("I can help you with trading on OKX DEX. Try asking me for the price of a token, for example: 'What is the price of BTC?'")
+    """Sends a message when the command /help is issued or the 'help' button is clicked."""
+    help_text = (
+        "Here's what I can do for you:\n\n"
+        "📈 **Portfolio Management**\n"
+        "   - `Show me my portfolio`: Get a full snapshot of your assets.\n"
+        "   - `List my wallets`: See all your connected wallets.\n"
+        "   - `Add a new wallet`: Connect a new wallet to track.\n\n"
+        "💹 **Trading & Swaps**\n"
+        "   - `Buy 0.1 ETH with USDC`: Execute a trade.\n"
+        "   - `What is the price of BTC?`: Get the latest price for any token.\n\n"
+        "🔔 **Alerts**\n"
+        "   - `Set a price alert`: Get notified when a token hits your target price."
+    )
+    # Check if the call is from a button click
+    if update.callback_query:
+        await update.callback_query.answer()
+        await update.callback_query.edit_message_text(help_text)
+    else:
+        await update.message.reply_text(help_text)
+
 
 async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Handles regular text messages, parses intent, and initiates actions."""
@@ -135,6 +163,17 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int
 
     elif intent == "set_take_profit":
         return await set_take_profit_intent(update, context, entities)
+
+    elif intent == "list_wallets":
+        await list_wallets(update, context)
+        return ConversationHandler.END
+
+    elif intent == "add_wallet":
+        return await add_wallet_start(update, context)
+
+    elif intent == "show_portfolio":
+        await portfolio(update, context)
+        return ConversationHandler.END
 
     elif intent == "greeting":
         await update.message.reply_text("Hello! How can I assist you with your trades today?")
@@ -724,6 +763,7 @@ conv_handler = ConversationHandler(
 )
 
 application.add_handler(conv_handler)
+application.add_handler(CallbackQueryHandler(help_command, pattern='^help$'))
 
 # Add other handlers that are not part of conversations
 application.add_handler(CommandHandler("start", start))
