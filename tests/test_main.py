@@ -118,7 +118,7 @@ class TestMainHandlers(unittest.IsolatedAsyncioTestCase):
         result = await handle_text(update, context)
 
         # Assert
-        mock_nlp_client.parse_intent.assert_called_once_with("show me my wallets")
+        mock_nlp_client.parse_intent.assert_called_once_with("show me my wallets", model_type='flash')
         mock_list_wallets.assert_called_once_with(update, context)
         self.assertEqual(result, ConversationHandler.END)
 
@@ -135,7 +135,7 @@ class TestMainHandlers(unittest.IsolatedAsyncioTestCase):
         result = await handle_text(update, context)
 
         # Assert
-        mock_nlp_client.parse_intent.assert_called_once_with("add a new wallet")
+        mock_nlp_client.parse_intent.assert_called_once_with("add a new wallet", model_type='flash')
         mock_add_wallet_start.assert_called_once_with(update, context)
         self.assertEqual(result, ConversationHandler.END)
 
@@ -152,8 +152,31 @@ class TestMainHandlers(unittest.IsolatedAsyncioTestCase):
         result = await handle_text(update, context)
 
         # Assert
-        mock_nlp_client.parse_intent.assert_called_once_with("show my assets")
+        mock_nlp_client.parse_intent.assert_called_once_with("show my assets", model_type='flash')
         mock_portfolio.assert_called_once_with(update, context)
+        self.assertEqual(result, ConversationHandler.END)
+
+    @patch('src.main.insights')
+    @patch('src.main.nlp_client')
+    async def test_handle_text_get_insights(self, mock_nlp_client, mock_insights):
+        """Test that 'get_insights' intent calls the correct handler and uses the Pro model."""
+        # Arrange
+        update, context = await self._create_update_context("give me insights")
+        # Simulate the two-step parsing process
+        mock_nlp_client.parse_intent.side_effect = [
+            {"intent": "get_insights", "entities": {}}, # First call (Flash)
+            {"intent": "get_insights", "entities": {}}  # Second call (Pro)
+        ]
+        mock_insights.return_value = None
+
+        # Act
+        result = await handle_text(update, context)
+
+        # Assert
+        self.assertEqual(mock_nlp_client.parse_intent.call_count, 2)
+        # Check that the second call specifically used the 'pro' model
+        self.assertEqual(mock_nlp_client.parse_intent.call_args_list[1].kwargs['model_type'], 'pro')
+        mock_insights.assert_called_once_with(update, context)
         self.assertEqual(result, ConversationHandler.END)
 
 if __name__ == '__main__':

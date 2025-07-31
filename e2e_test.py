@@ -204,6 +204,39 @@ def run_e2e_test():
         print(f"    ❌ FAILURE: Portfolio tests encountered an error: {e}")
         traceback.print_exc()
 
+    # --- Test 7: Conversational NLP ---
+    print("\n[7/7] Testing conversational NLP intents...")
+    try:
+        nlp_client = NLPClient()
+        
+        # Test "list_wallets"
+        print("    Query: 'show me my wallets'")
+        intent_data = nlp_client.parse_intent("show me my wallets")
+        if intent_data.get('intent') == 'list_wallets':
+            print("    ✅ SUCCESS: Correctly parsed 'list_wallets' intent.")
+        else:
+            print(f"    ❌ FAILURE: Incorrectly parsed 'list_wallets'. Got: {intent_data}")
+
+        # Test "add_wallet"
+        print("    Query: 'I want to add a wallet'")
+        intent_data = nlp_client.parse_intent("I want to add a wallet")
+        if intent_data.get('intent') == 'add_wallet':
+            print("    ✅ SUCCESS: Correctly parsed 'add_wallet' intent.")
+        else:
+            print(f"    ❌ FAILURE: Incorrectly parsed 'add_wallet'. Got: {intent_data}")
+            
+        # Test "show_portfolio"
+        print("    Query: 'what is in my portfolio'")
+        intent_data = nlp_client.parse_intent("what is in my portfolio")
+        if intent_data.get('intent') == 'show_portfolio':
+            print("    ✅ SUCCESS: Correctly parsed 'show_portfolio' intent.")
+        else:
+            print(f"    ❌ FAILURE: Incorrectly parsed 'show_portfolio'. Got: {intent_data}")
+            
+    except Exception as e:
+        print(f"    ❌ FAILURE: Conversational NLP tests encountered an error: {e}")
+        traceback.print_exc()
+
     print("\n--- End-to-End Test Finished ---")
 
 

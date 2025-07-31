@@ -24,7 +24,7 @@ class TestNLPClient(unittest.TestCase):
         result = client.parse_intent("price of btc", model_type='flash')
         
         # Assert
-        MockGenerativeModel.assert_called_once_with('gemini-1.5-flash-latest')
+        MockGenerativeModel.assert_called_once_with('gemini-2.5-flash')
         self.assertEqual(result, {"intent": "get_price"})
 
     @patch('src.nlp.genai.GenerativeModel')
@@ -41,7 +41,7 @@ class TestNLPClient(unittest.TestCase):
         result = client.parse_intent("buy 1 eth with usdc", model_type='pro')
         
         # Assert
-        MockGenerativeModel.assert_called_once_with('gemini-2.5-pro-latest')
+        MockGenerativeModel.assert_called_once_with('gemini-2.5-pro')
         self.assertEqual(result, {"intent": "buy_token"})
 
     @patch('src.nlp.genai.GenerativeModel')
@@ -54,11 +54,11 @@ class TestNLPClient(unittest.TestCase):
         
         # Access the flash model
         _ = client.flash_model
-        MockGenerativeModel.assert_called_once_with('gemini-1.5-flash-latest')
+        MockGenerativeModel.assert_called_once_with('gemini-2.5-flash')
         
         # Access the pro model
         _ = client.pro_model
-        MockGenerativeModel.assert_called_with('gemini-2.5-pro-latest')
+        MockGenerativeModel.assert_called_with('gemini-2.5-pro')
         self.assertEqual(MockGenerativeModel.call_count, 2)
 
     def test_parse_intent_add_wallet(self):
@@ -84,6 +84,18 @@ class TestNLPClient(unittest.TestCase):
             parsed_intent = client.parse_intent("show me my portfolio")
             
             self.assertEqual(parsed_intent['intent'], 'show_portfolio')
+
+    def test_parse_intent_get_insights(self):
+        """Test parsing of the 'get_insights' intent."""
+        with patch('src.nlp.genai.GenerativeModel') as MockGenerativeModel:
+            mock_model_instance = MagicMock()
+            mock_model_instance.generate_content.return_value.text = '{"intent": "get_insights", "entities": {}}'
+            MockGenerativeModel.return_value = mock_model_instance
+            
+            client = NLPClient()
+            parsed_intent = client.parse_intent("give me market insights")
+            
+            self.assertEqual(parsed_intent['intent'], 'get_insights')
 
 if __name__ == '__main__':
     unittest.main()

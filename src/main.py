@@ -143,10 +143,18 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
 async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Handles regular text messages, parses intent, and initiates actions."""
     user_message = update.message.text
-    parsed_intent = nlp_client.parse_intent(user_message)
+    
+    # Use the faster Flash model for initial intent recognition
+    parsed_intent = nlp_client.parse_intent(user_message, model_type='flash')
     
     intent = parsed_intent.get("intent")
     entities = parsed_intent.get("entities", {})
+
+    # For complex tasks that require deeper understanding, re-parse with the Pro model.
+    if intent in ["buy_token", "sell_token", "get_insights"]:
+        parsed_intent = nlp_client.parse_intent(user_message, model_type='pro')
+        intent = parsed_intent.get("intent")
+        entities = parsed_intent.get("entities", {})
 
     if intent == "get_price":
         await get_price_intent(update, context, entities)
@@ -173,6 +181,10 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int
 
     elif intent == "show_portfolio":
         await portfolio(update, context)
+        return ConversationHandler.END
+
+    elif intent == "get_insights":
+        await insights(update, context)
         return ConversationHandler.END
 
     elif intent == "greeting":

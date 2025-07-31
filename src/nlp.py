@@ -27,14 +27,14 @@ class NLPClient:
     def flash_model(self):
         """Lazy-loads and returns the Gemini Flash model."""
         if self._flash_model is None:
-            self._flash_model = genai.GenerativeModel('gemini-1.5-flash-latest')
+            self._flash_model = genai.GenerativeModel('gemini-2.5-flash')
         return self._flash_model
 
     @property
     def pro_model(self):
         """Lazy-loads and returns the Gemini Pro model."""
         if self._pro_model is None:
-            self._pro_model = genai.GenerativeModel('gemini-2.5-pro-latest')
+            self._pro_model = genai.GenerativeModel('gemini-2.5-pro')
         return self._pro_model
 
     def parse_intent(self, text: str, model_type: str = 'flash') -> dict:
@@ -56,6 +56,7 @@ class NLPClient:
         - list_wallets: User wants to see their saved wallets.
         - add_wallet: User wants to add a new wallet.
         - show_portfolio: User wants to see their portfolio.
+        - get_insights: User wants to get market or portfolio insights.
         
         For trading intents (buy, sell), extract the following entities if present:
         - symbol: The token symbol (e.g., ETH, BTC).
@@ -73,6 +74,7 @@ class NLPClient:
         Example for list_wallets: {{"intent": "list_wallets", "entities": {{}}}}
         Example for add_wallet: {{"intent": "add_wallet", "entities": {{}}}}
         Example for show_portfolio: {{"intent": "show_portfolio", "entities": {{}}}}
+        Example for get_insights: {{"intent": "get_insights", "entities": {{}}}}
 
         Query: "{text}"
         """
