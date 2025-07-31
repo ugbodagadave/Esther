@@ -67,10 +67,10 @@ class NLPClient:
 
         Return the output as a JSON object with "intent" and "entities" keys.
 
-        Example for get_price: {{"intent": "get_price", "entities": {{"symbol": "BTC"}}}}
-        Example for buy_token: {{"intent": "buy_token", "entities": {{"amount": "0.5", "symbol": "ETH", "currency": "USDT"}}}}
-        Example for set_stop_loss: {{"intent": "set_stop_loss", "entities": {{"symbol": "BTC", "price": "60000"}}}}
-        Example for set_take_profit: {{"intent": "set_take_profit", "entities": {{"symbol": "ETH", "price": "3000"}}}}
+            Example for get_price: {{"intent": "get_price", "entities": {{"symbol": "BTC"}}}}
+            Example for buy_token: {{"intent": "buy_token", "entities": {{"amount": "0.5", "symbol": "ETH", "currency": "USDT"}}}}
+            Example for set_stop_loss: {{"intent": "set_stop_loss", "entities": {{"symbol": "BTC", "price": "60000"}}}}
+            Example for set_take_profit: {{"intent": "set_take_profit", "entities": {{"symbol": "ETH", "price": "3000"}}}}
         Example for list_wallets: {{"intent": "list_wallets", "entities": {{}}}}
         Example for add_wallet: {{"intent": "add_wallet", "entities": {{}}}}
         Example for show_portfolio: {{"intent": "show_portfolio", "entities": {{}}}}

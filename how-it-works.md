@@ -82,30 +82,81 @@ Here is the step-by-step journey of a user command, from Telegram to execution a
     *   **Notification**: If an alert is triggered, the monitoring service uses the **Telegram Bot API** to send a direct message to the user.
     *   **Deactivation**: Once an alert is triggered, it is marked as inactive in the database to prevent duplicate notifications.
 
-## 4. Gemini Model Allocation Strategy
+## 4. Conversational NLP & Natural Language Understanding
+
+Esther has evolved from a command-driven bot to a sophisticated conversational AI that understands natural language. This transformation involves several key components:
+
+### 4.1 Intent Recognition System
+The NLP module uses Google's Gemini models to parse user messages into structured intents and entities:
+
+**Supported Intents**:
+- `greeting`: "Hello", "Hi Esther", "Good morning"
+- `get_price`: "What's the price of BTC?", "How much is ETH worth?"
+- `buy_token`: "Buy 0.1 ETH with USDT", "I want to purchase some Bitcoin"
+- `sell_token`: "Sell 0.5 ETH for USDC", "I need to sell my tokens"
+- `set_stop_loss`: "Set stop loss for BTC at 60000"
+- `set_take_profit`: "Set take profit for ETH at 3500"
+- `list_wallets`: "Show me my wallets", "List all my wallets"
+- `add_wallet`: "I want to add a wallet", "Add a new wallet"
+- `show_portfolio`: "What's in my portfolio?", "Show me my assets"
+- `get_insights`: "Give me market insights", "What's the market analysis?"
+
+### 4.2 Two-Tier Model Selection Strategy
+Esther intelligently chooses between Gemini models based on task complexity:
+
+**Gemini 2.5 Flash** (Fast, Cost-Effective):
+- Initial intent recognition for all queries
+- Simple, single-intent requests
+- Basic conversational responses
+- Portfolio and wallet management queries
+
+**Gemini 2.5 Pro** (Powerful, Comprehensive):
+- Complex trading decisions with multiple conditions
+- In-depth market analysis and insights generation
+- Personalized recommendations requiring portfolio analysis
+- Multi-step reasoning tasks
+
+### 4.3 Lazy Model Initialization
+The `NLPClient` uses lazy initialization to optimize resource usage:
+- Models are only instantiated when first accessed
+- Reduces startup time and memory footprint
+- Enables efficient model switching based on task requirements
+
+### 4.4 Conversational Command Flow
+1. **Message Reception**: User sends natural language message
+2. **Initial Parsing**: Gemini Flash quickly identifies basic intent
+3. **Complex Task Escalation**: For complex tasks, Gemini Pro re-parses with deeper understanding
+4. **Intent Routing**: System routes to appropriate handler function
+5. **Response Generation**: Contextual, helpful responses maintain conversation flow
+
+## 5. Gemini Model Allocation Strategy
 The choice between Gemini Pro and Flash is dynamic and crucial for balancing performance and cost.
 
 -   **Gemini Flash is used for**:
     -   Initial greetings and simple conversational turns.
     -   Single-intent, low-complexity queries: "What is the price of BTC?", "What is DeFi?".
     -   Simple, single-condition alerts: "Alert me if BTC > $70,000".
+    -   Portfolio and wallet management: "Show me my wallets", "What's in my portfolio?"
+    -   Basic intent recognition for all incoming messages.
 -   **Gemini Pro is used for**:
     -   Complex, multi-intent, or conditional commands: "Buy 0.1 ETH with USDT if the price is below $2000".
     -   In-depth market analysis and trend generation.
     -   Personalized recommendations that require analyzing user history and portfolio data.
     -   Nuanced sentiment analysis of news articles.
     -   Generating detailed, structured educational content.
+    -   Complex trading decisions requiring market analysis.
 
-## 5. Security Design
+## 6. Security Design
 Security is paramount. The following measures are integral to the design:
 -   **Environment Variables**: All system-level API keys and secrets are managed exclusively through environment variables and are never hardcoded.
 -   **Database Encryption**: User-specific sensitive data, particularly OKX DEX API keys, are encrypted using a strong algorithm (e.g., AES-256) before being stored in the PostgreSQL database. The encryption key itself is managed as a secure environment variable.
 -   **Immutable Transaction Confirmation**: The pre-execution confirmation step is a mandatory, non-skippable part of the workflow for any action that modifies a user's assets.
 -   **Principle of Least Privilege**: The OKX DEX API keys requested from the user should have the minimum required permissions for the bot's functionality.
+-   **Database Schema Migration**: Automatic schema initialization ensures the database structure is always up-to-date, preventing runtime errors.
 
-## 6. Portfolio Management Pipeline
+## 7. Portfolio Management Pipeline
 
-Esther now keeps a real-time view of every user’s on-chain balances **without requiring a separate paid worker on Render**.
+Esther now keeps a real-time view of every user's on-chain balances **without requiring a separate paid worker on Render**.
 
 1. **Balance Discovery**
    * A thin wrapper `src/okx_explorer.py` calls the OKX Web3 DEX API. The primary endpoint used is:
@@ -120,7 +171,7 @@ Esther now keeps a real-time view of every user’s on-chain balances **without 
 3. **Scheduling**
    * The existing background process `src/monitoring.py` now has a coroutine `sync_all_portfolios()`.
    * It runs every **10 minutes** (configurable via `PORTFOLIO_SYNC_INTERVAL`) inside the same Render worker that checks price alerts—so no extra dyno.
-4. **User Query Flow** (`/portfolio`)
+4. **User Query Flow** (`/portfolio` or "Show me my portfolio")
    * Telegram handler → calls `PortfolioService.sync_balances()` (best-effort) → `PortfolioService.get_snapshot()`
    * A Markdown table is returned summarising quantity and USD value of each asset along with a grand total.
 
@@ -128,7 +179,7 @@ Esther now keeps a real-time view of every user’s on-chain balances **without 
 * `get_diversification()` – returns a `{symbol: %}` map based on last valuation.
 * `get_roi(window_days)` – naive ROI using the first candle from `/api/v5/dex/market/candlesticks-history` vs current value.
 
-## 7. Rebalance Engine
+## 8. Rebalance Engine
 
 `PortfolioService.suggest_rebalance()` generates a **one-hop trade plan** to align the portfolio with a target allocation:
 
@@ -147,7 +198,7 @@ Algorithm (greedy, USD based):
 
 A future iteration will translate the plan into a sequence of OKX aggregator swaps with the existing confirmation workflow.
 
-## 8. Updated Component Diagram
+## 9. Updated Component Diagram
 
 ```mermaid
 graph TD
@@ -161,6 +212,11 @@ graph TD
     subgraph Application Core
         PortfolioService
         OKXExplorer
+        NLPClient
+    end
+    subgraph AI Models
+        G[Gemini 2.5 Pro]
+        H[Gemini 2.5 Flash]
     end
 
     M --> S
@@ -168,9 +224,11 @@ graph TD
     PortfolioService --> OKXExplorer
     PortfolioService --> DB
     OKXExplorer -->|DEX & Market Endpoints| OKXDEX[(OKX Web3 API)]
+    NLPClient --> G
+    NLPClient --> H
 ```
 
-## 9. Temporary Admin Tools (For Development)
+## 10. Temporary Admin Tools (For Development)
 During development, you may need to clear the PostgreSQL database to reset all users, wallets, and portfolio data. A temporary, secure admin page has been added for this purpose.
 
 To clear the database:
@@ -182,3 +240,25 @@ To clear the database:
 3.  Click the "Clear Database Now" button on the page to confirm the action.
 
 **IMPORTANT**: This endpoint is intended for development and testing only. It drops all tables and re-initializes the schema. It should be protected and used with caution.
+
+## 11. Testing Strategy
+
+Esther employs a comprehensive testing strategy to ensure reliability and stability:
+
+### 11.1 Unit Testing
+- **`tests/test_main.py`**: Tests Telegram bot handlers, command routing, and conversational flows
+- **`tests/test_nlp.py`**: Tests NLP client functionality, model initialization, and intent parsing
+- **`tests/test_portfolio.py`**: Tests portfolio service operations and API integrations
+- **`tests/test_okx_client.py`**: Tests OKX API client functionality
+- **`tests/test_database.py`**: Tests database operations and schema management
+
+### 11.2 End-to-End Testing
+- **`e2e_test.py`**: Live API testing with real Gemini and OKX endpoints
+- Tests portfolio sync, wallet management, and conversational NLP
+- Validates complete user workflows from natural language to execution
+
+### 11.3 Testing Best Practices
+- All changes are tested before committing
+- Mock external dependencies to ensure isolated testing
+- Use short, descriptive commit messages
+- Maintain test coverage for all new features

@@ -39,11 +39,58 @@ Alongside trading endpoints, Esther consumes OKX **Web3 DEX and Market** APIs to
 
 These calls are **GET** requests signed with the same HMAC flow as trading requests and **must** include the `OK-ACCESS-PROJECT` header described above.
 
-### D. Error Handling
+### D. Error Handling and Retry Logic
 
-The `OKXClient` includes robust error handling to manage potential issues with the API, such as network errors or invalid requests. It uses a retry mechanism to automatically resubmit failed requests, which makes the bot more resilient and reliable.
+The `OKXClient` includes robust error handling to manage potential issues with the API:
 
-## 2. Potential for X Layer Integration
+- **Retry Mechanism**: Failed requests are automatically retried with exponential backoff
+- **HTTP Status Code Handling**: Specific handling for 401 (Unauthorized), 429 (Rate Limited), and 500+ (Server Errors)
+- **Request Validation**: Ensures all required parameters are present and properly formatted
+- **Chain ID Formatting**: Automatically converts chain IDs to strings to prevent API formatting errors
+
+### E. Portfolio Integration
+
+The OKX DEX API powers Esther's real-time portfolio tracking:
+
+- **Automatic Balance Sync**: Every 10 minutes, Esther syncs all user wallet balances
+- **Multi-Chain Support**: Tracks balances across Ethereum, Polygon, BSC, and other supported chains
+- **Real-Time Pricing**: Uses OKX's integrated pricing data for accurate USD valuations
+- **Performance Analytics**: Calculates ROI and diversification metrics using historical data
+
+## 2. Natural Language Integration
+
+Esther's integration with OKX DEX API is enhanced by sophisticated natural language processing:
+
+### A. Intent Recognition for Trading
+
+The NLP system can understand various trading intents and route them to appropriate OKX API calls:
+
+- **Price Queries**: "What's the price of ETH?" → Calls OKX market data endpoints
+- **Trading Commands**: "Buy 0.1 ETH with USDT" → Initiates quote and swap workflow
+- **Portfolio Queries**: "Show me my portfolio" → Triggers balance sync and snapshot generation
+
+### B. Model Selection for API Operations
+
+Esther uses intelligent model selection for different types of OKX API interactions:
+
+- **Gemini 2.5 Flash**: For simple price checks and basic portfolio queries
+- **Gemini 2.5 Pro**: For complex trading decisions requiring market analysis
+
+## 3. Security and Best Practices
+
+### A. API Key Management
+
+- **Environment Variables**: All OKX credentials are stored securely in environment variables
+- **Encryption**: User-specific API keys are encrypted before database storage
+- **Least Privilege**: Only request necessary permissions for bot functionality
+
+### B. Request Signing
+
+- **HMAC Authentication**: All requests are properly signed using OKX's HMAC-SHA256 method
+- **Timestamp Validation**: Ensures requests are not replayable
+- **Nonce Generation**: Unique nonces prevent request duplication
+
+## 4. Potential for X Layer Integration
 
 X Layer is a high-performance, EVM-compatible Layer 2 network that is designed to make it faster and cheaper to transact with dApps in the OKX ecosystem. Integrating Esther with X Layer would provide a number of significant benefits:
 
@@ -68,3 +115,23 @@ To integrate Esther with X Layer, we would need to make the following changes:
 3.  **Update the Smart Contracts**: If Esther were to use its own smart contracts, we would need to deploy them to the X Layer network.
 
 By making these changes, we could seamlessly integrate Esther with X Layer and provide our users with a faster, cheaper, and more scalable trading experience.
+
+## 5. Testing and Validation
+
+### A. Unit Testing
+
+- **Mock OKX API Responses**: Comprehensive unit tests with mocked API responses
+- **Error Scenario Testing**: Tests for network failures, rate limiting, and invalid responses
+- **Authentication Testing**: Validates proper request signing and header inclusion
+
+### B. End-to-End Testing
+
+- **Live API Testing**: `e2e_test.py` performs real API calls to validate integration
+- **Portfolio Sync Testing**: Verifies balance discovery and valuation accuracy
+- **Trading Workflow Testing**: Tests complete quote-to-execution flow
+
+### C. Performance Monitoring
+
+- **Response Time Tracking**: Monitors API response times and retry frequency
+- **Error Rate Monitoring**: Tracks API error rates and success percentages
+- **Rate Limit Management**: Ensures compliance with OKX API rate limits

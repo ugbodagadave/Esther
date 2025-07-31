@@ -4,7 +4,7 @@
   <img src="esther-banner.png" alt="Esther AI Trading Agent Banner">
 </div>
 
-**Esther** is an AI Agent that lives in your Telegram chat. It makes trading easy and accessible for everyone by integrating with the OKX DEX aggregator, which allows users to swap cryptocurrencies across multiple blockchains and DEXs for the most competitive prices. With Esther, you can trade, get market updates, and manage your crypto portfolio just by having a conversation.
+**Esther** is an AI Agent that lives in your Telegram chat. It makes trading easy and accessible for everyone by integrating with the OKX DEX aggregator, which allows users to swap cryptocurrencies across multiple blockchains and DEXs for the most competitive prices. With Esther, you can trade, get market updates, and manage your crypto portfolio just by having a natural conversation.
 
 ## 🌟 Our Goal
 Decentralized Finance (DeFi) can be confusing. Our goal with Esther is to make it simple. Esther is designed to be a helpful and trustworthy guide for both beginners and experienced traders in the world of crypto.
@@ -12,19 +12,19 @@ Decentralized Finance (DeFi) can be confusing. Our goal with Esther is to make i
 ## ✨ What Esther Can Do
 
 ### Key Features
--   **Trade with Simple Chat Commands**:
-    -   **Check Prices**: "What's the price of ETH?"
-    -   **Buy and Sell Tokens**: "Buy 0.1 ETH with USDC" or "Sell 0.5 ETH for USDT".
-    -   **Set Smart Orders**: "Set a stop-loss for BTC at 60000" or "Set a take-profit for ETH at 3500".
-    -   **Track & Rebalance Portfolio**: `/portfolio` shows live balances + USD value; automated rebalance suggestions coming soon.
--   **Get Smart Insights**: Use the `/insights` command to get personalized advice and analysis on your crypto holdings.
+-   **Trade with Natural Language**:
+    -   **Check Prices**: "What's the price of ETH?" or "How much is Bitcoin worth?"
+    -   **Buy and Sell Tokens**: "Buy 0.1 ETH with USDC" or "I want to sell some Bitcoin for USDT".
+    -   **Set Smart Orders**: "Set a stop-loss for BTC at 60000" or "Alert me when ETH reaches 3500".
+    -   **Track & Rebalance Portfolio**: "Show me my portfolio" or "What's in my wallet?" displays live balances + USD value; automated rebalance suggestions coming soon.
+-   **Manage Your Wallets**: "Show me my wallets" or "I want to add a new wallet" - manage your wallet addresses securely with encrypted private keys.
+-   **Get Smart Insights**: "Give me market insights" or "What's the market analysis?" - get personalized advice and analysis on your crypto holdings.
 -   **Trade Safely**: Every trade must be confirmed by you, so you never have to worry about accidental transactions.
--   **Stay Updated with Price Alerts**: Set custom alerts for any cryptocurrency (e.g., "/addalert BTC above 70000").
+-   **Stay Updated with Price Alerts**: Set custom alerts for any cryptocurrency (e.g., "Alert me if BTC goes above 70000").
 -   **Practice with a Demo Mode**: A "Dry Run" mode lets you practice trading with real market data without using real money.
 -   **Manage Your Account**: Esther automatically creates and manages your user profile.
 -   **Cross-Chain Swaps**: Swap tokens across different blockchains, like from Ethereum to Polygon, with a single command.
--   **Keep Your Wallet Secure**: You can add, view, and delete your wallet addresses with confidence, as your private keys are always encrypted.
--   **Powered by Advanced AI**: Esther uses Google's Gemini models to understand your commands and provide intelligent responses.
+-   **Powered by Advanced AI**: Esther uses Google's Gemini 2.5 Pro & Flash models to understand your natural language commands and provide intelligent responses.
 -   **Reliable and Always On**: Esther is deployed on Render, a modern and reliable cloud platform, with a health check to ensure it's always running.
 
 ### What's Coming Next
@@ -33,7 +33,7 @@ Decentralized Finance (DeFi) can be confusing. Our goal with Esther is to make i
 ## 🛠️ The Technology Behind Esther
 
 -   **Programming Language**: Python
--   **AI and Language Processing**: Google Gemini 2.5 Pro & Flash
+-   **AI and Language Processing**: Google Gemini 2.5 Pro & Flash (Intelligent Model Selection)
 -   **Bot Framework**: `python-telegram-bot`
 -   **Web Server**: Flask
 -   **Database**: PostgreSQL
@@ -101,6 +101,23 @@ For a detailed explanation of how we integrated the OKX DEX API, see our [OKX DE
     ```
     This will start the bot, and it will begin listening for your commands in Telegram.
 
+## 💬 Conversational Features
+
+Esther understands natural language, so you can interact with it just like talking to a friend:
+
+### Example Conversations
+- **"Hello Esther!"** → Esther introduces herself and asks what you'd like to do
+- **"What's the price of Bitcoin?"** → Gets current BTC price
+- **"I want to buy some Ethereum"** → Starts the wallet addition process
+- **"Show me my portfolio"** → Displays your current holdings and values
+- **"Give me market insights"** → Provides personalized market analysis
+- **"What can you do?"** → Lists all available features
+
+### Intelligent Model Selection
+Esther automatically chooses the best AI model for your request:
+- **Gemini 2.5 Flash**: Fast responses for simple queries and basic tasks
+- **Gemini 2.5 Pro**: Deep analysis for complex trading decisions and insights
+
 ## ⚙️ Settings
 
 ### Demo Mode ("Dry Run")
@@ -136,3 +153,18 @@ To clear the database:
 ### Running the End-to-End Test
 The `e2e_test.py` script is provided to perform live checks against the Gemini and OKX APIs.
 It requires the following environment variables to be set:
+
+- `GEMINI_API_KEY`
+- `OKX_API_KEY`
+- `OKX_API_SECRET`
+- `OKX_API_PASSPHRASE`
+- `OKX_PROJECT_ID`
+- `TEST_WALLET_ADDRESS`
+- `TEST_WALLET_PRIVATE_KEY`
+
+Run the test with:
+```bash
+python e2e_test.py
+```
+
+This will test all major functionality including conversational NLP, portfolio management, and API integrations.
