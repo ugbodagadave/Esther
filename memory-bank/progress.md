@@ -35,7 +35,6 @@ The project has moved into a stabilization phase. The immediate focus is on ensu
 
 ## 3. What's Left to Build
 - **On-Demand Education**: An integrated learning module to explain DeFi concepts on the fly.
-- **Refine and Document `DRY_RUN_MODE`**: Ensure the `DRY_RUN_MODE` is consistently applied across all new features and document its usage.
 - **Real-time Notifications**: Begin work on the observer pattern for real-time market alerts.
 
 ## 4. Known Issues & Blockers

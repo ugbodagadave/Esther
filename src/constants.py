@@ -26,3 +26,8 @@ CHAIN_ID_MAP = {
     "arbitrum": 42161,
     "polygon": 137,
 }
+
+import os
+
+# Global flag for simulation mode, configurable via .env file
+DRY_RUN_MODE = os.getenv("DRY_RUN_MODE", "True").lower() in ("true", "1", "t")

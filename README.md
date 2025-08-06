@@ -142,17 +142,20 @@ Esther automatically chooses the best AI model for your request:
 
 ## ⚙️ Settings
 
-### Demo Mode ("Dry Run")
-For safe practice, Esther has a "Dry Run" mode. When it's on, you can simulate trades with real market data without spending any real money. This is the default setting.
+### ⚙️ Settings
 
-To turn demo mode on or off, change the `DRY_RUN_MODE` setting in your `.env` file:
+#### Demo Mode (`DRY_RUN_MODE`)
+For safe practice, Esther includes a "Dry Run" mode that simulates trades using real market data without executing any real-money transactions. This feature is enabled by default to prevent accidental trades.
+
+To control this setting, add the `DRY_RUN_MODE` variable to your `.env` file:
 ```dotenv
-# Set to "True" to practice without real money (this is the default)
+# Set to "True" to simulate all transactions (default behavior)
 DRY_RUN_MODE="True"
 
-# Set to "False" to make real trades on the crypto exchange
+# Set to "False" to execute real trades on the OKX DEX
 # DRY_RUN_MODE="False"
 ```
+When `DRY_RUN_MODE` is active, any command that would normally result in a blockchain transaction will instead return a simulated success message, allowing you to test the bot's functionality without risk.
 
 ### Admin Secret Key
 This key is used to protect the new admin endpoint for clearing the database during development.

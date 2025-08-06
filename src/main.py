@@ -46,7 +46,12 @@ from src.database import get_db_connection, initialize_database
 from src.encryption import encrypt_data, decrypt_data
 from src.insights import InsightsClient
 from src.portfolio import PortfolioService
-from src.constants import TOKEN_ADDRESSES, TOKEN_DECIMALS, CHAIN_ID_MAP
+from src.constants import (
+    TOKEN_ADDRESSES,
+    TOKEN_DECIMALS,
+    CHAIN_ID_MAP,
+    DRY_RUN_MODE,
+)
 
 # Initialize clients
 nlp_client = NLPClient()
@@ -60,8 +65,6 @@ AWAIT_WALLET_NAME, AWAIT_WALLET_ADDRESS, AWAIT_PRIVATE_KEY = 2, 3, 4
 AWAIT_ALERT_SYMBOL, AWAIT_ALERT_CONDITION, AWAIT_ALERT_PRICE = 5, 6, 7
 AWAIT_REBALANCE_CONFIRMATION = 8
 
-# Global flag for simulation mode, configurable via .env file
-DRY_RUN_MODE = os.getenv("DRY_RUN_MODE", "True").lower() in ("true", "1", "t")
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handles the /start command, registers the user, and provides a friendly welcome."""

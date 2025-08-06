@@ -66,9 +66,10 @@ Here is the step-by-step journey of a user command, from Telegram to execution a
     *   **User Action**: The user clicks either "Confirm" or "Cancel".
     *   **Callback Handling**: A `CallbackQueryHandler` captures the user's choice.
     *   **Swap Execution**: If the user confirms, the `confirm_swap` function is called. It retrieves the swap details from `context.user_data` and calls the `execute_swap` method in the **External Services Layer**.
-    *   **Dry Run vs. Live Mode**: The `DRY_RUN_MODE` flag determines the outcome.
-        *   If `True`, a simulated swap is performed by fetching a final quote.
-        *   If `False`, a real transaction is executed by sending a signed request to the `/api/v5/dex/aggregator/swap` endpoint of the **OKX DEX API**.
+    *   **Dry Run vs. Live Mode**: The `execute_swap` function is called with a `dry_run` parameter that defaults to the global `DRY_RUN_MODE` setting.
+        *   The function *always* begins by fetching a live quote from the OKX DEX API.
+        *   If `dry_run` is `True`, the function returns a simulated success message with the quote data, and no transaction is sent.
+        *   If `dry_run` is `False`, the function proceeds to send a signed request to the `/api/v5/dex/aggregator/swap` endpoint to execute a real transaction on the blockchain.
     *   **Cancellation**: If the user cancels, the `cancel_swap` function is called, the conversation ends, and the stored swap details are cleared.
 6.  **Response and Logging**:
     *   The result of the quote API call is received.

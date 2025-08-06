@@ -108,3 +108,17 @@ Here is a comprehensive guide to testing the Esther bot's features using natural
     2.  A confirmation prompt for the first swap in the plan.
     3.  After confirming each swap, a message indicating the progress (e.g., "Swap 1 of 2 executed successfully").
     4.  A final message confirming that the rebalance is complete.
+
+---
+
+### 11. Testing with DRY_RUN_MODE
+
+**Test 1: Verify Dry Run is Active**
+*   **Setup:** Ensure `DRY_RUN_MODE="True"` in your `.env` file.
+*   **Your Message:** `Buy 0.1 ETH with USDT`
+*   **Expected Bot Response:** After confirming the swap, the final message should explicitly state that the transaction was a simulation. For example: "[DRY RUN] ✅ Swap Simulated Successfully! ... This was a simulation. No real transaction was executed."
+
+**Test 2: Verify Live Mode is Active**
+*   **Setup:** Ensure `DRY_RUN_MODE="False"` in your `.env` file.
+*   **Your Message:** `Buy 0.1 ETH with USDT`
+*   **Expected Bot Response:** After confirming the swap, the final message should indicate a live transaction and include a transaction hash. For example: "[LIVE] ✅ Swap Executed Successfully! ... Transaction Hash: `0x...`"

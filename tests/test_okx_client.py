@@ -3,6 +3,7 @@ from unittest.mock import patch, MagicMock
 import os
 import requests
 from src.okx_client import OKXClient
+from src.constants import DRY_RUN_MODE
 
 class TestOKXClient(unittest.TestCase):
 
@@ -11,7 +12,7 @@ class TestOKXClient(unittest.TestCase):
         "OKX_API_SECRET": "test_secret",
         "OKX_API_PASSPHRASE": "test_passphrase"
     })
-    @patch('requests.get')
+    @patch('src.okx_client.requests.get')
     def test_get_live_quote_success(self, mock_get):
         """Test successful fetching of a live swap quote."""
         mock_response = MagicMock()
@@ -58,9 +59,11 @@ class TestOKXClient(unittest.TestCase):
         self.assertFalse(result['success'])
         self.assertEqual(result['error'], "Insufficient liquidity")
 
-    @patch('requests.post')
-    def test_execute_swap_real_run_success(self, mock_post):
+    @patch('src.okx_client.OKXClient.get_live_quote')
+    @patch('src.okx_client.requests.post')
+    def test_execute_swap_real_run_success(self, mock_post, mock_get_live_quote):
         """Test a successful real swap execution."""
+        mock_get_live_quote.return_value = {"success": True, "data": {}}
         mock_response = MagicMock()
         mock_response.status_code = 200
         mock_response.json.return_value = {
@@ -75,7 +78,7 @@ class TestOKXClient(unittest.TestCase):
         self.assertTrue(result['success'])
         self.assertEqual(result['data']['txHash'], "0x12345")
 
-    @patch('requests.get', side_effect=requests.exceptions.HTTPError("500 Server Error"))
+    @patch('src.okx_client.requests.get', side_effect=requests.exceptions.HTTPError("500 Server Error"))
     @patch('time.sleep', return_value=None) # Mock time.sleep to avoid delays
     def test_get_live_quote_retry_logic(self, mock_sleep, mock_get):
         """Test the retry logic for get_live_quote."""
@@ -86,10 +89,12 @@ class TestOKXClient(unittest.TestCase):
         self.assertEqual(result['error'], "Failed to fetch quote after multiple retries.")
         self.assertEqual(mock_get.call_count, 3)
 
-    @patch('requests.post', side_effect=requests.exceptions.HTTPError("500 Server Error"))
+    @patch('src.okx_client.OKXClient.get_live_quote')
+    @patch('src.okx_client.requests.post', side_effect=requests.exceptions.HTTPError("500 Server Error"))
     @patch('time.sleep', return_value=None)
-    def test_execute_swap_retry_logic(self, mock_sleep, mock_post):
+    def test_execute_swap_retry_logic(self, mock_sleep, mock_post, mock_get_live_quote):
         """Test the retry logic for execute_swap."""
+        mock_get_live_quote.return_value = {"success": True, "data": {}}
         client = OKXClient(max_retries=3, retry_delay=0.1)
         result = client.execute_swap("from", "to", "100", "wallet_addr", dry_run=False)
 
@@ -102,7 +107,7 @@ class TestOKXClient(unittest.TestCase):
         "OKX_API_SECRET": "test_secret",
         "OKX_API_PASSPHRASE": "test_passphrase"
     })
-    @patch('requests.get')
+    @patch('src.okx_client.requests.get')
     def test_get_live_quote_with_chain_id(self, mock_get):
         """Test get_live_quote with a specific chainId."""
         mock_response = MagicMock()
@@ -132,6 +137,40 @@ class TestOKXClient(unittest.TestCase):
         client.execute_swap("from", "to", "100", "wallet_addr", chainId=42, dry_run=True)
 
         mock_get_live_quote.assert_called_once_with("from", "to", "100", 42)
+
+    @patch('src.okx_client.DRY_RUN_MODE', True)
+    @patch.object(OKXClient, 'get_live_quote')
+    def test_execute_swap_respects_dry_run_mode_constant_true(self, mock_get_live_quote):
+        """Test that execute_swap defaults to DRY_RUN_MODE=True from constants."""
+        mock_get_live_quote.return_value = {"success": True, "data": {}}
+        
+        client = OKXClient()
+        # Call execute_swap without the dry_run parameter
+        result = client.execute_swap("from", "to", "100", "wallet_addr")
+
+        self.assertTrue(result['success'])
+        self.assertEqual(result['status'], 'simulated')
+        mock_get_live_quote.assert_called_once()
+
+    @patch('src.okx_client.DRY_RUN_MODE', False)
+    @patch('src.okx_client.OKXClient.get_live_quote')
+    @patch('src.okx_client.requests.post')
+    def test_execute_swap_respects_dry_run_mode_constant_false(self, mock_post, mock_get_live_quote):
+        """Test that execute_swap defaults to DRY_RUN_MODE=False from constants."""
+        mock_get_live_quote.return_value = {"success": True, "data": {}}
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {"code": "0", "data": [{"txHash": "0xreal"}]}
+        mock_post.return_value = mock_response
+
+        client = OKXClient()
+        # Call execute_swap without the dry_run parameter
+        result = client.execute_swap("from", "to", "100", "wallet_addr")
+
+        self.assertTrue(result['success'])
+        self.assertNotIn('status', result) # Real swaps don't have a 'status' field
+        self.assertEqual(result['data']['txHash'], "0xreal")
+        mock_post.assert_called_once()
 
 if __name__ == '__main__':
     unittest.main()

@@ -1,9 +1,10 @@
 # Active Context: Esther
 
 ## 1. Current Focus
-The current focus is on implementing the on-demand education feature. The portfolio rebalance execution feature has been completed and is now stable.
+The current focus is on implementing the on-demand education feature. The `DRY_RUN_MODE` refinement has been completed and is now stable.
 
 ## 2. Recent Changes & Decisions
+- **`DRY_RUN_MODE` Refinement Complete**: The `DRY_RUN_MODE` feature has been refactored to ensure consistent application across the codebase. The configuration has been centralized in `src/constants.py`, and comprehensive unit and integration tests have been added to verify its behavior. All relevant documentation has been updated.
 - **Portfolio Rebalance Feature Complete**: The portfolio rebalance feature has been fully implemented, including the conversational flow for sequential swap execution.
 - **Architectural Refactor**: The application has been refactored from a multi-threaded Flask application to a unified `asyncio` event loop using FastAPI. This has resolved the stability issues and created a robust foundation for future development.
 - **Deployment Command Update**: The `render.yaml` file has been updated to use `uvicorn` to run the FastAPI application, which is the correct and stable approach for an ASGI application.
@@ -11,7 +12,6 @@ The current focus is on implementing the on-demand education feature. The portfo
 
 ## 3. Next Steps
 1.  **On-Demand Education**: Begin work on an integrated learning module to explain DeFi concepts on the fly.
-2.  **Refine and Document `DRY_RUN_MODE`**: Ensure the `DRY_RUN_MODE` is consistently applied across all new features and document its usage.
 
 ## 4. Active Learnings & Insights
 - Decimal precision is a critical detail in DeFi applications. Hardcoding values is risky; dynamic lookup is essential.
