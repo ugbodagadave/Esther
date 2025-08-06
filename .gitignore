@@ -116,4 +116,5 @@ dmypy.json
 
 # Cline
 .clinerules/
+.cursor/
 CROSS_CHAIN_SWAP_TESTING_GUIDE.md
