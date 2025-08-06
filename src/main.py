@@ -757,15 +757,7 @@ logger.info("Initializing database...")
 initialize_database()
 logger.info("Database initialization complete.")
 
-# Get the webhook URL from environment variables, provided by Render
-webhook_url = os.getenv("RENDER_EXTERNAL_URL")
-if not webhook_url:
-    logger.error("RENDER_EXTERNAL_URL not found in environment. Cannot set webhook.")
-else:
-    # Set up the webhook
-    loop = asyncio.get_event_loop()
-    loop.run_until_complete(application.bot.set_webhook(f"{webhook_url}/webhook"))
-    logger.info(f"Webhook set to {webhook_url}/webhook")
+# The webhook is no longer set up here. Instead, the bot will use polling in run.py.
 
 # --- Main Conversation Handler ---
 conv_handler = ConversationHandler(
@@ -811,16 +803,6 @@ application.add_handler(CallbackQueryHandler(delete_wallet_callback, pattern="^d
 def health_check():
     return "Bot is running.", 200
 
-@app.route('/webhook', methods=['POST'])
-def webhook():
-    """Handle incoming webhook updates from Telegram."""
-    try:
-        # Use asyncio.run to handle the async operation in a sync context
-        asyncio.run(application.update_queue.put(Update.de_json(request.json, application.bot)))
-        return "OK", 200
-    except Exception as e:
-        logger.error(f"Error in webhook: {e}")
-        return "Error", 500
 
 
 @app.route('/admin/clear-database/<secret_key>', methods=['POST'])
