@@ -65,6 +65,7 @@ class OKXClient:
                 headers = self._get_request_headers('GET', full_request_path)
                 url = f"{self.base_url}{full_request_path}"
                 
+                logger.info(f"Sending GET request to OKX: {url}")
                 response = requests.get(url, headers=headers, timeout=10)
                 response.raise_for_status()
                 data = response.json()
@@ -119,6 +120,7 @@ class OKXClient:
                     headers = self._get_request_headers('POST', request_path, str(body))
                     url = f"{self.base_url}{request_path}"
                     
+                    logger.info(f"Sending POST request to OKX: {url}")
                     response = requests.post(url, headers=headers, json=body, timeout=15)
                     response.raise_for_status()
                     data = response.json()

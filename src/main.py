@@ -62,11 +62,15 @@ AWAIT_ALERT_SYMBOL, AWAIT_ALERT_CONDITION, AWAIT_ALERT_PRICE = 5, 6, 7
 DRY_RUN_MODE = os.getenv("DRY_RUN_MODE", "True").lower() in ("true", "1", "t")
 
 # A simple, hardcoded map for common token symbols to their Ethereum addresses
+# We map BTC to WBTC address as it's the token used in DeFi swaps.
 TOKEN_ADDRESSES = {
     "ETH": "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
     "USDC": "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48",
     "USDT": "0xdac17f958d2ee523a2206206994597c13d831ec7",
     "WBTC": "0x2260fac5e5542a773aa44fbcfedf7c193bc2c599",
+    "BTC": "0x2260fac5e5542a773aa44fbcfedf7c193bc2c599",  # Map BTC to WBTC
+    "DAI": "0x6b175474e89094c44da98b954eedeac495271d0f",
+    "MATIC": "0x7d1afa7b718fb893db30a3abc0cfc608aacfebb0",
 }
 
 CHAIN_ID_MAP = {
@@ -462,7 +466,7 @@ async def set_take_profit_intent(update: Update, context: ContextTypes.DEFAULT_T
 
     # In a real app, you would create a conditional order here.
     # For now, we will just confirm with the user.
-    await update.message.reply_text(f"I've set a take-profit for {symbol.upper()} at ${price}. I will notify you if the price rises to this level.")
+    await update.message.reply_text(f"Alert set: I will notify you if {symbol.upper()} > ${price}.")
     return ConversationHandler.END
 
 async def insights(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -792,6 +796,16 @@ application.add_handler(CallbackQueryHandler(delete_wallet_callback, pattern="^d
 def health_check():
     return "Bot is running.", 200
 
+@app.route('/webhook', methods=['POST'])
+async def webhook():
+    """Handle incoming webhook updates from Telegram."""
+    try:
+        await application.update_queue.put(Update.de_json(await request.json(), application.bot))
+        return "OK", 200
+    except Exception as e:
+        logger.error(f"Error in webhook: {e}")
+        return "Error", 500
+
 
 @app.route('/admin/clear-database/<secret_key>', methods=['POST'])
 def clear_database(secret_key):
@@ -862,19 +876,29 @@ def show_clear_database_page(secret_key):
 
 
 def main() -> None:
-    """Start the bot."""
-    # Initialize the database first to ensure all tables and columns are created
+    """Start the bot and set up the webhook."""
+    # Initialize the database first
     logger.info("Initializing database...")
     initialize_database()
     logger.info("Database initialization complete.")
 
-    # Start the Flask app in a separate thread
-    flask_thread = threading.Thread(target=lambda: app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 8080))))
-    flask_thread.daemon = True
-    flask_thread.start()
+    # Get the webhook URL from environment variables, provided by Render
+    webhook_url = os.getenv("RENDER_EXTERNAL_URL")
+    if not webhook_url:
+        logger.error("RENDER_EXTERNAL_URL not found in environment. Cannot set webhook.")
+        return
 
-    # Run the bot in polling mode
-    application.run_polling()
+    # Set up the webhook
+    loop = asyncio.get_event_loop()
+    loop.run_until_complete(application.bot.set_webhook(f"{webhook_url}/webhook"))
+    logger.info(f"Webhook set to {webhook_url}/webhook")
+
+    # The application is now ready to be run by a WSGI server like Gunicorn
+    # The Flask app will handle incoming requests from Telegram.
+    # We don't run polling or the flask app directly from here anymore.
 
 if __name__ == "__main__":
-    main()
+    # This part is mostly for local development now.
+    # In production, a WSGI server will import and run the `app` object.
+    logger.info("Starting Flask app for local development...")
+    app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 8080)))
