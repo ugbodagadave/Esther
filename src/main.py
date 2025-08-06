@@ -75,6 +75,17 @@ TOKEN_ADDRESSES = {
     "MATIC": "0x7d1afa7b718fb893db30a3abc0cfc608aacfebb0",
 }
 
+# Map of token symbols to their decimal precision
+TOKEN_DECIMALS = {
+    "ETH": 18,
+    "USDC": 6,
+    "USDT": 6,
+    "WBTC": 8,
+    "BTC": 8,  # WBTC has 8 decimals
+    "DAI": 18,
+    "MATIC": 18,
+}
+
 CHAIN_ID_MAP = {
     "ethereum": 1,
     "arbitrum": 42161,
@@ -215,17 +226,21 @@ async def get_price_intent(update: Update, context: ContextTypes.DEFAULT_TYPE, e
         await update.message.reply_text(f"Sorry, I don't have the address for the token {symbol.upper()}.")
         return
 
-    amount_in_wei = "1000000000000000000" # 1 ETH for price check
+    # Use the correct number of decimals for the token
+    decimals = TOKEN_DECIMALS.get(symbol.upper(), 18) # Default to 18 if not found
+    amount_in_smallest_unit = str(1 * 10**decimals)
 
     quote_response = okx_client.get_live_quote(
         from_token_address=from_token_address,
         to_token_address=to_token_address,
-        amount=amount_in_wei
+        amount=amount_in_smallest_unit
     )
     
     if quote_response.get("success"):
         quote_data = quote_response["data"]
-        price_estimate = float(quote_data.get('toTokenAmount', 0)) / 1_000_000
+        # Use the decimals of the 'to' token (USDT) for correct price calculation
+        to_token_decimals = TOKEN_DECIMALS.get("USDT", 6)
+        price_estimate = float(quote_data.get('toTokenAmount', 0)) / (10**to_token_decimals)
         await update.message.reply_text(f"The current estimated price for {symbol.upper()}-USDT is ${price_estimate:.2f}.")
     else:
         await update.message.reply_text(f"Sorry, I couldn't fetch a quote. Error: {quote_response.get('error')}")
