@@ -7,7 +7,7 @@ services:
     env: python
     plan: free # Specifies the free instance type
     buildCommand: "pip install -r requirements.txt"
-    startCommand: "gunicorn src.main:app"
+    startCommand: "python src/main.py"
 databases:
   # A PostgreSQL database on the free plan
   - name: esther-db
