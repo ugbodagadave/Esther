@@ -773,8 +773,8 @@ async def setup_webhook():
     else:
         logger.warning("WEBHOOK_URL not set. Bot will not run in webhook mode.")
 
-# Run the setup function once when the application starts
-asyncio.run(setup_webhook())
+# Webhook setup is now handled within the Flask app logic for production
+# asyncio.run(setup_webhook())
 
 # --- Main Conversation Handler ---
 conv_handler = ConversationHandler(
@@ -898,8 +898,7 @@ def show_clear_database_page(secret_key):
 
 
 if __name__ == "__main__":
-    # This part is for local development only.
-    # In production, Gunicorn will import and run the `app` object.
-    logger.info("Starting Flask app for local development (polling mode)...")
+    # This part is for local development only. It runs the bot in polling mode.
+    # The Flask app (`app.run`) is not needed for polling and causes conflicts.
+    logger.info("Starting bot in polling mode...")
     application.run_polling()
-    app.run(host='0.0.0.0', port=PORT)
