@@ -58,6 +58,7 @@ portfolio_service = PortfolioService()
 AWAIT_CONFIRMATION = 1
 AWAIT_WALLET_NAME, AWAIT_WALLET_ADDRESS, AWAIT_PRIVATE_KEY = 2, 3, 4
 AWAIT_ALERT_SYMBOL, AWAIT_ALERT_CONDITION, AWAIT_ALERT_PRICE = 5, 6, 7
+AWAIT_REBALANCE_CONFIRMATION = 8
 
 # Global flag for simulation mode, configurable via .env file
 DRY_RUN_MODE = os.getenv("DRY_RUN_MODE", "True").lower() in ("true", "1", "t")
@@ -173,6 +174,9 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int
     elif intent == "get_insights":
         await insights(update, context)
         return ConversationHandler.END
+
+    elif intent == "execute_rebalance":
+        return await rebalance_portfolio_start(update, context)
 
     elif intent == "greeting":
         await update.message.reply_text("Hello! How can I assist you with your trades today?")
@@ -340,7 +344,13 @@ async def confirm_swap(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
         await query.edit_message_text(text=f"[{'DRY RUN' if DRY_RUN_MODE else 'LIVE'}] {status_message}. Error: {swap_response.get('error')}")
 
     context.user_data.pop('swap_details', None)
-    return ConversationHandler.END
+
+    # Check if we are in a rebalance flow
+    if 'rebalance_plan' in context.user_data and context.user_data['rebalance_plan']:
+        # Present the next swap for confirmation
+        return await present_next_rebalance_swap(update, context)
+    else:
+        return ConversationHandler.END
 
 async def cancel_swap(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Cancels the swap conversation."""
@@ -348,6 +358,12 @@ async def cancel_swap(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int
     await query.answer()
     await query.edit_message_text(text="Swap cancelled.")
     context.user_data.pop('swap_details', None)
+    
+    # If in a rebalance flow, cancel the entire plan
+    if 'rebalance_plan' in context.user_data:
+        context.user_data.pop('rebalance_plan', None)
+        await query.message.reply_text("Portfolio rebalance cancelled.")
+
     return ConversationHandler.END
 
 async def sell_token_intent(update: Update, context: ContextTypes.DEFAULT_TYPE, entities: dict) -> int:
@@ -466,6 +482,51 @@ async def insights(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     
     insights_text = insights_client.generate_insights(user_id)
     await update.message.reply_text(insights_text)
+
+async def rebalance_portfolio_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Starts the portfolio rebalance conversation."""
+    user = update.effective_user
+    await update.message.reply_text("Calculating your portfolio rebalance plan... This may take a moment.")
+
+    plan = portfolio_service.suggest_rebalance(user.id)
+
+    if not plan:
+        await update.message.reply_text("Your portfolio is already balanced, or there's nothing to rebalance.")
+        return ConversationHandler.END
+
+    context.user_data['rebalance_plan'] = plan
+
+    summary_message = "Here is the proposed rebalance plan:\n\n"
+    for i, trade in enumerate(plan):
+        summary_message += f"**Trade {i+1}**: Sell {trade['from_amount']:.6f} {trade['from']} for {trade['to']} (~${trade['usd_amount']:.2f})\n"
+    
+    await update.message.reply_text(summary_message, parse_mode='Markdown')
+    
+    return await present_next_rebalance_swap(update, context)
+
+async def present_next_rebalance_swap(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Presents the next swap in the rebalance plan for confirmation."""
+    plan = context.user_data.get('rebalance_plan')
+    if not plan:
+        await update.callback_query.edit_message_text("✅ Portfolio rebalance complete!")
+        return ConversationHandler.END
+
+    trade = plan.pop(0)
+    
+    # Use the sell_token_intent to set up the confirmation
+    entities = {
+        "symbol": trade['from'],
+        "amount": str(trade['from_amount']),
+        "currency": trade['to']
+    }
+    
+    # We need to decide whether to use the message or callback_query object to send the reply
+    if update.callback_query:
+        # If we are in a sequence of swaps, we need to send a new message
+        await update.callback_query.message.reply_text("Now for the next trade:")
+        return await sell_token_intent(update.callback_query.message, context, entities)
+    else:
+        return await sell_token_intent(update, context, entities)
 
 # --- Portfolio Command ---
 async def portfolio(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:

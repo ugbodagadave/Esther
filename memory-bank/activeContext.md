@@ -1,17 +1,17 @@
 # Active Context: Esther
 
 ## 1. Current Focus
-The current focus is on implementing the portfolio rebalance execution feature. The application has been stabilized, and the development is now proceeding with new feature implementation.
+The current focus is on implementing the on-demand education feature. The portfolio rebalance execution feature has been completed and is now stable.
 
 ## 2. Recent Changes & Decisions
+- **Portfolio Rebalance Feature Complete**: The portfolio rebalance feature has been fully implemented, including the conversational flow for sequential swap execution.
 - **Architectural Refactor**: The application has been refactored from a multi-threaded Flask application to a unified `asyncio` event loop using FastAPI. This has resolved the stability issues and created a robust foundation for future development.
 - **Deployment Command Update**: The `render.yaml` file has been updated to use `uvicorn` to run the FastAPI application, which is the correct and stable approach for an ASGI application.
 - **Portfolio Service Enhancement**: The `suggest_rebalance` function in `PortfolioService` has been enhanced to calculate the `from_amount` in the token's native units, which is a prerequisite for executing rebalance plans.
 
 ## 3. Next Steps
-1.  **Implement Rebalance Conversation Flow**: Continue with Phase 2 of the rebalance feature, which involves creating the `ConversationHandler` logic to manage the sequential execution of swaps.
-2.  **End-to-End Testing**: Complete Phase 3 by adding end-to-end tests for the rebalance workflow and updating all relevant documentation.
-3.  **On-Demand Education**: Begin work on an integrated learning module to explain DeFi concepts on the fly.
+1.  **On-Demand Education**: Begin work on an integrated learning module to explain DeFi concepts on the fly.
+2.  **Refine and Document `DRY_RUN_MODE`**: Ensure the `DRY_RUN_MODE` is consistently applied across all new features and document its usage.
 
 ## 4. Active Learnings & Insights
 - Decimal precision is a critical detail in DeFi applications. Hardcoding values is risky; dynamic lookup is essential.

@@ -16,7 +16,9 @@ Decentralized Finance (DeFi) can be confusing. Our goal with Esther is to make i
     -   **Check Prices**: "What's the price of ETH?" or "How much is Bitcoin worth?"
     -   **Buy and Sell Tokens**: "Buy 0.1 ETH with USDC" or "I want to sell some Bitcoin for USDT".
     -   **Set Smart Orders**: "Set a stop-loss for BTC at 60000" or "Alert me when ETH reaches 3500".
-    -   **Track & Rebalance Portfolio**: "Show me my portfolio" or "What's in my wallet?" displays live balances + USD value; automated rebalance suggestions coming soon.
+    -   **Track & Rebalance Portfolio**: "Show me my portfolio" or "What's in my wallet?" displays live balances + USD value.
+    -   **Suggest Rebalance Plan**: "Suggest a rebalance to 50% BTC and 50% ETH" to get a plan for aligning your assets.
+    -   **Execute Rebalance Plan**: "Rebalance my portfolio" or "Execute the rebalance plan" to align your assets with a target allocation.
 -   **Manage Your Wallets**: "Show me my wallets" or "I want to add a new wallet" - manage your wallet addresses securely with encrypted private keys.
 -   **Get Smart Insights**: "Give me market insights" or "What's the market analysis?" - get personalized advice and analysis on your crypto holdings.
 -   **Trade Safely**: Every trade must be confirmed by you, so you never have to worry about accidental transactions.

@@ -20,6 +20,7 @@ The project has moved into a stabilization phase. The immediate focus is on ensu
 - **Portfolio Tracking**: `/portfolio` command shows live balances & USD value, backed by periodic background sync.
 - **Diversification & ROI Analytics**: Functions provide allocation percentages and 30-day ROI.
 - **Rebalance Suggestions**: `suggest_rebalance()` offers a one-hop trade plan to reach target allocations.
+- **Rebalance Execution**: The bot can now execute the rebalance plan, guiding the user through a series of swaps.
 - **Deployment**: The application has been refactored to use a stable `asyncio`-native architecture with FastAPI and Uvicorn.
 - **Advanced Orders**: The NLP model can now understand `set_stop_loss` and `set_take_profit` intents.
 - **Personalized Market Insights**: A new `/insights` command provides users with personalized market analysis and recommendations.
@@ -33,7 +34,6 @@ The project has moved into a stabilization phase. The immediate focus is on ensu
     - Detailed logging for OKX API endpoints is added.
 
 ## 3. What's Left to Build
-- **Execute Rebalance Plan (Phase 2 & 3)**: Implement the conversational flow and end-to-end testing for the portfolio rebalance feature.
 - **On-Demand Education**: An integrated learning module to explain DeFi concepts on the fly.
 - **Refine and Document `DRY_RUN_MODE`**: Ensure the `DRY_RUN_MODE` is consistently applied across all new features and document its usage.
 - **Real-time Notifications**: Begin work on the observer pattern for real-time market alerts.

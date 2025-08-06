@@ -68,6 +68,7 @@ The NLP system can understand various trading intents and route them to appropri
 - **Price Queries**: "What's the price of ETH?" → Calls OKX market data endpoints
 - **Trading Commands**: "Buy 0.1 ETH with USDT" → Initiates quote and swap workflow
 - **Portfolio Queries**: "Show me my portfolio" → Triggers balance sync and snapshot generation
+- **Rebalance Commands**: "Rebalance my portfolio" → Initiates the rebalance suggestion and execution workflow
 
 ### B. Model Selection for API Operations
 

@@ -57,6 +57,7 @@ class NLPClient:
         - add_wallet: User wants to add a new wallet.
         - show_portfolio: User wants to see their portfolio.
         - get_insights: User wants to get market or portfolio insights.
+        - execute_rebalance: User wants to execute a portfolio rebalance.
         
         For trading intents (buy, sell), extract the following entities if present:
         - symbol: The token symbol (e.g., ETH, BTC).
@@ -75,6 +76,7 @@ class NLPClient:
         Example for add_wallet: {{"intent": "add_wallet", "entities": {{}}}}
         Example for show_portfolio: {{"intent": "show_portfolio", "entities": {{}}}}
         Example for get_insights: {{"intent": "get_insights", "entities": {{}}}}
+        Example for execute_rebalance: {{"intent": "execute_rebalance", "entities": {{}}}}
 
         Query: "{text}"
         """

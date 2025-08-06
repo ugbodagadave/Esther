@@ -96,3 +96,15 @@ Here is a comprehensive guide to testing the Esther bot's features using natural
 **Test 1: Set Price Alert**
 *   **Your Message:** `Alert me when BTC goes above 115000`
 *   **Expected Bot Response:** A confirmation message stating that the alert has been set (e.g., "Alert set: I will notify you if BTC > $115,000"). When the condition is met, you should receive a separate notification.
+
+---
+
+### 10. Portfolio Rebalance
+
+**Test 1: Suggest and Execute Rebalance**
+*   **Your Message:** `Rebalance my portfolio to 50% BTC and 50% ETH`
+*   **Expected Bot Response:**
+    1.  A summary of the proposed swaps to achieve the target allocation.
+    2.  A confirmation prompt for the first swap in the plan.
+    3.  After confirming each swap, a message indicating the progress (e.g., "Swap 1 of 2 executed successfully").
+    4.  A final message confirming that the rebalance is complete.
