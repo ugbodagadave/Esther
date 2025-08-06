@@ -35,7 +35,7 @@ Decentralized Finance (DeFi) can be confusing. Our goal with Esther is to make i
 -   **Programming Language**: Python
 -   **AI and Language Processing**: Google Gemini 2.5 Pro & Flash (Intelligent Model Selection)
 -   **Bot Framework**: `python-telegram-bot`
--   **Web Server**: Flask
+-   **Web Server**: FastAPI
 -   **Database**: PostgreSQL
 -   **Crypto Exchange**: OKX DEX API
 -   **Cloud Hosting**: Render
@@ -117,7 +117,7 @@ For a detailed explanation of how we integrated the OKX DEX API, see our [OKX DE
 
 6.  **Start the Bot:**
     ```bash
-    python run.py
+    uvicorn src.main:app --host 0.0.0.0 --port 8080
     ```
     This will start the bot, and it will begin listening for your commands in Telegram.
 
