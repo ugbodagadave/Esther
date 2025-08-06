@@ -20,21 +20,21 @@ The project has moved into a stabilization phase. The immediate focus is on ensu
 - **Portfolio Tracking**: `/portfolio` command shows live balances & USD value, backed by periodic background sync.
 - **Diversification & ROI Analytics**: Functions provide allocation percentages and 30-day ROI.
 - **Rebalance Suggestions**: `suggest_rebalance()` offers a one-hop trade plan to reach target allocations.
-- **Deployment**: The application is now configured for a stable polling-based deployment on Render, suitable for development.
+- **Deployment**: The application has been refactored to use a stable `asyncio`-native architecture with FastAPI and Uvicorn.
 - **Advanced Orders**: The NLP model can now understand `set_stop_loss` and `set_take_profit` intents.
 - **Personalized Market Insights**: A new `/insights` command provides users with personalized market analysis and recommendations.
 - **Cross-Chain Swaps**: The bot now supports trading tokens across different blockchains, including Ethereum, Arbitrum, and Polygon.
-- **Code Stability**: The entire test suite has been run, and all 36 tests are passing, confirming the stability of the current codebase.
+- **Code Stability**: The entire test suite has been run, and all 37 tests are passing, confirming the stability of the current codebase.
 - **Bug Fixes Implemented**:
+    - **Architectural Stability**: Refactored the application from a multi-threaded Flask app to a unified `asyncio` event loop with FastAPI, resolving critical stability issues.
     - **Decimal Precision Fix**: Corrected a critical bug causing price quote failures by implementing dynamic decimal precision for API calls.
-    - **Deployment Stability**: Resolved multiple deployment errors (`Application not initialized`, `asyncio` conflicts) by switching to a polling-based deployment strategy for development.
     - Token resolution for BTC and other symbols is fixed.
     - Price alert response message is corrected.
     - Detailed logging for OKX API endpoints is added.
 
 ## 3. What's Left to Build
+- **Execute Rebalance Plan (Phase 2 & 3)**: Implement the conversational flow and end-to-end testing for the portfolio rebalance feature.
 - **On-Demand Education**: An integrated learning module to explain DeFi concepts on the fly.
-- **Execute Rebalance Plan**: Convert rebalance suggestions into swap confirmations.
 - **Refine and Document `DRY_RUN_MODE`**: Ensure the `DRY_RUN_MODE` is consistently applied across all new features and document its usage.
 - **Real-time Notifications**: Begin work on the observer pattern for real-time market alerts.
 

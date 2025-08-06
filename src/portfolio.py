@@ -4,6 +4,7 @@ from typing import Dict, List
 
 from src.database import get_db_connection
 from src.okx_explorer import OKXExplorer
+from src.constants import TOKEN_DECIMALS
 
 logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.INFO
@@ -175,7 +176,7 @@ class PortfolioService:
         If None, assume equal weight across existing tokens.
 
         Returns list of trades of the form
-        {"from": symbol_a, "to": symbol_b, "usd_amount": value}.
+        {"from": symbol_a, "to": symbol_b, "from_amount": float, "usd_amount": float}.
         Only single hop suggestions are returned; caller can translate into swaps.
         """
         snap = self.get_snapshot(telegram_id)
@@ -183,7 +184,7 @@ class PortfolioService:
         if total == 0:
             return []
 
-        assets = {a["symbol"]: Decimal(str(a["value_usd"])) for a in snap["assets"]}
+        assets = {a["symbol"]: {"value_usd": Decimal(str(a["value_usd"])), "quantity": Decimal(str(a["quantity"]))} for a in snap["assets"]}
 
         if not target_alloc:
             # Equal allocation among current holdings
@@ -199,8 +200,8 @@ class PortfolioService:
             target_alloc = {k: v * 100 / total_target for k, v in target_alloc.items()}
 
         diffs: Dict[str, Decimal] = {}
-        for sym, usd_value in assets.items():
-            current_pct = (usd_value / total) * 100
+        for sym, data in assets.items():
+            current_pct = (data["value_usd"] / total) * 100
             desired = Decimal(str(target_alloc.get(sym, 0)))
             diffs[sym] = current_pct - desired  # positive -> overweight
 
@@ -220,7 +221,19 @@ class PortfolioService:
         most_under_symbol = max(under, key=under.get)
         for sym, pct_excess in over.items():
             usd_excess = (pct_excess / 100) * total
-            plan.append({"from": sym, "to": most_under_symbol, "usd_amount": float(round(usd_excess, 2))})
+            
+            # Calculate from_amount
+            from_amount = 0.0
+            if assets[sym]["value_usd"] > 0:
+                price = assets[sym]["value_usd"] / assets[sym]["quantity"]
+                from_amount = usd_excess / price
+
+            plan.append({
+                "from": sym,
+                "to": most_under_symbol,
+                "from_amount": float(round(from_amount, 6)),
+                "usd_amount": float(round(usd_excess, 2))
+            })
 
         return plan
 
@@ -232,11 +245,11 @@ class PortfolioService:
         symbol = entry.get("symbol", "UNKNOWN")
         token_address = entry.get("tokenContractAddress", "0x")
         balance_str = entry.get("balance", "0")
-        # The new API does not provide decimals, so we have to assume a standard.
-        # This is a limitation, but for most major tokens 18 is correct.
-        decimals = 18
+        # Use the correct number of decimals for the token
+        decimals = TOKEN_DECIMALS.get(symbol.upper(), 18)
         try:
-            quantity = Decimal(balance_str) * (Decimal(10) ** decimals) # Store as raw integer
+            # The API gives balance as a float string, so convert to Decimal directly
+            quantity = Decimal(balance_str) * (Decimal(10) ** decimals)  # Store as raw integer
         except Exception:
             quantity = Decimal("0")
 
@@ -257,4 +270,4 @@ class PortfolioService:
                 decimals,
                 str(value_usd),
             ),
-        ) 
+        )
