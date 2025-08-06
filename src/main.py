@@ -752,6 +752,21 @@ if not TELEGRAM_BOT_TOKEN:
 
 application = Application.builder().token(TELEGRAM_BOT_TOKEN).build()
 
+# Initialize the database first
+logger.info("Initializing database...")
+initialize_database()
+logger.info("Database initialization complete.")
+
+# Get the webhook URL from environment variables, provided by Render
+webhook_url = os.getenv("RENDER_EXTERNAL_URL")
+if not webhook_url:
+    logger.error("RENDER_EXTERNAL_URL not found in environment. Cannot set webhook.")
+else:
+    # Set up the webhook
+    loop = asyncio.get_event_loop()
+    loop.run_until_complete(application.bot.set_webhook(f"{webhook_url}/webhook"))
+    logger.info(f"Webhook set to {webhook_url}/webhook")
+
 # --- Main Conversation Handler ---
 conv_handler = ConversationHandler(
     entry_points=[
@@ -874,28 +889,6 @@ def show_clear_database_page(secret_key):
     """
     return html_content
 
-
-def main() -> None:
-    """Start the bot and set up the webhook."""
-    # Initialize the database first
-    logger.info("Initializing database...")
-    initialize_database()
-    logger.info("Database initialization complete.")
-
-    # Get the webhook URL from environment variables, provided by Render
-    webhook_url = os.getenv("RENDER_EXTERNAL_URL")
-    if not webhook_url:
-        logger.error("RENDER_EXTERNAL_URL not found in environment. Cannot set webhook.")
-        return
-
-    # Set up the webhook
-    loop = asyncio.get_event_loop()
-    loop.run_until_complete(application.bot.set_webhook(f"{webhook_url}/webhook"))
-    logger.info(f"Webhook set to {webhook_url}/webhook")
-
-    # The application is now ready to be run by a WSGI server like Gunicorn
-    # The Flask app will handle incoming requests from Telegram.
-    # We don't run polling or the flask app directly from here anymore.
 
 if __name__ == "__main__":
     # This part is mostly for local development now.
