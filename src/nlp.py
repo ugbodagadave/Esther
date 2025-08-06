@@ -86,6 +86,10 @@ class NLPClient:
             model = self.pro_model if model_type == 'pro' else self.flash_model
             response = model.generate_content(prompt)
             
+            if not response.parts:
+                logger.error(f"Gemini {model_type} model returned no content. Finish reason: {response.prompt_feedback}")
+                return {"intent": "unknown", "entities": {}}
+
             # Clean up the response to ensure it's valid JSON
             json_response_text = response.text.strip().replace("```json", "").replace("```", "")
             return json.loads(json_response_text)

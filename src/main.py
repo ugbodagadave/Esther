@@ -491,7 +491,7 @@ async def portfolio(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
     snapshot = portfolio_service.get_snapshot(user.id)
     if not snapshot or not snapshot.get("assets"):
-        await update.message.reply_text("Your portfolio was synced successfully, but I couldn't find any assets in your wallet(s). Have you funded your wallet yet?")
+        await update.message.reply_text("Your portfolio is currently empty. If you've recently funded your wallet, it may take a few minutes for the assets to appear.")
         return
 
     total = snapshot.get("total_value_usd", 0)

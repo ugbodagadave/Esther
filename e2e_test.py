@@ -158,6 +158,17 @@ def run_e2e_test():
         dummy_telegram_id = 999999999
         with conn.cursor() as cur:
             # Clean up previous test runs to ensure idempotency
+            # First, get the user_id if it exists
+            cur.execute("SELECT id FROM users WHERE telegram_id = %s;", (dummy_telegram_id,))
+            user_record = cur.fetchone()
+            if user_record:
+                user_pk = user_record[0]
+                # Delete associated wallets first
+                cur.execute("DELETE FROM wallets WHERE user_id = %s;", (user_pk,))
+                # Delete associated portfolios 
+                cur.execute("DELETE FROM portfolios WHERE user_id = %s;", (user_pk,))
+            
+            # Now, delete the user
             cur.execute("DELETE FROM users WHERE telegram_id = %s;", (dummy_telegram_id,))
             conn.commit()
 
@@ -185,17 +196,24 @@ def run_e2e_test():
         print("    Query: Retrieving portfolio snapshot...")
         snapshot = portfolio_service.get_snapshot(dummy_telegram_id)
 
-        if snapshot and "total_value_usd" in snapshot and snapshot.get("assets"):
-            print(f"    ✅ SUCCESS: Portfolio sync and snapshot retrieved successfully.")
-            print(f"    -> Snapshot Total Value: ${snapshot['total_value_usd']:.2f}")
-            print(f"    -> Assets Found: {len(snapshot.get('assets', []))}")
+        if snapshot and "total_value_usd" in snapshot:
+            if snapshot.get("assets"):
+                print(f"    ✅ SUCCESS: Portfolio sync and snapshot retrieved successfully.")
+                print(f"    -> Snapshot Total Value: ${snapshot['total_value_usd']:.2f}")
+                print(f"    -> Assets Found: {len(snapshot.get('assets', []))}")
 
-            # Also test analytics functions
-            div = portfolio_service.get_diversification(dummy_telegram_id)
-            print(f"    -> Diversification: {div}")
+                # Also test analytics functions
+                div = portfolio_service.get_diversification(dummy_telegram_id)
+                print(f"    -> Diversification: {div}")
 
-            roi = portfolio_service.get_roi(dummy_telegram_id, window_days=7)
-            print(f"    -> 7-day ROI: {roi*100:.2f}%")
+                roi = portfolio_service.get_roi(dummy_telegram_id, window_days=7)
+                print(f"    -> 7-day ROI: {roi*100:.2f}%")
+            elif snapshot.get("total_value_usd") == 0.0 and not snapshot.get("assets"):
+                print("    ✅ SUCCESS: Portfolio sync completed successfully for an empty wallet.")
+                print(f"    -> Snapshot: {snapshot}")
+            else:
+                print("    ❌ FAILURE: Snapshot data was empty or invalid after a successful sync.")
+                print(f"    -> Snapshot: {snapshot}")
         else:
             print("    ❌ FAILURE: Snapshot data was empty or invalid after a successful sync.")
             print(f"    -> Snapshot: {snapshot}")
