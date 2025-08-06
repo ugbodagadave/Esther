@@ -760,8 +760,8 @@ initialize_database()
 logger.info("Database initialization complete.")
 
 # Import and start the monitoring service in a separate thread
-from src.monitoring import start_monitoring_service
-monitoring_thread = threading.Thread(target=lambda: asyncio.run(start_monitoring_service(application)), daemon=True)
+from src.monitoring import main as monitoring_main
+monitoring_thread = threading.Thread(target=lambda: asyncio.run(monitoring_main()), daemon=True)
 monitoring_thread.start()
 logger.info("Monitoring service started in a separate thread.")
 
