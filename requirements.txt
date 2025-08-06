@@ -7,3 +7,4 @@ Flask[async]
 cryptography
 pytest
 gunicorn
+uvicorn
