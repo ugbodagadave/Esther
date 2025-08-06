@@ -765,13 +765,16 @@ monitoring_thread = threading.Thread(target=lambda: asyncio.run(monitoring_main(
 monitoring_thread.start()
 logger.info("Monitoring service started in a separate thread.")
 
-# Set up the webhook
-if WEBHOOK_URL:
-    application.updater.start_webhook(listen="0.0.0.0", port=PORT, url_path="webhook", webhook_url=WEBHOOK_URL)
-    application.bot.set_webhook(url=WEBHOOK_URL + "/webhook")
-    logger.info(f"Webhook set to {WEBHOOK_URL}/webhook")
-else:
-    logger.warning("WEBHOOK_URL not set. Bot will not run in webhook mode.")
+# Set up the webhook on startup
+async def setup_webhook():
+    if WEBHOOK_URL:
+        await application.bot.set_webhook(url=f"{WEBHOOK_URL}/webhook")
+        logger.info(f"Webhook set to {WEBHOOK_URL}/webhook")
+    else:
+        logger.warning("WEBHOOK_URL not set. Bot will not run in webhook mode.")
+
+# Run the setup function once when the application starts
+asyncio.run(setup_webhook())
 
 # --- Main Conversation Handler ---
 conv_handler = ConversationHandler(
@@ -819,7 +822,11 @@ def health_check():
 @app.route('/webhook', methods=['POST'])
 async def telegram_webhook():
     """Handle incoming Telegram updates via webhook."""
-    await application.update_queue.put(Update.de_json(request.get_json(force=True), application.bot))
+    try:
+        update = Update.de_json(request.get_json(force=True), application.bot)
+        await application.process_update(update)
+    except Exception as e:
+        logger.error(f"Error processing update: {e}")
     return "ok"
 
 @app.route('/admin/clear-database/<secret_key>', methods=['POST'])
