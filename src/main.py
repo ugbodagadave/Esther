@@ -39,6 +39,8 @@ logger = logging.getLogger(__name__)
 # Get the token from environment variables
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 ADMIN_SECRET_KEY = os.getenv("ADMIN_SECRET_KEY")
+WEBHOOK_URL = os.getenv("WEBHOOK_URL")
+PORT = int(os.environ.get('PORT', 8080))
 
 from src.nlp import NLPClient
 from src.okx_client import OKXClient
@@ -757,7 +759,19 @@ logger.info("Initializing database...")
 initialize_database()
 logger.info("Database initialization complete.")
 
-# The webhook is no longer set up here. Instead, the bot will use polling in run.py.
+# Import and start the monitoring service in a separate thread
+from src.monitoring import start_monitoring_service
+monitoring_thread = threading.Thread(target=lambda: asyncio.run(start_monitoring_service(application)), daemon=True)
+monitoring_thread.start()
+logger.info("Monitoring service started in a separate thread.")
+
+# Set up the webhook
+if WEBHOOK_URL:
+    application.updater.start_webhook(listen="0.0.0.0", port=PORT, url_path="webhook", webhook_url=WEBHOOK_URL)
+    application.bot.set_webhook(url=WEBHOOK_URL + "/webhook")
+    logger.info(f"Webhook set to {WEBHOOK_URL}/webhook")
+else:
+    logger.warning("WEBHOOK_URL not set. Bot will not run in webhook mode.")
 
 # --- Main Conversation Handler ---
 conv_handler = ConversationHandler(
@@ -798,12 +812,15 @@ application.add_handler(CommandHandler("listalerts", list_alerts))
 application.add_handler(CommandHandler("deletewallet", delete_wallet_start))
 application.add_handler(CallbackQueryHandler(delete_wallet_callback, pattern="^delete_"))
 
-
 @app.route('/')
 def health_check():
     return "Bot is running.", 200
 
-
+@app.route('/webhook', methods=['POST'])
+async def telegram_webhook():
+    """Handle incoming Telegram updates via webhook."""
+    await application.update_queue.put(Update.de_json(request.get_json(force=True), application.bot))
+    return "ok"
 
 @app.route('/admin/clear-database/<secret_key>', methods=['POST'])
 def clear_database(secret_key):
@@ -874,7 +891,8 @@ def show_clear_database_page(secret_key):
 
 
 if __name__ == "__main__":
-    # This part is mostly for local development now.
-    # In production, a WSGI server will import and run the `app` object.
-    logger.info("Starting Flask app for local development...")
-    app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 8080)))
+    # This part is for local development only.
+    # In production, Gunicorn will import and run the `app` object.
+    logger.info("Starting Flask app for local development (polling mode)...")
+    application.run_polling()
+    app.run(host='0.0.0.0', port=PORT)

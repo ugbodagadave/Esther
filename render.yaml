@@ -8,24 +8,6 @@ services:
     plan: free # Specifies the free instance type
     buildCommand: "pip install -r requirements.txt"
     startCommand: "gunicorn src.main:app"
-  - type: worker
-    name: esther-bot-worker
-    env: python
-    plan: free
-    buildCommand: "pip install -r requirements.txt"
-    startCommand: "python run_bot.py"
-    envVars:
-      # The DATABASE_URL is automatically provided by Render from the linked database service.
-      - key: DATABASE_URL
-        fromDatabase:
-          name: esther-db # This should match the name of your Render PostgreSQL database
-          property: connectionString
-      # Non-secret environment variables can be defined here.
-      - key: PYTHON_VERSION
-        value: 3.11.7 # Specify a major, minor, and patch version
-      # IMPORTANT: All other secrets (TELEGRAM_BOT_TOKEN, GEMINI_API_KEY, etc.) 
-      # must be added as a Secret File in the Render dashboard's "Environment" tab.
-
 databases:
   # A PostgreSQL database on the free plan
   - name: esther-db
