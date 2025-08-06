@@ -91,13 +91,33 @@ For a detailed explanation of how we integrated the OKX DEX API, see our [OKX DE
     TEST_WALLET_PRIVATE_KEY="your_ethereum_test_wallet_private_key"
     ADMIN_SECRET_KEY="your_admin_secret_key"
     ```
+    ```dotenv
+    # For Telegram and the AI
+    TELEGRAM_BOT_TOKEN="your_telegram_bot_token"
+    GEMINI_API_KEY="your_gemini_api_key"
 
-4.  **Set Up the Database:**
+    # For the OKX Crypto Exchange
+    OKX_API_KEY="your_okx_api_key"
+    OKX_API_SECRET="your_okx_api_secret"
+    OKX_API_PASSPHRASE="your_okx_api_passphrase"
+    # The Project ID that groups your keys and quota in OKX Web3 – required for portfolio features
+    OKX_PROJECT_ID="your_okx_project_id"
+
+    # For the Database
+    DATABASE_URL="your_postgresql_connection_string"
+    
+    # A test wallet for practice
+    TEST_WALLET_ADDRESS="your_ethereum_test_wallet_address"
+    TEST_WALLET_PRIVATE_KEY="your_ethereum_test_wallet_private_key"
+    ADMIN_SECRET_KEY="your_admin_secret_key"
+    ```
+
+5.  **Set Up the Database:**
     The app will automatically create the tables it needs when you run it for the first time.
 
-5.  **Start the Bot:**
+6.  **Start the Bot:**
     ```bash
-    python src/main.py
+    python run.py
     ```
     This will start the bot, and it will begin listening for your commands in Telegram.
 
