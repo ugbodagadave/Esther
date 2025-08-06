@@ -49,7 +49,7 @@ graph TD
 
 Here is the step-by-step journey of a user command, from Telegram to execution and back:
 
-1.  **Message Reception**: The **Telegram Bot Interface**, using a long-polling mechanism, receives a message from a user. This is managed by the `python-telegram-bot` library's `Application.run_polling()` method.
+1.  **Message Reception**: The **Telegram Bot Interface** receives a message from a user via a webhook. Telegram sends an HTTP POST request to the `/webhook` endpoint of the Flask application, which then processes the update.
 2.  **NLP Processing**: The message is passed to the **NLP Module**.
     *   A preliminary check determines the likely complexity of the query.
     *   **Strategy Pattern**: Based on complexity, the system selects either **Gemini Flash** (for simple requests like "price of ETH") or **Gemini Pro** (for complex requests like "buy 0.5 ETH if...").
@@ -73,6 +73,7 @@ Here is the step-by-step journey of a user command, from Telegram to execution a
 6.  **Response and Logging**:
     *   The result of the quote API call is received.
     *   A final status message is sent to the user (e.g., "Trade executed successfully" or "Trade failed: Insufficient funds").
+    *   All outgoing requests to the OKX API are now logged, showing the full URL for improved transparency and debugging.
     *   The transaction details are logged in the **PostgreSQL Database** for the user's history.
 7.  **Background Monitoring (Price Alerts)**:
     *   A separate, continuously running process (`src/monitoring.py`) handles real-time price alerts.

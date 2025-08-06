@@ -10,7 +10,7 @@ from pathlib import Path
 project_root = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(project_root))
 
-from flask import Flask
+from flask import Flask, request
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
     Application,
@@ -812,10 +812,11 @@ def health_check():
     return "Bot is running.", 200
 
 @app.route('/webhook', methods=['POST'])
-async def webhook():
+def webhook():
     """Handle incoming webhook updates from Telegram."""
     try:
-        await application.update_queue.put(Update.de_json(await request.json(), application.bot))
+        # Use asyncio.run to handle the async operation in a sync context
+        asyncio.run(application.update_queue.put(Update.de_json(request.json, application.bot)))
         return "OK", 200
     except Exception as e:
         logger.error(f"Error in webhook: {e}")
