@@ -912,8 +912,17 @@ def show_clear_database_page(secret_key):
     return html_content
 
 
-if __name__ == "__main__":
-    # This part is for local development only. It runs the bot in polling mode.
-    # The Flask app (`app.run`) is not needed for polling and causes conflicts.
+def run_polling():
+    """Starts the Telegram bot in polling mode."""
     logger.info("Starting bot in polling mode...")
     application.run_polling()
+
+if __name__ == "__main__":
+    # Start the bot in a separate thread
+    bot_thread = threading.Thread(target=run_polling)
+    bot_thread.daemon = True
+    bot_thread.start()
+
+    # Run the Flask app to handle web requests and keep the service alive
+    logger.info(f"Starting Flask app on port {PORT}...")
+    app.run(host='0.0.0.0', port=PORT)
