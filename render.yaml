@@ -7,7 +7,7 @@ services:
     env: python
     plan: free # Specifies the free instance type
     buildCommand: "pip install -r requirements.txt"
-    startCommand: "python src/main.py"
+    startCommand: "uvicorn src.main:app --host 0.0.0.0 --port 8080"
 databases:
   # A PostgreSQL database on the free plan
   - name: esther-db

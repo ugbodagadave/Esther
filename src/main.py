@@ -1,16 +1,14 @@
 import os
 import logging
-import threading
-import sys
 import asyncio
+import sys
 from pathlib import Path
 
 # Add project root to the Python path
-# This allows imports like 'from src.nlp import NLPClient' to work when the script is run from the root
 project_root = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(project_root))
 
-from flask import Flask, request
+from fastapi import FastAPI, Request, HTTPException
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
     Application,
@@ -26,8 +24,8 @@ from dotenv import load_dotenv
 # Load environment variables from .env file
 load_dotenv()
 
-# --- Flask App for Render Health Checks ---
-app = Flask(__name__)
+# --- FastAPI App ---
+app = FastAPI()
 
 # --- Telegram Bot Logic ---
 # Enable logging
@@ -767,29 +765,8 @@ async def list_alerts(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
 if not TELEGRAM_BOT_TOKEN:
     raise ValueError("TELEGRAM_BOT_TOKEN not found in environment variables.")
 
-application = Application.builder().token(TELEGRAM_BOT_TOKEN).build()
-
-# Initialize the database first
-logger.info("Initializing database...")
-initialize_database()
-logger.info("Database initialization complete.")
-
-# Import and start the monitoring service in a separate thread
-from src.monitoring import main as monitoring_main
-monitoring_thread = threading.Thread(target=lambda: asyncio.run(monitoring_main()), daemon=True)
-monitoring_thread.start()
-logger.info("Monitoring service started in a separate thread.")
-
-# Set up the webhook on startup
-async def setup_webhook():
-    if WEBHOOK_URL:
-        await application.bot.set_webhook(url=f"{WEBHOOK_URL}/webhook")
-        logger.info(f"Webhook set to {WEBHOOK_URL}/webhook")
-    else:
-        logger.warning("WEBHOOK_URL not set. Bot will not run in webhook mode.")
-
-# Webhook setup is now handled within the Flask app logic for production
-# asyncio.run(setup_webhook())
+# Build the application
+bot_app = Application.builder().token(TELEGRAM_BOT_TOKEN).build()
 
 # --- Main Conversation Handler ---
 conv_handler = ConversationHandler(
@@ -817,43 +794,78 @@ conv_handler = ConversationHandler(
     per_message=False,
 )
 
-application.add_handler(conv_handler)
-application.add_handler(CallbackQueryHandler(help_command, pattern='^help$'))
+bot_app.add_handler(conv_handler)
+bot_app.add_handler(CallbackQueryHandler(help_command, pattern='^help$'))
 
 # Add other handlers that are not part of conversations
-application.add_handler(CommandHandler("start", start))
-application.add_handler(CommandHandler("help", help_command))
-application.add_handler(CommandHandler("insights", insights))
-application.add_handler(CommandHandler("portfolio", portfolio))
-application.add_handler(CommandHandler("listwallets", list_wallets))
-application.add_handler(CommandHandler("listalerts", list_alerts))
-application.add_handler(CommandHandler("deletewallet", delete_wallet_start))
-application.add_handler(CallbackQueryHandler(delete_wallet_callback, pattern="^delete_"))
+bot_app.add_handler(CommandHandler("start", start))
+bot_app.add_handler(CommandHandler("help", help_command))
+bot_app.add_handler(CommandHandler("insights", insights))
+bot_app.add_handler(CommandHandler("portfolio", portfolio))
+bot_app.add_handler(CommandHandler("listwallets", list_wallets))
+bot_app.add_handler(CommandHandler("listalerts", list_alerts))
+bot_app.add_handler(CommandHandler("deletewallet", delete_wallet_start))
+bot_app.add_handler(CallbackQueryHandler(delete_wallet_callback, pattern="^delete_"))
 
-@app.route('/')
+@app.on_event("startup")
+async def startup_event():
+    """Initializes the application on startup."""
+    logger.info("Initializing database...")
+    initialize_database()
+    logger.info("Database initialization complete.")
+
+    # Import and start the monitoring service as a background task
+    from src.monitoring import main as monitoring_main
+    asyncio.create_task(monitoring_main())
+    logger.info("Monitoring service started as a background task.")
+
+    # Set up the webhook if the URL is provided
+    if WEBHOOK_URL:
+        await bot_app.bot.set_webhook(url=f"{WEBHOOK_URL}/webhook")
+        logger.info(f"Webhook set to {WEBHOOK_URL}/webhook")
+        # Start the bot application to handle webhook updates
+        await bot_app.initialize()
+        await bot_app.start()
+        await bot_app.updater.start_polling()
+    else:
+        logger.info("WEBHOOK_URL not set. Starting in polling mode.")
+        # Start the bot application in polling mode
+        await bot_app.initialize()
+        await bot_app.updater.start_polling()
+        await bot_app.start()
+
+@app.on_event("shutdown")
+async def shutdown_event():
+    """Cleans up the application on shutdown."""
+    logger.info("Shutting down...")
+    await bot_app.updater.stop()
+    await bot_app.stop()
+
+@app.get('/')
 def health_check():
-    return "Bot is running.", 200
+    return {"status": "ok"}
 
-@app.route('/webhook', methods=['POST'])
-async def telegram_webhook():
+@app.post('/webhook')
+async def telegram_webhook(request: Request):
     """Handle incoming Telegram updates via webhook."""
     try:
-        update = Update.de_json(request.get_json(force=True), application.bot)
-        await application.process_update(update)
+        update_data = await request.json()
+        update = Update.de_json(update_data, bot_app.bot)
+        await bot_app.process_update(update)
     except Exception as e:
         logger.error(f"Error processing update: {e}")
-    return "ok"
+    return {"status": "ok"}
 
-@app.route('/admin/clear-database/<secret_key>', methods=['POST'])
-def clear_database(secret_key):
+@app.post('/admin/clear-database/{secret_key}')
+def clear_database(secret_key: str):
     """(Admin) Clears and re-initializes the PostgreSQL database."""
     if not ADMIN_SECRET_KEY or secret_key != ADMIN_SECRET_KEY:
-        return "Unauthorized", 401
+        raise HTTPException(status_code=401, detail="Unauthorized")
 
     try:
         conn = get_db_connection()
         if conn is None:
-            return "Database connection failed", 500
+            raise HTTPException(status_code=500, detail="Database connection failed")
         
         with conn.cursor() as cur:
             # Drop all tables
@@ -872,17 +884,16 @@ def clear_database(secret_key):
         # Re-initialize the schema
         initialize_database()
 
-        return "Database cleared and re-initialized successfully.", 200
+        return {"message": "Database cleared and re-initialized successfully."}
     except Exception as e:
         logger.error(f"Error clearing database: {e}")
-        return "An internal error occurred", 500
+        raise HTTPException(status_code=500, detail="An internal error occurred")
 
-
-@app.route('/admin/clear-db-page/<secret_key>', methods=['GET'])
-def show_clear_database_page(secret_key):
+@app.get('/admin/clear-db-page/{secret_key}')
+def show_clear_database_page(secret_key: str):
     """(Admin) Displays a page with a button to clear the database."""
     if not ADMIN_SECRET_KEY or secret_key != ADMIN_SECRET_KEY:
-        return "Unauthorized", 401
+        raise HTTPException(status_code=401, detail="Unauthorized")
     
     # Simple HTML page with a form that POSTs to the clear_database endpoint
     html_content = f"""
@@ -909,20 +920,5 @@ def show_clear_database_page(secret_key):
     </body>
     </html>
     """
-    return html_content
-
-
-def run_polling():
-    """Starts the Telegram bot in polling mode."""
-    logger.info("Starting bot in polling mode...")
-    application.run_polling()
-
-if __name__ == "__main__":
-    # Start the bot in a separate thread
-    bot_thread = threading.Thread(target=run_polling)
-    bot_thread.daemon = True
-    bot_thread.start()
-
-    # Run the Flask app to handle web requests and keep the service alive
-    logger.info(f"Starting Flask app on port {PORT}...")
-    app.run(host='0.0.0.0', port=PORT)
+    from fastapi.responses import HTMLResponse
+    return HTMLResponse(content=html_content)

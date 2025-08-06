@@ -8,3 +8,4 @@ cryptography
 pytest
 gunicorn
 uvicorn
+fastapi
