@@ -145,7 +145,7 @@ During development, you may need to clear the PostgreSQL database to reset all u
 To clear the database:
 1.  Ensure you have set the `ADMIN_SECRET_KEY` environment variable in your `.env` file or in your Render dashboard. This should be a long, random string.
 2.  Visit the following URL in your browser:
-    `https://esther-bot.onrender.com/admin/clear-db-page/<your_secret_key>`
+    `https://esther-bot-9l9d.onrender.com/admin/clear-db-page/<your_secret_key>`
     
     Replace `<your_secret_key>` with the secret key you set.
 3.  Click the "Clear Database Now" button on the page to confirm the action.

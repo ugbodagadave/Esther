@@ -1,0 +1,98 @@
+# Esther Bot Testing Guide
+
+Here is a comprehensive guide to testing the Esther bot's features using natural language prompts.
+
+---
+
+### 1. Basic Interaction
+
+**Test 1: Start Command**
+*   **Your Message:** `/start`
+*   **Expected Bot Response:** A welcome message from Esther, introducing herself and offering to help. For example: "Hello! I'm Esther, your AI-powered DEX trading assistant. I can help you check prices, execute trades, and get market insights. How can I help you today?"
+
+**Test 2: Help Command**
+*   **Your Message:** `/help`
+*   **Expected Bot Response:** A message listing the main commands and features Esther supports, such as checking prices, trading, managing wallets, and getting insights.
+
+---
+
+### 2. Price Checks
+
+**Test 1: Price of BTC**
+*   **Your Message:** `What's the price of BTC?`
+*   **Expected Bot Response:** A message showing the current price of Bitcoin (BTC) in USD or USDT. For example: "The current price of Bitcoin (BTC) is $113,722."
+
+**Test 2: Price of ETH**
+*   **Your Message:** `How much is ETH worth?`
+*   **Expected Bot Response:** A message showing the current price of Ethereum (ETH). For example: "The current price of Ethereum (ETH) is $3,578."
+
+---
+
+### 3. Wallet Management
+
+**Test 1: Show Wallets**
+*   **Your Message:** `Show me my wallets`
+*   **Expected Bot Response:** A list of your saved wallet addresses. If no wallets are added, it should prompt you to add one. For example: "Here are your saved wallets:\n- 0x123...abc\n- 0x456...def" or "You haven't added any wallets yet. Would you like to add one?"
+
+**Test 2: Add a New Wallet**
+*   **Your Message:** `I want to add a new wallet`
+*   **Expected Bot Response:** Esther will ask you to provide the wallet address and then the private key, confirming once it has been securely saved. For example: "Please provide the wallet address you would like to add."
+
+---
+
+### 4. Trading (Buy, Sell, Swap)
+
+**Test 1: Buy ETH**
+*   **Your Message:** `Buy 0.1 ETH with USDT`
+*   **Expected Bot Response:**
+    1.  A confirmation message showing the estimated amount of ETH you will receive for your USDT.
+    2.  Two buttons: "✅ Confirm" and "❌ Cancel".
+    3.  After confirming, a message indicating that the simulated trade was successful.
+
+**Test 2: Sell ETH**
+*   **Your Message:** `Sell 0.5 ETH for USDC`
+*   **Expected Bot Response:** A similar confirmation flow as the "buy" command, ending with a success message for the simulated sale.
+
+---
+
+### 5. Cross-Chain Swaps
+
+**Test 1: Swap ETH on Ethereum for MATIC on Polygon**
+*   **Your Message:** `Swap 0.1 ETH on Ethereum for MATIC on Polygon`
+*   **Expected Bot Response:** A confirmation message that clearly states the source chain (Ethereum) and destination chain (Polygon), along with the estimated amounts for the swap. The rest of the flow is the same as a regular trade.
+
+---
+
+### 6. Advanced Orders
+
+**Test 1: Set Stop Loss**
+*   **Your Message:** `Set a stop loss for BTC at 110000`
+*   **Expected Bot Response:** A confirmation message like, "OK, I've set a stop-loss for BTC at $110,000. I will notify you if the price drops to this level."
+
+**Test 2: Set Take Profit**
+*   **Your Message:** `Set a take profit for ETH at 3700`
+*   **Expected Bot Response:** A confirmation message like, "Got it. I've set a take-profit for ETH at $3,700."
+
+---
+
+### 7. Portfolio Tracking
+
+**Test 1: Show Portfolio**
+*   **Your Message:** `/portfolio` or `Show me my assets`
+*   **Expected Bot Response:** A formatted message showing a list of all tokens in your wallet, their quantities, and their current value in USD, along with a total portfolio value.
+
+---
+
+### 8. Personalized Market Insights
+
+**Test 1: Get Insights**
+*   **Your Message:** `/insights` or `Give me market insights`
+*   **Expected Bot Response:** A message containing analysis of your holdings, potential market trends, or other relevant insights.
+
+---
+
+### 9. Price Alerts
+
+**Test 1: Set Price Alert**
+*   **Your Message:** `Alert me when BTC goes above 115000`
+*   **Expected Bot Response:** A confirmation message stating that the alert has been set (e.g., "Alert set: I will notify you if BTC > $115,000"). When the condition is met, you should receive a separate notification.
