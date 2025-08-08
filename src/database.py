@@ -2,6 +2,8 @@ import os
 import psycopg2
 import logging
 from dotenv import load_dotenv
+from src.exceptions import WalletAlreadyExistsError, DatabaseConnectionError
+from psycopg2 import OperationalError, IntegrityError
 
 # Load environment variables
 load_dotenv()
@@ -17,25 +19,21 @@ def get_db_connection():
     DATABASE_URL = os.getenv("DATABASE_URL")
     if not DATABASE_URL:
         logger.error("DATABASE_URL not found in environment variables.")
-        return None
+        raise DatabaseConnectionError("DATABASE_URL not found in environment variables.")
     try:
         conn = psycopg2.connect(DATABASE_URL)
         return conn
-    except psycopg2.OperationalError as e:
+    except OperationalError as e:
         logger.error(f"Could not connect to the database: {e}")
-        return None
+        raise DatabaseConnectionError(f"Could not connect to the database: {e}")
 
 def initialize_database():
     """
     Initializes the database by creating the necessary tables if they don't exist
     and adding any missing columns to existing tables.
     """
-    conn = get_db_connection()
-    if conn is None:
-        logger.error("Database connection failed. Cannot initialize tables.")
-        return
-
     try:
+        conn = get_db_connection()
         with conn.cursor() as cur:
             # Create users table
             cur.execute("""
@@ -134,9 +132,48 @@ def initialize_database():
             
             conn.commit()
             logger.info("Database tables initialized successfully.")
-    except psycopg2.Error as e:
+    except (OperationalError, psycopg2.Error) as e:
         logger.error(f"Error initializing database tables: {e}")
-        conn.rollback()
+        if conn:
+            conn.rollback()
+    finally:
+        if conn:
+            conn.close()
+
+def add_wallet(user_id, wallet_name, wallet_address, encrypted_private_key, chain_id=1):
+    """Adds a new wallet to the database for a given user."""
+    try:
+        conn = get_db_connection()
+        with conn.cursor() as cur:
+            # Get the internal user ID from the telegram_id
+            cur.execute("SELECT id FROM users WHERE telegram_id = %s;", (user_id,))
+            user_record = cur.fetchone()
+            if not user_record:
+                # If the user doesn't exist, create a new one
+                cur.execute("INSERT INTO users (telegram_id) VALUES (%s) RETURNING id;", (user_id,))
+                user_record = cur.fetchone()
+            
+            internal_user_id = user_record[0]
+
+            cur.execute(
+                """
+                INSERT INTO wallets (user_id, name, address, encrypted_private_key, chain_id)
+                VALUES (%s, %s, %s, %s, %s);
+                """,
+                (internal_user_id, wallet_name, wallet_address, encrypted_private_key, chain_id)
+            )
+            conn.commit()
+            logger.info(f"Wallet {wallet_name} added for user {user_id}.")
+    except IntegrityError as e:
+        if e.pgcode == '23505': # unique_violation
+            raise WalletAlreadyExistsError(f"Wallet with address {wallet_address} already exists.")
+        else:
+            raise e
+    except (OperationalError, psycopg2.Error) as e:
+        logger.error(f"Error adding wallet for user {user_id}: {e}")
+        if conn:
+            conn.rollback()
+        raise
     finally:
         if conn:
             conn.close()

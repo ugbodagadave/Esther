@@ -43,9 +43,10 @@ PORT = int(os.environ.get('PORT', 8080))
 
 from src.nlp import NLPClient
 from src.okx_client import OKXClient
-from src.database import get_db_connection, initialize_database
+from src.database import add_wallet, get_db_connection, initialize_database
 from src.encryption import encrypt_data, decrypt_data
 from src.insights import InsightsClient
+from src.exceptions import WalletAlreadyExistsError, InvalidWalletAddressError, DatabaseConnectionError
 from src.portfolio import PortfolioService
 from src.constants import (
     TOKEN_ADDRESSES,
@@ -591,30 +592,30 @@ async def received_private_key(update: Update, context: ContextTypes.DEFAULT_TYP
     wallet_name = context.user_data.get('wallet_name')
     wallet_address = context.user_data.get('wallet_address')
 
-    encrypted_private_key = encrypt_data(private_key)
-
-    conn = get_db_connection()
-    if conn is None:
-        await update.message.reply_text("Database connection failed. Please try again later.")
-        return ConversationHandler.END
-
     try:
-        with conn.cursor() as cur:
-            cur.execute("SELECT id FROM users WHERE telegram_id = %s;", (user.id,))
-            user_id = cur.fetchone()[0]
+        # Basic validation for wallet address
+        if not wallet_address or not wallet_address.startswith('0x'):
+            raise InvalidWalletAddressError("Invalid wallet address format.")
 
-            cur.execute(
-                "INSERT INTO wallets (user_id, name, address, encrypted_private_key) VALUES (%s, %s, %s, %s);",
-                (user_id, wallet_name, wallet_address, encrypted_private_key)
-            )
-            conn.commit()
-            await update.message.reply_text(f"✅ Wallet '{wallet_name}' added successfully!")
+        encrypted_private_key = encrypt_data(private_key)
+        
+        add_wallet(user.id, wallet_name, wallet_address, encrypted_private_key)
+        
+        await update.message.reply_text(f"✅ Wallet '{wallet_name}' added successfully!")
+
+    except InvalidWalletAddressError as e:
+        logger.warning(f"Invalid wallet address provided by user {user.id}: {wallet_address}")
+        await update.message.reply_text(str(e))
+    except WalletAlreadyExistsError:
+        logger.warning(f"User {user.id} tried to add a duplicate wallet: {wallet_address}")
+        await update.message.reply_text("This wallet address has already been added to your profile.")
+    except DatabaseConnectionError as e:
+        logger.error(f"Database connection error while adding wallet for user {user.id}: {e}")
+        await update.message.reply_text("I'm having trouble connecting to the database. Please try again later.")
     except Exception as e:
-        logger.error(f"Error adding wallet for user {user.id}: {e}")
-        await update.message.reply_text("An error occurred while saving your wallet.")
+        logger.error(f"An unexpected error occurred while adding wallet for user {user.id}: {e}", exc_info=True)
+        await update.message.reply_text("An unexpected error occurred while saving your wallet. Please contact support.")
     finally:
-        if conn:
-            conn.close()
         context.user_data.clear()
 
     return ConversationHandler.END
