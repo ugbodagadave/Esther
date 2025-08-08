@@ -304,7 +304,7 @@ class TestMainHandlers(unittest.IsolatedAsyncioTestCase):
 
         mock_get_historical_price.return_value = {
             "success": True,
-            "data": {"prices": [{"price": "60000", "ts": "1672531200000"}]}
+            "data": {"prices": [{"price": "60000", "time": "1672531200000"}]}
         }
         mock_generate_price_chart.return_value = b"fake_chart_image"
         update.message.reply_photo = AsyncMock()

@@ -184,19 +184,19 @@ class TestOKXClient(unittest.TestCase):
         mock_response.status_code = 200
         mock_response.json.return_value = {
             "code": "0",
-            "data": [{"ts": "1672531200000", "price": "16547.2"}]
+            "data": [{"time": "1672531200000", "price": "16547.2"}]
         }
         mock_get.return_value = mock_response
 
         client = OKXClient()
-        result = client.get_historical_price("token_addr", 1, "1M")
+        result = client.get_historical_price("token_addr", 1, "7d")
 
         self.assertTrue(result['success'])
         self.assertEqual(result['data']['price'], "16547.2")
         mock_get.assert_called_once()
         called_url = mock_get.call_args[0][0]
-        self.assertIn("tokenAddress=token_addr", called_url)
-        self.assertIn("period=1M", called_url)
+        self.assertIn("chainIndex=1", called_url)
+        self.assertIn("period=1d", called_url)
 
 if __name__ == '__main__':
     unittest.main()

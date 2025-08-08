@@ -7,7 +7,7 @@ import hmac
 import base64
 import time
 import json
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from dotenv import load_dotenv
 
 from src.constants import DRY_RUN_MODE
@@ -158,11 +158,28 @@ class OKXClient:
         """
         for attempt in range(self.max_retries):
             try:
-                request_path = '/api/v5/dex/historical-index-price'
+                request_path = f'/api/v5/wallet/token/historical-price'
+                
+                # Convert period to begin timestamp and limit
+                now = datetime.now(timezone.utc)
+                if period == "24h":
+                    begin = int((now - timedelta(hours=24)).timestamp() * 1000)
+                    limit = 24
+                elif period == "7d":
+                    begin = int((now - timedelta(days=7)).timestamp() * 1000)
+                    limit = 7
+                elif period == "1m":
+                    begin = int((now - timedelta(days=30)).timestamp() * 1000)
+                    limit = 30
+                else:
+                    begin = int((now - timedelta(days=7)).timestamp() * 1000)
+                    limit = 7
+
                 params = {
-                    "chainId": chainId,
-                    "tokenAddress": token_address,
-                    "period": period
+                    "chainIndex": chainId,
+                    "limit": limit,
+                    "begin": begin,
+                    "period": "1d" # OKX API requires a period, so we'll use 1d
                 }
                 
                 query_string = '&'.join([f'{k}={v}' for k, v in params.items()])

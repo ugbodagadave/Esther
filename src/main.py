@@ -220,7 +220,8 @@ async def get_price_chart_intent(update: Update, context: ContextTypes.DEFAULT_T
     await update.message.reply_text(f"Generating price chart for {symbol.upper()} over the last {period}...")
 
     # Assuming chainId 1 (Ethereum) for now
-    historical_data_response = okx_client.get_historical_price(token_address, 1, period)
+    chain_id = 1
+    historical_data_response = okx_client.get_historical_price(token_address, chain_id, period)
 
     if not historical_data_response.get("success"):
         await update.message.reply_text(f"Sorry, I couldn't fetch historical data. Error: {historical_data_response.get('error')}")

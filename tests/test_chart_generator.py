@@ -10,9 +10,9 @@ class TestChartGenerator(unittest.TestCase):
         """
         historical_data = {
             "prices": [
-                {"price": "100", "ts": "1672531200000"},
-                {"price": "110", "ts": "1672617600000"},
-                {"price": "105", "ts": "1672704000000"}
+                {"price": "100", "time": "1672531200000"},
+                {"price": "110", "time": "1672617600000"},
+                {"price": "105", "time": "1672704000000"}
             ]
         }
         token_symbol = "BTC"
