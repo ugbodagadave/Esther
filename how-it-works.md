@@ -190,7 +190,7 @@ Esther now keeps a real-time view of every user's on-chain balances **without re
 The price chart feature allows users to visualize historical price data for a token.
 
 1.  **Intent Recognition**: The `get_price_chart` intent is recognized by the NLP module, which also extracts the token `symbol` and `period` (e.g., "7d", "1m").
-2.  **Data Fetching**: The `OKXClient` calls the `/api/v5/dex/historical-index-price` endpoint with the appropriate token address and period.
+2.  **Data Fetching**: The `OKXClient` intelligently selects the correct endpoint based on the token type. For instrument IDs like 'BTC-USD', it uses `/api/v5/market/history-candles`. For EVM token addresses, it uses `/api/v5/wallet/token/historical-price`.
 3.  **Chart Rendering**: The `matplotlib` library is used to generate a PNG image of the price chart from the historical data.
 4.  **Response**: The generated chart image is sent back to the user via Telegram.
 

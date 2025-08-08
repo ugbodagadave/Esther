@@ -35,7 +35,8 @@ Alongside trading endpoints, Esther consumes OKX **Web3 DEX and Market** APIs to
 | Endpoint                                            | Purpose                                                      |
 |-----------------------------------------------------|--------------------------------------------------------------|
 | `/api/v5/dex/balance/all-token-balances-by-address` | Consolidated native and token balances with USD prices.      |
-| `/api/v5/dex/market/candlesticks-history`           | Historical candles used for ROI calculation.                 |
+| `/api/v5/market/history-candles`                    | Historical candles for instrument IDs (e.g., BTC-USD).       |
+| `/api/v5/wallet/token/historical-price`             | Historical prices for specific token addresses on a chain.   |
 
 These calls are **GET** requests signed with the same HMAC flow as trading requests and **must** include the `OK-ACCESS-PROJECT` header described above.
 

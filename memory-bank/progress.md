@@ -29,7 +29,7 @@ The project is moving into a feature expansion phase. The "Simple Price Charts" 
 - **Portfolio Performance Tracker**: The initial implementation of the portfolio performance tracker is complete.
 - **Code Stability**: The entire test suite has been run, and all 55 tests are passing, confirming the stability of the current codebase.
 - **Bug Fixes Implemented**:
-    - **Price Chart Bug Fix**: Fixed a critical bug where the wrong OKX API endpoint was being used.
+- **Price Chart Bug Fix**: Fixed a critical bug where the price chart for BTC was showing incorrect prices.
     - **Portfolio Performance Tracker**: Fixed a critical bug where the time period was not being correctly parsed from user input.
     - **Architectural Stability**: Refactored the application from a multi-threaded Flask app to a unified `asyncio` event loop with FastAPI, resolving critical stability issues.
     - **Decimal Precision Fix**: Corrected a critical bug causing price quote failures by implementing dynamic decimal precision for API calls.

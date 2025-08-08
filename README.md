@@ -20,7 +20,7 @@ Esther is designed to be a comprehensive AI trading assistant. Here are its core
 | **Price Alerts** | Set custom price alerts to get notified of market movements. | `/api/v5/dex/market/candlesticks-history` |
 | **Portfolio Rebalancing**| Automatically generate and execute a plan to rebalance your portfolio. | `/api/v5/dex/aggregator/swap` |
 | **Portfolio Performance**| Track the historical performance of your crypto assets. | `/api/v5/dex/historical-index-price` |
-| **Price Charts**| Generate a price chart for a token over a specified period. | `/api/v5/dex/historical-index-price` |
+| **Price Charts**| Generate a price chart for a token over a specified period. | `/api/v5/market/history-candles`, `/api/v5/wallet/token/historical-price` |
 
 For a detailed explanation of how we integrated the OKX DEX API, see our [OKX DEX API Integration Guide](./okx_dex_api_integration.md).
 

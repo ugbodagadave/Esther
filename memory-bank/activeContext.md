@@ -4,7 +4,7 @@
 The current focus is on ensuring the stability and correctness of the newly implemented "Simple Price Charts" feature.
 
 ## 2. Recent Changes & Decisions
-- **Price Chart Bug Fix**: Fixed a critical bug in the `get_historical_price` function where the wrong OKX API endpoint was being used. The endpoint has been corrected to `/api/v5/wallet/token/historical-price`, and the `chart_generator.py` and `main.py` files have been updated to handle the new data structure.
+- **Price Chart Bug Fix**: Fixed a critical bug where the price chart for BTC was showing incorrect prices. The issue was caused by using the WBTC token address instead of the correct instrument ID for BTC. The `get_historical_price` function has been refactored to handle both instrument IDs and token addresses, using the correct API endpoint for each.
 - **Matplotlib Backend**: Configured `matplotlib` to use the `Agg` backend to prevent GUI-related errors in a server environment.
 - **Simple Price Charts Feature**: Implemented the core feature, including the NLP intent, data fetching, chart generation, and Telegram bot handler.
 - **Portfolio Performance Bug Fix**: Fixed a critical bug in the `portfolio_performance` function where the time period was not being correctly parsed from user input. The new implementation is more robust and handles a wider variety of user inputs (e.g., "14 days", "28d", "last month").
