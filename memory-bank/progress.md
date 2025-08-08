@@ -3,9 +3,10 @@
 ## 1. Current Status
 **Phase 3: Feature Expansion**
 
-The project is moving into a feature expansion phase. The immediate focus is on implementing the "Simple Price Charts" feature.
+The project is moving into a feature expansion phase. The "Simple Price Charts" feature has been implemented and is now stable.
 
 ## 2. What Works
+- **Simple Price Charts**: The new feature to allow users to request and view simple price charts for a given token and time period is fully implemented and working.
 - **Complete Project Foundation**: All core documentation (`Memory Bank`, `prd.md`, `plan.md`, etc.) is in place.
 - **Telegram Bot**: The bot is live, connects to Telegram, and can handle basic commands (`/start`, `/help`).
 - **Database Integration**: The bot successfully connects to the PostgreSQL database on Render to manage users.
@@ -26,8 +27,9 @@ The project is moving into a feature expansion phase. The immediate focus is on 
 - **Personalized Market Insights**: A new `/insights` command provides users with personalized market analysis and recommendations.
 - **Cross-Chain Swaps**: The bot now supports trading tokens across different blockchains, including Ethereum, Arbitrum, and Polygon.
 - **Portfolio Performance Tracker**: The initial implementation of the portfolio performance tracker is complete.
-- **Code Stability**: The entire test suite has been run, and all 52 tests are passing, confirming the stability of the current codebase.
+- **Code Stability**: The entire test suite has been run, and all 55 tests are passing, confirming the stability of the current codebase.
 - **Bug Fixes Implemented**:
+    - **Price Chart Bug Fix**: Fixed a critical bug where the wrong OKX API endpoint was being used.
     - **Portfolio Performance Tracker**: Fixed a critical bug where the time period was not being correctly parsed from user input.
     - **Architectural Stability**: Refactored the application from a multi-threaded Flask app to a unified `asyncio` event loop with FastAPI, resolving critical stability issues.
     - **Decimal Precision Fix**: Corrected a critical bug causing price quote failures by implementing dynamic decimal precision for API calls.
@@ -36,7 +38,6 @@ The project is moving into a feature expansion phase. The immediate focus is on 
     - Detailed logging for OKX API endpoints is added.
 
 ## 3. What's Left to Build
-- **Simple Price Charts**: Implement the new feature to allow users to request and view simple price charts for a given token and time period.
 - **On-Demand Education**: An integrated learning module to explain DeFi concepts on the fly.
 - **Real-time Notifications**: Begin work on the observer pattern for real-time market alerts.
 

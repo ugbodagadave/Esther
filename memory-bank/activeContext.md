@@ -1,9 +1,12 @@
 # Active Context: Esther
 
 ## 1. Current Focus
-The current focus is on planning the implementation of the new "Simple Price Charts" feature.
+The current focus is on ensuring the stability and correctness of the newly implemented "Simple Price Charts" feature.
 
 ## 2. Recent Changes & Decisions
+- **Price Chart Bug Fix**: Fixed a critical bug in the `get_historical_price` function where the wrong OKX API endpoint was being used. The endpoint has been corrected to `/api/v5/wallet/token/historical-price`, and the `chart_generator.py` and `main.py` files have been updated to handle the new data structure.
+- **Matplotlib Backend**: Configured `matplotlib` to use the `Agg` backend to prevent GUI-related errors in a server environment.
+- **Simple Price Charts Feature**: Implemented the core feature, including the NLP intent, data fetching, chart generation, and Telegram bot handler.
 - **Portfolio Performance Bug Fix**: Fixed a critical bug in the `portfolio_performance` function where the time period was not being correctly parsed from user input. The new implementation is more robust and handles a wider variety of user inputs (e.g., "14 days", "28d", "last month").
 - **Portfolio Performance Tracker**: Implemented the core feature, including database schema changes, new API client methods, and the conversational flow.
 - **Error Handling**: Implemented a robust error handling system for the wallet addition feature. This includes creating custom exceptions, refactoring the database and main application logic to handle these exceptions gracefully, and adding comprehensive unit tests to ensure the new system works as expected.
@@ -17,10 +20,11 @@ The current focus is on planning the implementation of the new "Simple Price Cha
 - **Portfolio Service Enhancement**: The `suggest_rebalance` function in `PortfolioService` has been enhanced to calculate the `from_amount` in the token's native units, which is a prerequisite for executing rebalance plans.
 
 ## 3. Next Steps
-1.  **Implement Simple Price Charts**: Begin work on the new feature to allow users to request and view simple price charts for a given token and time period.
-2.  **On-Demand Education**: Begin work on an integrated learning module to explain DeFi concepts on the fly.
+1.  **On-Demand Education**: Begin work on an integrated learning module to explain DeFi concepts on the fly.
 
 ## 4. Active Learnings & Insights
+- API endpoints can change, and it's important to have a robust testing and validation process to catch these changes early.
+- Non-interactive backends for libraries like `matplotlib` are essential for server-side applications.
 - Robust input parsing is crucial for a good user experience. A simple regex or string matching is often not enough to handle the variety of user inputs.
 - Decimal precision is a critical detail in DeFi applications. Hardcoding values is risky; dynamic lookup is essential.
 - Deployment environments (like Render) can have subtle differences from local setups. Understanding how WSGI servers like Gunicorn interact with `asyncio` applications is vital for debugging.

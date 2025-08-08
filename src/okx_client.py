@@ -155,38 +155,60 @@ class OKXClient:
     def get_historical_price(self, token_address: str, chainId: int, period: str) -> dict:
         """
         Fetches historical price data for a token.
+        Handles both instrument IDs (e.g., 'BTC-USD') and token addresses.
         """
+        # Convert period to parameters
+        now = datetime.now(timezone.utc)
+        if period == "24h":
+            begin = int((now - timedelta(hours=24)).timestamp() * 1000)
+            bar = "1H"
+            limit = "24"
+            okx_period = "1H" # Period for wallet API
+        elif period == "7d":
+            begin = int((now - timedelta(days=7)).timestamp() * 1000)
+            bar = "1D"
+            limit = "7"
+            okx_period = "1D"
+        elif period == "1m":
+            begin = int((now - timedelta(days=30)).timestamp() * 1000)
+            bar = "1D"
+            limit = "30"
+            okx_period = "1D"
+        else: # default to 7d
+            begin = int((now - timedelta(days=7)).timestamp() * 1000)
+            bar = "1D"
+            limit = "7"
+            okx_period = "1D"
+
+        # Check if it's an instrument ID or a token address
+        if '-' in token_address:
+            # It's an instrument ID like BTC-USD, use the market data endpoint
+            request_path = '/api/v5/market/history-candles'
+            params = {
+                "instId": token_address,
+                "bar": bar,
+                "limit": limit
+            }
+            base_url = "https://www.okx.com"
+        else:
+            # It's a token address, use the wallet endpoint
+            request_path = f'/api/v5/wallet/token/historical-price'
+            params = {
+                "tokenAddress": token_address,
+                "chainIndex": str(chainId),
+                "limit": limit,
+                "begin": str(begin),
+                "period": okx_period
+            }
+            base_url = self.base_url
+
         for attempt in range(self.max_retries):
             try:
-                request_path = f'/api/v5/wallet/token/historical-price'
-                
-                # Convert period to begin timestamp and limit
-                now = datetime.now(timezone.utc)
-                if period == "24h":
-                    begin = int((now - timedelta(hours=24)).timestamp() * 1000)
-                    limit = 24
-                elif period == "7d":
-                    begin = int((now - timedelta(days=7)).timestamp() * 1000)
-                    limit = 7
-                elif period == "1m":
-                    begin = int((now - timedelta(days=30)).timestamp() * 1000)
-                    limit = 30
-                else:
-                    begin = int((now - timedelta(days=7)).timestamp() * 1000)
-                    limit = 7
-
-                params = {
-                    "chainIndex": chainId,
-                    "limit": limit,
-                    "begin": begin,
-                    "period": "1d" # OKX API requires a period, so we'll use 1d
-                }
-                
                 query_string = '&'.join([f'{k}={v}' for k, v in params.items()])
                 full_request_path = f"{request_path}?{query_string}"
 
                 headers = self._get_request_headers('GET', full_request_path)
-                url = f"{self.base_url}{full_request_path}"
+                url = f"{base_url}{full_request_path}"
                 
                 logger.info(f"Sending GET request to OKX for historical price: {url}")
                 response = requests.get(url, headers=headers, timeout=10)
@@ -194,7 +216,18 @@ class OKXClient:
                 data = response.json()
 
                 if data.get("code") == "0":
-                    return {"success": True, "data": data.get("data", [{}])[0]}
+                    raw_data = data.get("data", [])
+                    processed_data = []
+                    if '-' in token_address:
+                        # Normalize history-candles data: [ts, o, h, l, c, vol, volCcy, volCcyQuote, confirm]
+                        # We want a list of dicts: [{"ts": "...", "price": "..."}]
+                        for item in raw_data:
+                            processed_data.append({"ts": item[0], "price": item[4]})
+                    else:
+                        # Data from historical-price is already in the correct format
+                        processed_data = raw_data
+
+                    return {"success": True, "data": processed_data}
                 else:
                     error_msg = data.get("msg", "Unknown API error")
                     logger.error(f"Error fetching historical price from OKX API: {error_msg}")

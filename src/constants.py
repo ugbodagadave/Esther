@@ -5,7 +5,7 @@ TOKEN_ADDRESSES = {
     "USDC": "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48",
     "USDT": "0xdac17f958d2ee523a2206206994597c13d831ec7",
     "WBTC": "0x2260fac5e5542a773aa44fbcfedf7c193bc2c599",
-    "BTC": "0x2260fac5e5542a773aa44fbcfedf7c193bc2c599",  # Map BTC to WBTC
+    "BTC": "BTC-USD",  # Use the instrument ID for BTC
     "DAI": "0x6b175474e89094c44da98b954eedeac495271d0f",
     "MATIC": "0x7d1afa7b718fb893db30a3abc0cfc608aacfebb0",
 }

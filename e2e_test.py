@@ -304,8 +304,8 @@ def test_e2e_price_chart():
         # Test OKX historical data
         print("    Query: Fetching historical data for BTC...")
         historical_data = okx_client.get_historical_price(
-            token_address="0x2260fac5e5542a773aa44fbcfedf7c193bc2c599", # WBTC on Ethereum
-            chainId=1,
+            token_address="BTC-USD", # Use the instrument ID for BTC
+            chainId=1, # Not used for instrument IDs, but required by the function signature
             period="7d"
         )
 
