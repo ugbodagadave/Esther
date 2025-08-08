@@ -232,7 +232,7 @@ class TestMainHandlers(unittest.IsolatedAsyncioTestCase):
         self.assertIn("web_app", kwargs['reply_markup'].inline_keyboard[0][0].to_dict())
         self.assertEqual(result, 9) # AWAIT_WEB_APP_DATA
 
-    @patch('src.main.get_db_connection')
+    @patch('src.database.get_db_connection')
     @patch('src.main.encrypt_data', return_value=b"encrypted_key")
     async def test_received_private_key_saves_wallet(self, mock_encrypt, mock_get_conn):
         """Test that received_private_key saves the wallet."""
@@ -253,10 +253,18 @@ class TestMainHandlers(unittest.IsolatedAsyncioTestCase):
 
         # Assert
         mock_encrypt.assert_called_once_with("test_private_key")
-        mock_cur.execute.assert_called_with(
-            "INSERT INTO wallets (user_id, name, address, encrypted_private_key) VALUES (%s, %s, %s, %s);",
-            (1, "Test Wallet", "0x123", b"encrypted_key")
-        )
+        
+        # Get the actual SQL query and arguments from the mock
+        actual_call = mock_cur.execute.call_args
+        self.assertIsNotNone(actual_call)
+        
+        # Clean up the SQL strings for comparison
+        expected_sql = "INSERT INTO wallets (user_id, name, address, encrypted_private_key, chain_id) VALUES (%s, %s, %s, %s, %s);"
+        actual_sql = ' '.join(actual_call.args[0].split())
+        
+        self.assertEqual(expected_sql, actual_sql)
+        self.assertEqual(actual_call.args[1], (1, "Test Wallet", "0x123", b"encrypted_key", 1))
+        
         update.message.reply_text.assert_called_once_with("✅ Wallet 'Test Wallet' added successfully!")
         self.assertEqual(result, ConversationHandler.END)
 

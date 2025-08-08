@@ -67,6 +67,9 @@ class NLPClient:
         - source_chain: The source blockchain (if specified).
         - destination_chain: The destination blockchain (if specified).
 
+        For get_portfolio_performance, extract the following entities if present:
+        - period: The time period (e.g., "7 days", "last month", "30d").
+
         Return the output as a JSON object with "intent" and "entities" keys.
 
             Example for get_price: {{"intent": "get_price", "entities": {{"symbol": "BTC"}}}}

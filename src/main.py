@@ -497,17 +497,25 @@ async def portfolio_performance(update: Update, context: ContextTypes.DEFAULT_TY
     user = update.effective_user
     period = entities.get("period", "7d") # Default to 7 days
     
-    # Convert period string to days (this is a simplification)
-    period_days = 7
-    if "month" in period:
-        period_days = 30
-    elif "year" in period:
-        period_days = 365
-    else:
-        try:
-            period_days = int(period.replace('d', ''))
-        except (ValueError, TypeError):
-            period_days = 7
+    # Convert period string to days
+    period_days = 7 # Default
+    if isinstance(period, str):
+        period = period.lower()
+        if "month" in period:
+            period_days = 30
+        elif "year" in period:
+            period_days = 365
+        elif "d" in period:
+            try:
+                period_days = int(period.replace('d', ''))
+            except (ValueError, TypeError):
+                period_days = 7
+        else:
+            try:
+                # Handle cases like "7 days"
+                period_days = int(''.join(filter(str.isdigit, period)))
+            except (ValueError, TypeError):
+                period_days = 7
 
     await update.message.reply_text(f"Calculating your portfolio performance for the last {period_days} days...")
 
@@ -648,7 +656,7 @@ async def received_private_key(update: Update, context: ContextTypes.DEFAULT_TYP
 
         encrypted_private_key = encrypt_data(private_key)
         
-        add_wallet(user.id, wallet_name, wallet_address, encrypted_private_key)
+        add_wallet(user.id, wallet_name, wallet_address, encrypted_private_key, chain_id=1)
         
         await update.message.reply_text(f"✅ Wallet '{wallet_name}' added successfully!")
 

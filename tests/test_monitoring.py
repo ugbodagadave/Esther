@@ -12,7 +12,7 @@ class TestMonitoring(unittest.IsolatedAsyncioTestCase):
         # Mock DB to return two users
         conn = MagicMock()
         cur = MagicMock()
-        cur.fetchall.return_value = [(111,), (222,)]
+        cur.fetchall.return_value = [(1, 111), (2, 222)]
         conn.cursor.return_value.__enter__.return_value = cur
         mock_get_conn.return_value = conn
 
@@ -22,4 +22,4 @@ class TestMonitoring(unittest.IsolatedAsyncioTestCase):
 
         # Ensure sync_balances called for both users
         calls = [c.args[0] for c in mock_portfolio_service.sync_balances.call_args_list]
-        self.assertListEqual(calls, [111, 222]) 
+        self.assertListEqual(calls, [111, 222])

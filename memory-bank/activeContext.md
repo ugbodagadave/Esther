@@ -1,9 +1,10 @@
 # Active Context: Esther
 
 ## 1. Current Focus
-The current focus is on improving the error handling of the application. The previous task to improve the UI of the secure wallet input web app has been completed and is now stable.
+The current focus is on fixing the bugs in the Portfolio Performance Tracker feature.
 
 ## 2. Recent Changes & Decisions
+- **Portfolio Performance Tracker**: Implemented the core feature, including database schema changes, new API client methods, and the conversational flow.
 - **Error Handling**: Implemented a robust error handling system for the wallet addition feature. This includes creating custom exceptions, refactoring the database and main application logic to handle these exceptions gracefully, and adding comprehensive unit tests to ensure the new system works as expected.
 - **UI Improvements**: The UI of the secure wallet input web app has been updated to a dark-themed, neo-brutalism design.
 - **Concurrency Fix**: Resolved a critical bug that caused the bot to process messages twice by removing the redundant polling loop when a webhook is active.
@@ -15,7 +16,11 @@ The current focus is on improving the error handling of the application. The pre
 - **Portfolio Service Enhancement**: The `suggest_rebalance` function in `PortfolioService` has been enhanced to calculate the `from_amount` in the token's native units, which is a prerequisite for executing rebalance plans.
 
 ## 3. Next Steps
-1.  **On-Demand Education**: Begin work on an integrated learning module to explain DeFi concepts on the fly.
+1.  **Fix Bugs in Portfolio Performance Tracker**:
+    *   Fix the NLP intent to correctly extract time periods.
+    *   Update the monitoring service to save daily portfolio snapshots.
+    *   Improve the period parsing in the main application.
+2.  **On-Demand Education**: Begin work on an integrated learning module to explain DeFi concepts on the fly.
 
 ## 4. Active Learnings & Insights
 - Decimal precision is a critical detail in DeFi applications. Hardcoding values is risky; dynamic lookup is essential.

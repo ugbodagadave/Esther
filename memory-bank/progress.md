@@ -25,6 +25,7 @@ The project has moved into a stabilization phase. The immediate focus is on ensu
 - **Advanced Orders**: The NLP model can now understand `set_stop_loss` and `set_take_profit` intents.
 - **Personalized Market Insights**: A new `/insights` command provides users with personalized market analysis and recommendations.
 - **Cross-Chain Swaps**: The bot now supports trading tokens across different blockchains, including Ethereum, Arbitrum, and Polygon.
+- **Portfolio Performance Tracker**: The initial implementation of the portfolio performance tracker is complete.
 - **Code Stability**: The entire test suite has been run, and all 37 tests are passing, confirming the stability of the current codebase.
 - **Bug Fixes Implemented**:
     - **Architectural Stability**: Refactored the application from a multi-threaded Flask app to a unified `asyncio` event loop with FastAPI, resolving critical stability issues.
@@ -38,7 +39,7 @@ The project has moved into a stabilization phase. The immediate focus is on ensu
 - **Real-time Notifications**: Begin work on the observer pattern for real-time market alerts.
 
 ## 4. Known Issues & Blockers
-- **No known issues at this time.**
+- **Portfolio Performance Tracker**: The feature is not correctly parsing time periods from user input and is not saving historical data.
 - **Potential Blockers**:
     - **API Access**: Access to OKX DEX, Gemini, and News APIs will be required. The process for obtaining and securely managing these keys needs to be addressed.
     - **Render Free Tier Limitations**: The constraints of the free tier may become a blocker during later stages of development if the application's resource usage exceeds the allocated limits. This needs to be monitored closely.

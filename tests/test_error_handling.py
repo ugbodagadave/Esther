@@ -21,7 +21,7 @@ class TestErrorHandling(unittest.TestCase):
         import asyncio
         asyncio.run(received_private_key(update, context))
 
-        mock_add_wallet.assert_called_once_with(123, 'Test Wallet', '0x123', 'encrypted_key')
+        mock_add_wallet.assert_called_once_with(123, 'Test Wallet', '0x123', 'encrypted_key', chain_id=1)
         update.message.reply_text.assert_called_with("✅ Wallet 'Test Wallet' added successfully!")
 
     @patch('src.main.add_wallet')

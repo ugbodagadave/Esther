@@ -89,3 +89,12 @@ CREATE TABLE portfolio_history (
 - A new Git branch named `feature/portfolio-performance` will be created for this feature.
 - All commits will follow the established conventions, with clear and descriptive messages.
 - The branch will be merged into `main` only after all tests have passed and the feature has been manually verified by the user.
+
+## 7. Future Enhancements
+
+The `/api/v5/dex/historical-index-price` endpoint can be used to build several other valuable features in the future:
+
+-   **Individual Asset Performance Tracking**: Allow users to ask questions like, "How did my ETH holdings perform this month?" to get a detailed performance analysis for a single asset.
+-   **Simple Price Charts**: Generate and display simple price charts directly in the chat for a given token and time period (e.g., "Show me a 30-day price chart for BTC").
+-   **Enhanced Market Insights**: Provide more detailed market analysis, such as Simple Moving Averages (SMA) and historical volatility, to help users make more informed decisions.
+-   **Backtesting Simple Trading Strategies**: Allow users to test simple trading strategies, such as dollar-cost averaging, to see how they would have performed over a given period.

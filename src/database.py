@@ -175,7 +175,7 @@ def add_wallet(user_id, wallet_name, wallet_address, encrypted_private_key, chai
                 (internal_user_id, wallet_name, wallet_address, encrypted_private_key, chain_id)
             )
             conn.commit()
-            logger.info(f"Wallet {wallet_name} added for user {user_id}.")
+            logger.info(f"Wallet {wallet_name} added for user {internal_user_id}.")
     except IntegrityError as e:
         if e.pgcode == '23505': # unique_violation
             raise WalletAlreadyExistsError(f"Wallet with address {wallet_address} already exists.")
