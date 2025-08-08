@@ -1,9 +1,9 @@
 # Project Progress: Esther
 
 ## 1. Current Status
-**Phase 2: Stabilization and Core Feature Hardening**
+**Phase 3: Feature Expansion**
 
-The project has moved into a stabilization phase. The immediate focus is on ensuring the reliability of core features and documenting the system architecture and recent changes.
+The project is moving into a feature expansion phase. The immediate focus is on implementing the "Simple Price Charts" feature.
 
 ## 2. What Works
 - **Complete Project Foundation**: All core documentation (`Memory Bank`, `prd.md`, `plan.md`, etc.) is in place.
@@ -36,6 +36,7 @@ The project has moved into a stabilization phase. The immediate focus is on ensu
     - Detailed logging for OKX API endpoints is added.
 
 ## 3. What's Left to Build
+- **Simple Price Charts**: Implement the new feature to allow users to request and view simple price charts for a given token and time period.
 - **On-Demand Education**: An integrated learning module to explain DeFi concepts on the fly.
 - **Real-time Notifications**: Begin work on the observer pattern for real-time market alerts.
 

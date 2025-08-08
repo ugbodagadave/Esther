@@ -1,7 +1,7 @@
 # Active Context: Esther
 
 ## 1. Current Focus
-The current focus is on completing the bug fix for the Portfolio Performance Tracker feature and preparing for the next feature development cycle.
+The current focus is on planning the implementation of the new "Simple Price Charts" feature.
 
 ## 2. Recent Changes & Decisions
 - **Portfolio Performance Bug Fix**: Fixed a critical bug in the `portfolio_performance` function where the time period was not being correctly parsed from user input. The new implementation is more robust and handles a wider variety of user inputs (e.g., "14 days", "28d", "last month").
@@ -17,7 +17,8 @@ The current focus is on completing the bug fix for the Portfolio Performance Tra
 - **Portfolio Service Enhancement**: The `suggest_rebalance` function in `PortfolioService` has been enhanced to calculate the `from_amount` in the token's native units, which is a prerequisite for executing rebalance plans.
 
 ## 3. Next Steps
-1.  **On-Demand Education**: Begin work on an integrated learning module to explain DeFi concepts on the fly.
+1.  **Implement Simple Price Charts**: Begin work on the new feature to allow users to request and view simple price charts for a given token and time period.
+2.  **On-Demand Education**: Begin work on an integrated learning module to explain DeFi concepts on the fly.
 
 ## 4. Active Learnings & Insights
 - Robust input parsing is crucial for a good user experience. A simple regex or string matching is often not enough to handle the variety of user inputs.
