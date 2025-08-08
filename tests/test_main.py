@@ -13,8 +13,33 @@ from src.main import (
     confirm_swap,
     received_wallet_address,
     received_private_key,
-    # Add other handlers you need to test
+    _parse_period_to_days,
+    portfolio_performance,
 )
+
+class TestPeriodParsing(unittest.TestCase):
+    def test_parse_period_to_days(self):
+        """Test the _parse_period_to_days helper function with various inputs."""
+        test_cases = {
+            "7d": 7,
+            "14 days": 14,
+            "28d": 28,
+            "30 days": 30,
+            "last month": 30,
+            "1 month": 30,
+            "last year": 365,
+            "1 year": 365,
+            "1y": 365,
+            "90d": 90,
+            "1": 1,
+            "invalid": 7,  # Default
+            None: 7,       # Default
+            "": 7,         # Default
+        }
+
+        for period_str, expected_days in test_cases.items():
+            with self.subTest(period_str=period_str):
+                self.assertEqual(_parse_period_to_days(period_str), expected_days)
 
 class TestMainHandlers(unittest.IsolatedAsyncioTestCase):
 

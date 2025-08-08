@@ -2,7 +2,9 @@ import os
 import logging
 import asyncio
 import sys
+import re
 from pathlib import Path
+from datetime import datetime, timedelta
 
 # Add project root to the Python path
 project_root = Path(__file__).resolve().parent.parent
@@ -492,30 +494,41 @@ async def insights(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     insights_text = insights_client.generate_insights(user_id)
     await update.message.reply_text(insights_text)
 
+def _parse_period_to_days(period_str: str) -> int:
+    """
+    Parses a flexible time period string into a number of days.
+    Handles formats like "7d", "14 days", "last month", "1 year".
+    """
+    if not isinstance(period_str, str):
+        return 7  # Default
+
+    period_str = period_str.lower().strip()
+
+    # Handle "last month", "last year"
+    if "month" in period_str:
+        return 30
+    if "year" in period_str:
+        return 365
+
+    # Handle "7d", "14days", "1y" etc.
+    match = re.match(r"(\d+)\s*(d|day|days|y|year|years)?", period_str)
+    if match:
+        unit = match.group(2)
+        if unit in ('y', 'year', 'years'):
+            return int(match.group(1)) * 365
+        try:
+            return int(match.group(1))
+        except (ValueError, TypeError):
+            pass
+            
+    return 7 # Default if no other format matches
+
 async def portfolio_performance(update: Update, context: ContextTypes.DEFAULT_TYPE, entities: dict):
     """Handles the get_portfolio_performance intent."""
     user = update.effective_user
-    period = entities.get("period", "7d") # Default to 7 days
+    period_str = entities.get("period", "7d") # Default to 7 days
     
-    # Convert period string to days
-    period_days = 7 # Default
-    if isinstance(period, str):
-        period = period.lower()
-        if "month" in period:
-            period_days = 30
-        elif "year" in period:
-            period_days = 365
-        elif "d" in period:
-            try:
-                period_days = int(period.replace('d', ''))
-            except (ValueError, TypeError):
-                period_days = 7
-        else:
-            try:
-                # Handle cases like "7 days"
-                period_days = int(''.join(filter(str.isdigit, period)))
-            except (ValueError, TypeError):
-                period_days = 7
+    period_days = _parse_period_to_days(period_str)
 
     await update.message.reply_text(f"Calculating your portfolio performance for the last {period_days} days...")
 
