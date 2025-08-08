@@ -872,7 +872,6 @@ async def startup_event():
         # Start the bot application to handle webhook updates
         await bot_app.initialize()
         await bot_app.start()
-        await bot_app.updater.start_polling()
     else:
         logger.info("WEBHOOK_URL not set. Starting in polling mode.")
         # Start the bot application in polling mode
