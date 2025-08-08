@@ -27,6 +27,7 @@ graph TD
 - **Strategy Pattern**: The choice between using Gemini Pro and Gemini Flash is implemented using the Strategy pattern. A context class decides which model to use based on the complexity of the user's query, allowing for dynamic and efficient allocation of AI resources.
 - **Singleton Pattern**: For managing connections to the database and external APIs. This ensures that only one connection instance is created, which is crucial for managing resources efficiently.
 - **Observer Pattern**: The custom alert system uses this pattern. The market monitoring service is the "subject," and user alerts are "observers." When a market condition matches an alert's criteria, the observers are notified, and a message is sent to the user.
+- **Custom Exceptions**: The application uses a set of custom exception classes to handle specific error conditions gracefully. This allows for more granular error handling and user-friendly error messages.
 
 ## 3. Deployment Strategy
 - **Development (Current)**: The application runs in a **polling mode** using a simple `python src/main.py` command. This is a stable, single-process method ideal for development and debugging on Render's free tier.

@@ -1,9 +1,11 @@
 # Active Context: Esther
 
 ## 1. Current Focus
-The current focus is on improving the UI of the secure wallet input web app. The previous task to implement the secure wallet input feature has been completed and is now stable.
+The current focus is on improving the error handling of the application. The previous task to improve the UI of the secure wallet input web app has been completed and is now stable.
 
 ## 2. Recent Changes & Decisions
+- **Error Handling**: Implemented a robust error handling system for the wallet addition feature. This includes creating custom exceptions, refactoring the database and main application logic to handle these exceptions gracefully, and adding comprehensive unit tests to ensure the new system works as expected.
+- **UI Improvements**: The UI of the secure wallet input web app has been updated to a dark-themed, neo-brutalism design.
 - **Concurrency Fix**: Resolved a critical bug that caused the bot to process messages twice by removing the redundant polling loop when a webhook is active.
 - **Secure Wallet Input**: Implemented a secure web app for private key entry, enhancing security by preventing sensitive data from being stored in chat history.
 - **`DRY_RUN_MODE` Refinement Complete**: The `DRY_RUN_MODE` feature has been refactored to ensure consistent application across the codebase. The configuration has been centralized in `src/constants.py`, and comprehensive unit and integration tests have been added to verify its behavior. All relevant documentation has been updated.
