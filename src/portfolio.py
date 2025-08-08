@@ -141,6 +141,58 @@ class PortfolioService:
         alloc = {a["symbol"]: round(a["value_usd"] / total * 100, 2) for a in assets}
         return alloc
 
+    def get_portfolio_performance(self, user_id: int, period_days: int = 7) -> Dict:
+        """
+        Calculates portfolio performance over a specified period.
+        """
+        conn = get_db_connection()
+        if conn is None:
+            return {}
+        try:
+            with conn.cursor() as cur:
+                # 1. Get current portfolio value
+                current_snapshot = self.get_snapshot(user_id)
+                current_value = Decimal(str(current_snapshot.get("total_value_usd", 0)))
+
+                # 2. Get historical portfolio value
+                cur.execute(
+                    """
+                    SELECT total_value_usd
+                    FROM portfolio_history
+                    WHERE user_id = (SELECT id FROM users WHERE telegram_id = %s)
+                    AND snapshot_date <= (CURRENT_DATE - INTERVAL '%s days')
+                    ORDER BY snapshot_date DESC
+                    LIMIT 1;
+                    """,
+                    (user_id, period_days),
+                )
+                result = cur.fetchone()
+                past_value = Decimal(str(result[0])) if result else Decimal("0")
+
+                if past_value == 0:
+                    return {
+                        "current_value": float(current_value),
+                        "past_value": 0,
+                        "absolute_change": float(current_value),
+                        "percentage_change": "inf" if current_value > 0 else 0,
+                    }
+
+                # 3. Calculate performance
+                absolute_change = current_value - past_value
+                percentage_change = (absolute_change / past_value) * 100
+
+                return {
+                    "current_value": float(current_value),
+                    "past_value": float(past_value),
+                    "absolute_change": float(absolute_change),
+                    "percentage_change": float(percentage_change),
+                }
+        except Exception as e:
+            logger.error("get_portfolio_performance error: %s", e)
+            return {}
+        finally:
+            conn.close()
+
     def get_roi(self, telegram_id: int, window_days: int = 30) -> float:
         """Calculate simple ROI over *window_days* based on historical price data.
 

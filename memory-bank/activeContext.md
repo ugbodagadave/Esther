@@ -1,9 +1,14 @@
 # Active Context: Esther
 
 ## 1. Current Focus
-The current focus is on improving the error handling of the application. The previous task to improve the UI of the secure wallet input web app has been completed and is now stable.
+The current focus is on ensuring the stability and correctness of the newly implemented "Simple Price Charts" feature.
 
 ## 2. Recent Changes & Decisions
+- **Price Chart Bug Fix**: Fixed a critical bug where the price chart for BTC was showing incorrect prices. The issue was caused by using the WBTC token address instead of the correct instrument ID for BTC. The `get_historical_price` function has been refactored to handle both instrument IDs and token addresses, using the correct API endpoint for each.
+- **Matplotlib Backend**: Configured `matplotlib` to use the `Agg` backend to prevent GUI-related errors in a server environment.
+- **Simple Price Charts Feature**: Implemented the core feature, including the NLP intent, data fetching, chart generation, and Telegram bot handler.
+- **Portfolio Performance Bug Fix**: Fixed a critical bug in the `portfolio_performance` function where the time period was not being correctly parsed from user input. The new implementation is more robust and handles a wider variety of user inputs (e.g., "14 days", "28d", "last month").
+- **Portfolio Performance Tracker**: Implemented the core feature, including database schema changes, new API client methods, and the conversational flow.
 - **Error Handling**: Implemented a robust error handling system for the wallet addition feature. This includes creating custom exceptions, refactoring the database and main application logic to handle these exceptions gracefully, and adding comprehensive unit tests to ensure the new system works as expected.
 - **UI Improvements**: The UI of the secure wallet input web app has been updated to a dark-themed, neo-brutalism design.
 - **Concurrency Fix**: Resolved a critical bug that caused the bot to process messages twice by removing the redundant polling loop when a webhook is active.
@@ -18,6 +23,9 @@ The current focus is on improving the error handling of the application. The pre
 1.  **On-Demand Education**: Begin work on an integrated learning module to explain DeFi concepts on the fly.
 
 ## 4. Active Learnings & Insights
+- API endpoints can change, and it's important to have a robust testing and validation process to catch these changes early.
+- Non-interactive backends for libraries like `matplotlib` are essential for server-side applications.
+- Robust input parsing is crucial for a good user experience. A simple regex or string matching is often not enough to handle the variety of user inputs.
 - Decimal precision is a critical detail in DeFi applications. Hardcoding values is risky; dynamic lookup is essential.
 - Deployment environments (like Render) can have subtle differences from local setups. Understanding how WSGI servers like Gunicorn interact with `asyncio` applications is vital for debugging.
 - A stable development environment is a prerequisite for productive feature development. It was necessary to pause and fix the deployment before other work could continue.

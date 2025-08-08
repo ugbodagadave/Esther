@@ -13,8 +13,34 @@ from src.main import (
     confirm_swap,
     received_wallet_address,
     received_private_key,
-    # Add other handlers you need to test
+    _parse_period_to_days,
+    portfolio_performance,
+    get_price_chart_intent,
 )
+
+class TestPeriodParsing(unittest.TestCase):
+    def test_parse_period_to_days(self):
+        """Test the _parse_period_to_days helper function with various inputs."""
+        test_cases = {
+            "7d": 7,
+            "14 days": 14,
+            "28d": 28,
+            "30 days": 30,
+            "last month": 30,
+            "1 month": 30,
+            "last year": 365,
+            "1 year": 365,
+            "1y": 365,
+            "90d": 90,
+            "1": 1,
+            "invalid": 7,  # Default
+            None: 7,       # Default
+            "": 7,         # Default
+        }
+
+        for period_str, expected_days in test_cases.items():
+            with self.subTest(period_str=period_str):
+                self.assertEqual(_parse_period_to_days(period_str), expected_days)
 
 class TestMainHandlers(unittest.IsolatedAsyncioTestCase):
 
@@ -232,7 +258,7 @@ class TestMainHandlers(unittest.IsolatedAsyncioTestCase):
         self.assertIn("web_app", kwargs['reply_markup'].inline_keyboard[0][0].to_dict())
         self.assertEqual(result, 9) # AWAIT_WEB_APP_DATA
 
-    @patch('src.main.get_db_connection')
+    @patch('src.database.get_db_connection')
     @patch('src.main.encrypt_data', return_value=b"encrypted_key")
     async def test_received_private_key_saves_wallet(self, mock_encrypt, mock_get_conn):
         """Test that received_private_key saves the wallet."""
@@ -253,12 +279,46 @@ class TestMainHandlers(unittest.IsolatedAsyncioTestCase):
 
         # Assert
         mock_encrypt.assert_called_once_with("test_private_key")
-        mock_cur.execute.assert_called_with(
-            "INSERT INTO wallets (user_id, name, address, encrypted_private_key) VALUES (%s, %s, %s, %s);",
-            (1, "Test Wallet", "0x123", b"encrypted_key")
-        )
+        
+        # Get the actual SQL query and arguments from the mock
+        actual_call = mock_cur.execute.call_args
+        self.assertIsNotNone(actual_call)
+        
+        # Clean up the SQL strings for comparison
+        expected_sql = "INSERT INTO wallets (user_id, name, address, encrypted_private_key, chain_id) VALUES (%s, %s, %s, %s, %s);"
+        actual_sql = ' '.join(actual_call.args[0].split())
+        
+        self.assertEqual(expected_sql, actual_sql)
+        self.assertEqual(actual_call.args[1], (1, "Test Wallet", "0x123", b"encrypted_key", 1))
+        
         update.message.reply_text.assert_called_once_with("✅ Wallet 'Test Wallet' added successfully!")
         self.assertEqual(result, ConversationHandler.END)
+
+    @patch('src.main.generate_price_chart')
+    @patch('src.main.okx_client.get_historical_price')
+    async def test_get_price_chart_intent(self, mock_get_historical_price, mock_generate_price_chart):
+        """Test the get_price_chart intent handler."""
+        # Arrange
+        update, context = await self._create_update_context("price chart for btc")
+        entities = {"symbol": "BTC", "period": "7d"}
+
+        mock_get_historical_price.return_value = {
+            "success": True,
+            "data": {"prices": [{"price": "60000", "time": "1672531200000"}]}
+        }
+        mock_generate_price_chart.return_value = b"fake_chart_image"
+        update.message.reply_photo = AsyncMock()
+
+        # Act
+        await get_price_chart_intent(update, context, entities)
+
+        # Assert
+        mock_get_historical_price.assert_called_once()
+        mock_generate_price_chart.assert_called_once()
+        update.message.reply_photo.assert_called_once_with(
+            photo=b"fake_chart_image",
+            caption="Price chart for BTC (7d)"
+        )
 
 if __name__ == '__main__':
     unittest.main()

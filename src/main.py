@@ -2,7 +2,9 @@ import os
 import logging
 import asyncio
 import sys
+import re
 from pathlib import Path
+from datetime import datetime, timedelta
 
 # Add project root to the Python path
 project_root = Path(__file__).resolve().parent.parent
@@ -48,6 +50,7 @@ from src.encryption import encrypt_data, decrypt_data
 from src.insights import InsightsClient
 from src.exceptions import WalletAlreadyExistsError, InvalidWalletAddressError, DatabaseConnectionError
 from src.portfolio import PortfolioService
+from src.chart_generator import generate_price_chart
 from src.constants import (
     TOKEN_ADDRESSES,
     TOKEN_DECIMALS,
@@ -183,6 +186,14 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int
     elif intent == "execute_rebalance":
         return await rebalance_portfolio_start(update, context)
 
+    elif intent == "get_portfolio_performance":
+        await portfolio_performance(update, context, entities)
+        return ConversationHandler.END
+
+    elif intent == "get_price_chart":
+        await get_price_chart_intent(update, context, entities)
+        return ConversationHandler.END
+
     elif intent == "greeting":
         await update.message.reply_text("Hello! How can I assist you with your trades today?")
         return ConversationHandler.END
@@ -190,6 +201,36 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int
     else:
         await update.message.reply_text("I'm not sure how to help with that. You can ask me for the price of a token or to buy a token.")
         return ConversationHandler.END
+
+
+async def get_price_chart_intent(update: Update, context: ContextTypes.DEFAULT_TYPE, entities: dict):
+    """Handles the get_price_chart intent."""
+    symbol = entities.get("symbol")
+    period = entities.get("period", "7d")  # Default to 7 days
+
+    if not symbol:
+        await update.message.reply_text("Please specify a token symbol (e.g., BTC, ETH).")
+        return
+
+    token_address = TOKEN_ADDRESSES.get(symbol.upper())
+    if not token_address:
+        await update.message.reply_text(f"Sorry, I don't have the address for the token {symbol.upper()}.")
+        return
+
+    await update.message.reply_text(f"Generating price chart for {symbol.upper()} over the last {period}...")
+
+    # Assuming chainId 1 (Ethereum) for now
+    chain_id = 1
+    historical_data_response = okx_client.get_historical_price(token_address, chain_id, period)
+
+    if not historical_data_response.get("success"):
+        await update.message.reply_text(f"Sorry, I couldn't fetch historical data. Error: {historical_data_response.get('error')}")
+        return
+
+    chart_image = generate_price_chart(historical_data_response['data'], symbol.upper(), period)
+
+    await update.message.reply_photo(photo=chart_image, caption=f"Price chart for {symbol.upper()} ({period})")
+
 
 async def get_price_intent(update: Update, context: ContextTypes.DEFAULT_TYPE, entities: dict):
     """Handles the get_price intent."""
@@ -488,6 +529,70 @@ async def insights(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     insights_text = insights_client.generate_insights(user_id)
     await update.message.reply_text(insights_text)
 
+def _parse_period_to_days(period_str: str) -> int:
+    """
+    Parses a flexible time period string into a number of days.
+    Handles formats like "7d", "14 days", "last month", "1 year".
+    """
+    if not isinstance(period_str, str):
+        return 7  # Default
+
+    period_str = period_str.lower().strip()
+
+    # Handle "last month", "last year"
+    if "month" in period_str:
+        return 30
+    if "year" in period_str:
+        return 365
+
+    # Handle "7d", "14days", "1y" etc.
+    match = re.match(r"(\d+)\s*(d|day|days|y|year|years)?", period_str)
+    if match:
+        unit = match.group(2)
+        if unit in ('y', 'year', 'years'):
+            return int(match.group(1)) * 365
+        try:
+            return int(match.group(1))
+        except (ValueError, TypeError):
+            pass
+            
+    return 7 # Default if no other format matches
+
+async def portfolio_performance(update: Update, context: ContextTypes.DEFAULT_TYPE, entities: dict):
+    """Handles the get_portfolio_performance intent."""
+    user = update.effective_user
+    period_str = entities.get("period", "7d") # Default to 7 days
+    
+    period_days = _parse_period_to_days(period_str)
+
+    await update.message.reply_text(f"Calculating your portfolio performance for the last {period_days} days...")
+
+    performance_data = portfolio_service.get_portfolio_performance(user.id, period_days)
+
+    if not performance_data:
+        await update.message.reply_text("Could not calculate portfolio performance. Please ensure you have a portfolio history.")
+        return
+
+    current_value = performance_data.get("current_value", 0)
+    past_value = performance_data.get("past_value", 0)
+    absolute_change = performance_data.get("absolute_change", 0)
+    percentage_change = performance_data.get("percentage_change", 0)
+
+    if percentage_change == "inf":
+        percentage_change_str = "∞"
+    else:
+        percentage_change_str = f"{percentage_change:+.2f}%"
+
+    response_message = (
+        f"📈 *Portfolio Performance ({period_days} Days)*\n\n"
+        f"Current Value: `${current_value:,.2f}`\n"
+        f"Past Value: `${past_value:,.2f}`\n"
+        f"Absolute Change: `${absolute_change:,.2f}`\n"
+        f"Percentage Change: `{percentage_change_str}`"
+    )
+
+    await update.message.reply_text(response_message, parse_mode='Markdown')
+
 async def rebalance_portfolio_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Starts the portfolio rebalance conversation."""
     user = update.effective_user
@@ -599,7 +704,7 @@ async def received_private_key(update: Update, context: ContextTypes.DEFAULT_TYP
 
         encrypted_private_key = encrypt_data(private_key)
         
-        add_wallet(user.id, wallet_name, wallet_address, encrypted_private_key)
+        add_wallet(user.id, wallet_name, wallet_address, encrypted_private_key, chain_id=1)
         
         await update.message.reply_text(f"✅ Wallet '{wallet_name}' added successfully!")
 

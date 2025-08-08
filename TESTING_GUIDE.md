@@ -81,6 +81,10 @@ Here is a comprehensive guide to testing the Esther bot's features using natural
 *   **Your Message:** `/portfolio` or `Show me my assets`
 *   **Expected Bot Response:** A formatted message showing a list of all tokens in your wallet, their quantities, and their current value in USD, along with a total portfolio value.
 
+**Test 2: Portfolio Performance**
+*   **Your Message:** `How has my portfolio performed over the last 7 days?`
+*   **Expected Bot Response:** A message showing the portfolio's performance over the last 7 days, including the current value, past value, absolute change, and percentage change.
+
 ---
 
 ### 8. Personalized Market Insights
@@ -111,7 +115,15 @@ Here is a comprehensive guide to testing the Esther bot's features using natural
 
 ---
 
-### 11. Testing with DRY_RUN_MODE
+### 11. Price Charts
+
+**Test 1: Generate Price Chart**
+*   **Your Message:** `Show me the price chart for BTC over the last 7 days`
+*   **Expected Bot Response:** A PNG image of the price chart for BTC over the last 7 days, with a caption.
+
+---
+
+### 12. Testing with DRY_RUN_MODE
 
 **Test 1: Verify Dry Run is Active**
 *   **Setup:** Ensure `DRY_RUN_MODE="True"` in your `.env` file.

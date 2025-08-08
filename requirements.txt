@@ -9,3 +9,4 @@ pytest
 gunicorn
 uvicorn
 fastapi
+matplotlib

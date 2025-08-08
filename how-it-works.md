@@ -103,6 +103,7 @@ The NLP module uses Google's Gemini models to parse user messages into structure
 - `show_portfolio`: "What's in my portfolio?", "Show me my assets"
 - `get_insights`: "Give me market insights", "What's the market analysis?"
 - `execute_rebalance`: "Rebalance my portfolio", "Execute the rebalance plan"
+- `get_price_chart`: "Show me the price chart for BTC", "Chart for ETH over 7d"
 
 ### 4.2 Two-Tier Model Selection Strategy
 Esther intelligently chooses between Gemini models based on task complexity:
@@ -182,8 +183,18 @@ Esther now keeps a real-time view of every user's on-chain balances **without re
 ### Diversification & Performance Analytics
 * `get_diversification()` – returns a `{symbol: %}` map based on last valuation.
 * `get_roi(window_days)` – naive ROI using the first candle from `/api/v5/dex/market/candlesticks-history` vs current value.
+* `get_portfolio_performance(period_days)` – calculates portfolio performance over a specified period by comparing the current portfolio value with the historical value stored in the `portfolio_history` table.
 
-## 8. Rebalance Engine
+## 8. Price Chart Generation
+
+The price chart feature allows users to visualize historical price data for a token.
+
+1.  **Intent Recognition**: The `get_price_chart` intent is recognized by the NLP module, which also extracts the token `symbol` and `period` (e.g., "7d", "1m").
+2.  **Data Fetching**: The `OKXClient` intelligently selects the correct endpoint based on the token type. For instrument IDs like 'BTC-USD', it uses `/api/v5/market/history-candles`. For EVM token addresses, it uses `/api/v5/wallet/token/historical-price`.
+3.  **Chart Rendering**: The `matplotlib` library is used to generate a PNG image of the price chart from the historical data.
+4.  **Response**: The generated chart image is sent back to the user via Telegram.
+
+## 9. Rebalance Engine
 
 `PortfolioService.suggest_rebalance()` generates a **one-hop trade plan** to align the portfolio with a target allocation:
 
@@ -202,7 +213,7 @@ Algorithm (greedy, USD based):
 
 A future iteration will translate the plan into a sequence of OKX aggregator swaps with the existing confirmation workflow.
 
-## 9. Updated Component Diagram
+## 10. Updated Component Diagram
 
 ```mermaid
 graph TD
@@ -232,7 +243,7 @@ graph TD
     NLPClient --> H
 ```
 
-## 10. Temporary Admin Tools (For Development)
+## 11. Temporary Admin Tools (For Development)
 During development, you may need to clear the PostgreSQL database to reset all users, wallets, and portfolio data. A temporary, secure admin page has been added for this purpose.
 
 To clear the database:
@@ -245,23 +256,23 @@ To clear the database:
 
 **IMPORTANT**: This endpoint is intended for development and testing only. It drops all tables and re-initializes the schema. It should be protected and used with caution.
 
-## 11. Testing Strategy
+## 12. Testing Strategy
 
 Esther employs a comprehensive testing strategy to ensure reliability and stability:
 
-### 11.1 Unit Testing
+### 12.1 Unit Testing
 - **`tests/test_main.py`**: Tests Telegram bot handlers, command routing, and conversational flows
 - **`tests/test_nlp.py`**: Tests NLP client functionality, model initialization, and intent parsing
 - **`tests/test_portfolio.py`**: Tests portfolio service operations and API integrations
 - **`tests/test_okx_client.py`**: Tests OKX API client functionality
 - **`tests/test_database.py`**: Tests database operations and schema management
 
-### 11.2 End-to-End Testing
+### 12.2 End-to-End Testing
 - **`e2e_test.py`**: Live API testing with real Gemini and OKX endpoints
 - Tests portfolio sync, wallet management, and conversational NLP
 - Validates complete user workflows from natural language to execution
 
-### 11.3 Testing Best Practices
+### 12.3 Testing Best Practices
 - All changes are tested before committing
 - Mock external dependencies to ensure isolated testing
 - Use short, descriptive commit messages

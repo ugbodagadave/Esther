@@ -58,6 +58,8 @@ class NLPClient:
         - show_portfolio: User wants to see their portfolio.
         - get_insights: User wants to get market or portfolio insights.
         - execute_rebalance: User wants to execute a portfolio rebalance.
+        - get_portfolio_performance: User wants to know their portfolio performance.
+        - get_price_chart: User wants to see a price chart for a token.
         
         For trading intents (buy, sell), extract the following entities if present:
         - symbol: The token symbol (e.g., ETH, BTC).
@@ -65,6 +67,13 @@ class NLPClient:
         - currency: The currency to use for the transaction.
         - source_chain: The source blockchain (if specified).
         - destination_chain: The destination blockchain (if specified).
+
+        For get_portfolio_performance, extract the following entities if present:
+        - period: The time period (e.g., "7 days", "last month", "30d").
+
+        For get_price_chart, extract the following entities if present:
+        - symbol: The token symbol (e.g., "BTC", "ETH").
+        - period: The time period for the chart (e.g., "24h", "7d", "1m").
 
         Return the output as a JSON object with "intent" and "entities" keys.
 
@@ -77,6 +86,8 @@ class NLPClient:
         Example for show_portfolio: {{"intent": "show_portfolio", "entities": {{}}}}
         Example for get_insights: {{"intent": "get_insights", "entities": {{}}}}
         Example for execute_rebalance: {{"intent": "execute_rebalance", "entities": {{}}}}
+        Example for get_portfolio_performance: {{"intent": "get_portfolio_performance", "entities": {{"period": "7d"}}}}
+        Example for get_price_chart: {{"intent": "get_price_chart", "entities": {{"symbol": "BTC", "period": "7d"}}}}
 
         Query: "{text}"
         """

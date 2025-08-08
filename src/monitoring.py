@@ -35,15 +35,20 @@ async def sync_all_portfolios():
 
     try:
         with conn.cursor() as cur:
-            cur.execute("SELECT telegram_id FROM users;")
+            cur.execute("SELECT id, telegram_id FROM users;")
             user_rows = cur.fetchall()
 
         total = len(user_rows)
         success = 0
-        for (telegram_id,) in user_rows:
+        for (user_pk, telegram_id) in user_rows:
             try:
                 if portfolio_service.sync_balances(telegram_id):
                     success += 1
+                    # After a successful sync, save a snapshot
+                    snapshot = portfolio_service.get_snapshot(telegram_id)
+                    if snapshot and "total_value_usd" in snapshot:
+                        from src.database import save_portfolio_snapshot
+                        save_portfolio_snapshot(user_pk, snapshot["total_value_usd"])
             except Exception as exc:
                 logger.warning("Portfolio sync failed for %s: %s", telegram_id, exc)
 

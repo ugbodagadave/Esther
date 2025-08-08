@@ -13,6 +13,7 @@ from src.okx_explorer import OKXExplorer
 from src.portfolio import PortfolioService
 from src.database import initialize_database, get_db_connection
 from src.encryption import encrypt_data
+from src.chart_generator import generate_price_chart
 import traceback
 
 
@@ -284,6 +285,97 @@ def test_e2e_rebalance_suggestion():
         traceback.print_exc()
 
 
+def test_e2e_price_chart():
+    """Test the full price chart workflow."""
+    print("\n--- E2E Price Chart ---")
+    try:
+        nlp_client = NLPClient()
+        okx_client = OKXClient()
+
+        # Test NLP intent
+        print("    Query: 'show me the price chart for btc'")
+        intent_data = nlp_client.parse_intent("show me the price chart for btc")
+        if intent_data.get('intent') == 'get_price_chart' and intent_data.get('entities', {}).get('symbol') == 'BTC':
+            print("    ✅ SUCCESS: Correctly parsed 'get_price_chart' intent.")
+        else:
+            print(f"    ❌ FAILURE: Incorrectly parsed 'get_price_chart'. Got: {intent_data}")
+            return
+
+        # Test OKX historical data
+        print("    Query: Fetching historical data for BTC...")
+        historical_data = okx_client.get_historical_price(
+            token_address="BTC-USD", # Use the instrument ID for BTC
+            chainId=1, # Not used for instrument IDs, but required by the function signature
+            period="7d"
+        )
+
+        if historical_data.get("success"):
+            print("    ✅ SUCCESS: OKX historical price API responded successfully.")
+            # Test chart generation
+            print("    Query: Generating price chart...")
+            chart_image = generate_price_chart(historical_data['data'], "BTC", "7d")
+            if isinstance(chart_image, bytes) and len(chart_image) > 0:
+                print("    ✅ SUCCESS: Price chart generated successfully.")
+            else:
+                print("    ❌ FAILURE: Price chart generation failed.")
+        else:
+            print("    ❌ FAILURE: OKX historical price API returned an error.")
+            print(f"    -> Error: {historical_data.get('error')}")
+
+    except Exception as e:
+        print(f"    ❌ FAILURE: Price chart test encountered an error: {e}")
+        traceback.print_exc()
+
+
+def test_e2e_portfolio_performance():
+    """Test the full portfolio performance workflow."""
+    print("\n--- E2E Portfolio Performance ---")
+    try:
+        portfolio_service = PortfolioService()
+        dummy_telegram_id = 999999999 # Same dummy user from portfolio sync test
+        
+        # Ensure the user has a portfolio to test
+        synced = portfolio_service.sync_balances(dummy_telegram_id)
+        if not synced:
+            raise Exception("Balance sync failed before performance test")
+
+        # Save a snapshot for today
+        snapshot = portfolio_service.get_snapshot(dummy_telegram_id)
+        if snapshot and snapshot.get("total_value_usd") > 0:
+            conn = get_db_connection()
+            if not conn:
+                raise Exception("Could not connect to db to save snapshot")
+            with conn.cursor() as cur:
+                cur.execute("SELECT id FROM users WHERE telegram_id = %s;", (dummy_telegram_id,))
+                user_pk = cur.fetchone()[0]
+                # Save a fake historical record for 8 days ago
+                cur.execute(
+                    """
+                    INSERT INTO portfolio_history (user_id, total_value_usd, snapshot_date)
+                    VALUES (%s, %s, CURRENT_DATE - INTERVAL '8 days')
+                    ON CONFLICT (user_id, snapshot_date) DO UPDATE SET total_value_usd = EXCLUDED.total_value_usd;
+                    """,
+                    (user_pk, snapshot['total_value_usd'] * 0.9) # Simulate a 10% gain
+                )
+                conn.commit()
+            conn.close()
+
+        print("    Query: Calculating 7-day portfolio performance...")
+        performance = portfolio_service.get_portfolio_performance(dummy_telegram_id, period_days=7)
+
+        if performance:
+            print("    ✅ SUCCESS: Portfolio performance calculated successfully.")
+            print(f"    -> Performance Data: {performance}")
+        else:
+            print("    ❌ FAILURE: Portfolio performance calculation failed.")
+
+    except Exception as e:
+        print(f"    ❌ FAILURE: Portfolio performance test encountered an error: {e}")
+        traceback.print_exc()
+
+
 if __name__ == "__main__":
     run_e2e_test()
     test_e2e_rebalance_suggestion()
+    test_e2e_portfolio_performance()
+    test_e2e_price_chart()
