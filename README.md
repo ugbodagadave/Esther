@@ -19,7 +19,7 @@ Decentralized Finance (DeFi) can be confusing. Our goal with Esther is to make i
     -   **Track & Rebalance Portfolio**: "Show me my portfolio" or "What's in my wallet?" displays live balances + USD value.
     -   **Suggest Rebalance Plan**: "Suggest a rebalance to 50% BTC and 50% ETH" to get a plan for aligning your assets.
     -   **Execute Rebalance Plan**: "Rebalance my portfolio" or "Execute the rebalance plan" to align your assets with a target allocation.
--   **Manage Your Wallets**: "Show me my wallets" or "I want to add a new wallet" - manage your wallet addresses securely with encrypted private keys.
+-   **Manage Your Wallets**: "Show me my wallets" or "I want to add a new wallet" - manage your wallet addresses securely with encrypted private keys entered through a secure web interface.
 -   **Get Smart Insights**: "Give me market insights" or "What's the market analysis?" - get personalized advice and analysis on your crypto holdings.
 -   **Trade Safely**: Every trade must be confirmed by you, so you never have to worry about accidental transactions.
 -   **Stay Updated with Price Alerts**: Set custom alerts for any cryptocurrency (e.g., "Alert me if BTC goes above 70000").

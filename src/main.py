@@ -9,7 +9,8 @@ project_root = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(project_root))
 
 from fastapi import FastAPI, Request, HTTPException
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from fastapi.staticfiles import StaticFiles
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo
 from telegram.ext import (
     Application,
     CommandHandler,
@@ -61,7 +62,7 @@ portfolio_service = PortfolioService()
 
 # --- Conversation Handler States ---
 AWAIT_CONFIRMATION = 1
-AWAIT_WALLET_NAME, AWAIT_WALLET_ADDRESS, AWAIT_PRIVATE_KEY = 2, 3, 4
+AWAIT_WALLET_NAME, AWAIT_WALLET_ADDRESS, AWAIT_PRIVATE_KEY, AWAIT_WEB_APP_DATA = 2, 3, 4, 9
 AWAIT_ALERT_SYMBOL, AWAIT_ALERT_CONDITION, AWAIT_ALERT_PRICE = 5, 6, 7
 AWAIT_REBALANCE_CONFIRMATION = 8
 
@@ -571,15 +572,22 @@ async def received_wallet_name(update: Update, context: ContextTypes.DEFAULT_TYP
     return AWAIT_WALLET_ADDRESS
 
 async def received_wallet_address(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """Receives the wallet address and asks for the private key."""
+    """Receives the wallet address and sends a button to open the web app for private key entry."""
     context.user_data['wallet_address'] = update.message.text
-    await update.message.reply_text("Great. Now, please provide the private key. This will be encrypted and stored securely.")
-    return AWAIT_PRIVATE_KEY
+    
+    keyboard = [[InlineKeyboardButton("Enter Private Key Securely", web_app=WebAppInfo(url=f"{WEBHOOK_URL}/web-app/index.html"))]]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    
+    await update.message.reply_text(
+        "Great. Now, please click the button below to securely enter your private key.",
+        reply_markup=reply_markup
+    )
+    return AWAIT_WEB_APP_DATA
 
 async def received_private_key(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """Receives the private key, saves the wallet, and ends the conversation."""
+    """Receives the private key from the web app, saves the wallet, and ends the conversation."""
     user = update.effective_user
-    private_key = update.message.text
+    private_key = update.message.web_app_data.data
     wallet_name = context.user_data.get('wallet_name')
     wallet_address = context.user_data.get('wallet_address')
 
@@ -820,7 +828,7 @@ conv_handler = ConversationHandler(
         # States for adding a wallet
         AWAIT_WALLET_NAME: [MessageHandler(filters.TEXT & ~filters.COMMAND, received_wallet_name)],
         AWAIT_WALLET_ADDRESS: [MessageHandler(filters.TEXT & ~filters.COMMAND, received_wallet_address)],
-        AWAIT_PRIVATE_KEY: [MessageHandler(filters.TEXT & ~filters.COMMAND, received_private_key)],
+        AWAIT_WEB_APP_DATA: [MessageHandler(filters.StatusUpdate.WEB_APP_DATA, received_private_key)],
         # States for adding an alert
         AWAIT_ALERT_SYMBOL: [MessageHandler(filters.TEXT & ~filters.COMMAND, received_alert_symbol)],
         AWAIT_ALERT_CONDITION: [CallbackQueryHandler(received_alert_condition, pattern="^alert_")],
@@ -829,6 +837,8 @@ conv_handler = ConversationHandler(
     fallbacks=[CommandHandler("start", start)],
     per_message=False,
 )
+
+app.mount("/web-app", StaticFiles(directory=str(project_root / "src/web_app")), name="web_app")
 
 bot_app.add_handler(conv_handler)
 bot_app.add_handler(CallbackQueryHandler(help_command, pattern='^help$'))

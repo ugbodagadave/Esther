@@ -13,7 +13,7 @@ The project has moved into a stabilization phase. The immediate focus is on ensu
 - **Live OKX DEX API Integration**: The bot can make authenticated, read-only calls to the OKX DEX API to fetch live quotes.
 - **User Confirmation Flow**: A multi-step `ConversationHandler` is implemented to confirm trades (both buy and sell) with the user before execution.
 - **Real & Simulated Swap Execution**: The `OKXClient` can now execute both real and simulated swaps via the `/api/v5/dex/aggregator/swap` endpoint.
-- **User Wallet Management**: A secure system for users to add, list, and delete their wallet addresses, with private keys encrypted in the database.
+- **User Wallet Management**: A secure system for users to add, list, and delete their wallet addresses, with private keys encrypted in the database. Private keys are entered through a secure web app to prevent them from being stored in chat history.
 - **Error Handling**: Implemented retry logic for API calls to enhance resilience.
 - **Real-time Price Alerts**: A background service (`src/monitoring.py`) is implemented to monitor and notify users of price alerts.
 - **Dry Run Mode**: A simulation mode is fully implemented, allowing for safe, realistic demos using live market data without executing real trades.

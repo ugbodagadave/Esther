@@ -152,6 +152,7 @@ The choice between Gemini Pro and Flash is dynamic and crucial for balancing per
 ## 6. Security Design
 Security is paramount. The following measures are integral to the design:
 -   **Environment Variables**: All system-level API keys and secrets are managed exclusively through environment variables and are never hardcoded.
+-   **Secure Web App for Private Keys**: To enhance security, the bot uses a Telegram Web App for private key submission. Instead of sending sensitive data through chat, users are directed to a secure, isolated web interface. This prevents private keys from being stored in chat history and adds a layer of protection against unauthorized access.
 -   **Database Encryption**: User-specific sensitive data, particularly OKX DEX API keys, are encrypted using a strong algorithm (e.g., AES-256) before being stored in the PostgreSQL database. The encryption key itself is managed as a secure environment variable.
 -   **Immutable Transaction Confirmation**: The pre-execution confirmation step is a mandatory, non-skippable part of the workflow for any action that modifies a user's assets.
 -   **Principle of Least Privilege**: The OKX DEX API keys requested from the user should have the minimum required permissions for the bot's functionality.

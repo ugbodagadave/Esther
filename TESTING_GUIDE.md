@@ -36,7 +36,7 @@ Here is a comprehensive guide to testing the Esther bot's features using natural
 
 **Test 2: Add a New Wallet**
 *   **Your Message:** `I want to add a new wallet`
-*   **Expected Bot Response:** Esther will ask you to provide the wallet address and then the private key, confirming once it has been securely saved. For example: "Please provide the wallet address you would like to add."
+*   **Expected Bot Response:** Esther will guide you through a conversational flow to get the wallet name and address. It will then present a button to open a secure web app where you can enter your private key. Upon submission, the bot will confirm that the wallet has been saved.
 
 ---
 

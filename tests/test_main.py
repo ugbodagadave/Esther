@@ -11,6 +11,8 @@ from src.main import (
     handle_text,
     list_wallets,
     confirm_swap,
+    received_wallet_address,
+    received_private_key,
     # Add other handlers you need to test
 )
 
@@ -214,6 +216,49 @@ class TestMainHandlers(unittest.IsolatedAsyncioTestCase):
         # Check the keyword arguments passed to execute_swap
         _, kwargs = mock_execute_swap.call_args
         self.assertTrue(kwargs.get('dry_run'))
+
+    @patch('src.main.WEBHOOK_URL', "https://test.com")
+    async def test_received_wallet_address_sends_web_app(self):
+        """Test that received_wallet_address sends a web app button."""
+        # Arrange
+        update, context = await self._create_update_context("0x123")
+        
+        # Act
+        result = await received_wallet_address(update, context)
+
+        # Assert
+        update.message.reply_text.assert_called_once()
+        _, kwargs = update.message.reply_text.call_args
+        self.assertIn("web_app", kwargs['reply_markup'].inline_keyboard[0][0].to_dict())
+        self.assertEqual(result, 9) # AWAIT_WEB_APP_DATA
+
+    @patch('src.main.get_db_connection')
+    @patch('src.main.encrypt_data', return_value=b"encrypted_key")
+    async def test_received_private_key_saves_wallet(self, mock_encrypt, mock_get_conn):
+        """Test that received_private_key saves the wallet."""
+        # Arrange
+        update, context = await self._create_update_context()
+        update.message.web_app_data = MagicMock()
+        update.message.web_app_data.data = "test_private_key"
+        
+        context.user_data['wallet_name'] = "Test Wallet"
+        context.user_data['wallet_address'] = "0x123"
+        
+        mock_conn, mock_cur = self._mock_db()
+        mock_cur.fetchone.return_value = (1,) # User ID
+        mock_get_conn.return_value = mock_conn
+
+        # Act
+        result = await received_private_key(update, context)
+
+        # Assert
+        mock_encrypt.assert_called_once_with("test_private_key")
+        mock_cur.execute.assert_called_with(
+            "INSERT INTO wallets (user_id, name, address, encrypted_private_key) VALUES (%s, %s, %s, %s);",
+            (1, "Test Wallet", "0x123", b"encrypted_key")
+        )
+        update.message.reply_text.assert_called_once_with("✅ Wallet 'Test Wallet' added successfully!")
+        self.assertEqual(result, ConversationHandler.END)
 
 if __name__ == '__main__':
     unittest.main()

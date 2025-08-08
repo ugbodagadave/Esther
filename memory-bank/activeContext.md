@@ -1,9 +1,10 @@
 # Active Context: Esther
 
 ## 1. Current Focus
-The current focus is on implementing the on-demand education feature. The `DRY_RUN_MODE` refinement has been completed and is now stable.
+The current focus is on implementing the on-demand education feature. The secure wallet input feature has been completed and is now stable.
 
 ## 2. Recent Changes & Decisions
+- **Secure Wallet Input**: Implemented a secure web app for private key entry, enhancing security by preventing sensitive data from being stored in chat history.
 - **`DRY_RUN_MODE` Refinement Complete**: The `DRY_RUN_MODE` feature has been refactored to ensure consistent application across the codebase. The configuration has been centralized in `src/constants.py`, and comprehensive unit and integration tests have been added to verify its behavior. All relevant documentation has been updated.
 - **Portfolio Rebalance Feature Complete**: The portfolio rebalance feature has been fully implemented, including the conversational flow for sequential swap execution.
 - **Architectural Refactor**: The application has been refactored from a multi-threaded Flask application to a unified `asyncio` event loop using FastAPI. This has resolved the stability issues and created a robust foundation for future development.
