@@ -10,6 +10,9 @@ from src.main import (
     help_command,
     handle_text,
     list_wallets,
+    confirm_swap,
+    received_wallet_address,
+    received_private_key,
     # Add other handlers you need to test
 )
 
@@ -177,6 +180,84 @@ class TestMainHandlers(unittest.IsolatedAsyncioTestCase):
         # Check that the second call specifically used the 'pro' model
         self.assertEqual(mock_nlp_client.parse_intent.call_args_list[1].kwargs['model_type'], 'pro')
         mock_insights.assert_called_once_with(update, context)
+        self.assertEqual(result, ConversationHandler.END)
+
+    @patch('src.main.okx_client.execute_swap')
+    @patch('src.main.DRY_RUN_MODE', True)
+    async def test_confirm_swap_respects_dry_run_mode(self, mock_execute_swap):
+        """Test that confirm_swap passes the DRY_RUN_MODE constant to execute_swap."""
+        # Arrange
+        update, context = await self._create_update_context()
+        
+        # Mock a callback query and context
+        query = AsyncMock(spec=Update.callback_query)
+        query.answer = AsyncMock()
+        query.edit_message_text = AsyncMock()
+        update.callback_query = query
+        
+        context.user_data['swap_details'] = {
+            "from_token": "USDC",
+            "to_token": "ETH",
+            "from_token_address": "0x...",
+            "to_token_address": "0x...",
+            "amount": "100",
+            "amount_in_smallest_unit": "100000000",
+            "source_chain_id": 1,
+        }
+        
+        # Mock the return value of execute_swap
+        mock_execute_swap.return_value = {"success": True, "data": {}}
+
+        # Act
+        await confirm_swap(update, context)
+
+        # Assert
+        mock_execute_swap.assert_called_once()
+        # Check the keyword arguments passed to execute_swap
+        _, kwargs = mock_execute_swap.call_args
+        self.assertTrue(kwargs.get('dry_run'))
+
+    @patch('src.main.WEBHOOK_URL', "https://test.com")
+    async def test_received_wallet_address_sends_web_app(self):
+        """Test that received_wallet_address sends a web app button."""
+        # Arrange
+        update, context = await self._create_update_context("0x123")
+        
+        # Act
+        result = await received_wallet_address(update, context)
+
+        # Assert
+        update.message.reply_text.assert_called_once()
+        _, kwargs = update.message.reply_text.call_args
+        self.assertIn("web_app", kwargs['reply_markup'].inline_keyboard[0][0].to_dict())
+        self.assertEqual(result, 9) # AWAIT_WEB_APP_DATA
+
+    @patch('src.main.get_db_connection')
+    @patch('src.main.encrypt_data', return_value=b"encrypted_key")
+    async def test_received_private_key_saves_wallet(self, mock_encrypt, mock_get_conn):
+        """Test that received_private_key saves the wallet."""
+        # Arrange
+        update, context = await self._create_update_context()
+        update.message.web_app_data = MagicMock()
+        update.message.web_app_data.data = "test_private_key"
+        
+        context.user_data['wallet_name'] = "Test Wallet"
+        context.user_data['wallet_address'] = "0x123"
+        
+        mock_conn, mock_cur = self._mock_db()
+        mock_cur.fetchone.return_value = (1,) # User ID
+        mock_get_conn.return_value = mock_conn
+
+        # Act
+        result = await received_private_key(update, context)
+
+        # Assert
+        mock_encrypt.assert_called_once_with("test_private_key")
+        mock_cur.execute.assert_called_with(
+            "INSERT INTO wallets (user_id, name, address, encrypted_private_key) VALUES (%s, %s, %s, %s);",
+            (1, "Test Wallet", "0x123", b"encrypted_key")
+        )
+        update.message.reply_text.assert_called_once_with("✅ Wallet 'Test Wallet' added successfully!")
         self.assertEqual(result, ConversationHandler.END)
 
 if __name__ == '__main__':

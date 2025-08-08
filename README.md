@@ -16,8 +16,10 @@ Decentralized Finance (DeFi) can be confusing. Our goal with Esther is to make i
     -   **Check Prices**: "What's the price of ETH?" or "How much is Bitcoin worth?"
     -   **Buy and Sell Tokens**: "Buy 0.1 ETH with USDC" or "I want to sell some Bitcoin for USDT".
     -   **Set Smart Orders**: "Set a stop-loss for BTC at 60000" or "Alert me when ETH reaches 3500".
-    -   **Track & Rebalance Portfolio**: "Show me my portfolio" or "What's in my wallet?" displays live balances + USD value; automated rebalance suggestions coming soon.
--   **Manage Your Wallets**: "Show me my wallets" or "I want to add a new wallet" - manage your wallet addresses securely with encrypted private keys.
+    -   **Track & Rebalance Portfolio**: "Show me my portfolio" or "What's in my wallet?" displays live balances + USD value.
+    -   **Suggest Rebalance Plan**: "Suggest a rebalance to 50% BTC and 50% ETH" to get a plan for aligning your assets.
+    -   **Execute Rebalance Plan**: "Rebalance my portfolio" or "Execute the rebalance plan" to align your assets with a target allocation.
+-   **Manage Your Wallets**: "Show me my wallets" or "I want to add a new wallet" - manage your wallet addresses securely with encrypted private keys entered through a secure web interface.
 -   **Get Smart Insights**: "Give me market insights" or "What's the market analysis?" - get personalized advice and analysis on your crypto holdings.
 -   **Trade Safely**: Every trade must be confirmed by you, so you never have to worry about accidental transactions.
 -   **Stay Updated with Price Alerts**: Set custom alerts for any cryptocurrency (e.g., "Alert me if BTC goes above 70000").
@@ -91,26 +93,6 @@ For a detailed explanation of how we integrated the OKX DEX API, see our [OKX DE
     TEST_WALLET_PRIVATE_KEY="your_ethereum_test_wallet_private_key"
     ADMIN_SECRET_KEY="your_admin_secret_key"
     ```
-    ```dotenv
-    # For Telegram and the AI
-    TELEGRAM_BOT_TOKEN="your_telegram_bot_token"
-    GEMINI_API_KEY="your_gemini_api_key"
-
-    # For the OKX Crypto Exchange
-    OKX_API_KEY="your_okx_api_key"
-    OKX_API_SECRET="your_okx_api_secret"
-    OKX_API_PASSPHRASE="your_okx_api_passphrase"
-    # The Project ID that groups your keys and quota in OKX Web3 – required for portfolio features
-    OKX_PROJECT_ID="your_okx_project_id"
-
-    # For the Database
-    DATABASE_URL="your_postgresql_connection_string"
-    
-    # A test wallet for practice
-    TEST_WALLET_ADDRESS="your_ethereum_test_wallet_address"
-    TEST_WALLET_PRIVATE_KEY="your_ethereum_test_wallet_private_key"
-    ADMIN_SECRET_KEY="your_admin_secret_key"
-    ```
 
 5.  **Set Up the Database:**
     The app will automatically create the tables it needs when you run it for the first time.
@@ -140,17 +122,20 @@ Esther automatically chooses the best AI model for your request:
 
 ## ⚙️ Settings
 
-### Demo Mode ("Dry Run")
-For safe practice, Esther has a "Dry Run" mode. When it's on, you can simulate trades with real market data without spending any real money. This is the default setting.
+### ⚙️ Settings
 
-To turn demo mode on or off, change the `DRY_RUN_MODE` setting in your `.env` file:
+#### Demo Mode (`DRY_RUN_MODE`)
+For safe practice, Esther includes a "Dry Run" mode that simulates trades using real market data without executing any real-money transactions. This feature is enabled by default to prevent accidental trades.
+
+To control this setting, add the `DRY_RUN_MODE` variable to your `.env` file:
 ```dotenv
-# Set to "True" to practice without real money (this is the default)
+# Set to "True" to simulate all transactions (default behavior)
 DRY_RUN_MODE="True"
 
-# Set to "False" to make real trades on the crypto exchange
+# Set to "False" to execute real trades on the OKX DEX
 # DRY_RUN_MODE="False"
 ```
+When `DRY_RUN_MODE` is active, any command that would normally result in a blockchain transaction will instead return a simulated success message, allowing you to test the bot's functionality without risk.
 
 ### Admin Secret Key
 This key is used to protect the new admin endpoint for clearing the database during development.

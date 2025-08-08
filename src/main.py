@@ -9,7 +9,8 @@ project_root = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(project_root))
 
 from fastapi import FastAPI, Request, HTTPException
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from fastapi.staticfiles import StaticFiles
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo
 from telegram.ext import (
     Application,
     CommandHandler,
@@ -42,10 +43,17 @@ PORT = int(os.environ.get('PORT', 8080))
 
 from src.nlp import NLPClient
 from src.okx_client import OKXClient
-from src.database import get_db_connection, initialize_database
+from src.database import add_wallet, get_db_connection, initialize_database
 from src.encryption import encrypt_data, decrypt_data
 from src.insights import InsightsClient
+from src.exceptions import WalletAlreadyExistsError, InvalidWalletAddressError, DatabaseConnectionError
 from src.portfolio import PortfolioService
+from src.constants import (
+    TOKEN_ADDRESSES,
+    TOKEN_DECIMALS,
+    CHAIN_ID_MAP,
+    DRY_RUN_MODE,
+)
 
 # Initialize clients
 nlp_client = NLPClient()
@@ -55,40 +63,10 @@ portfolio_service = PortfolioService()
 
 # --- Conversation Handler States ---
 AWAIT_CONFIRMATION = 1
-AWAIT_WALLET_NAME, AWAIT_WALLET_ADDRESS, AWAIT_PRIVATE_KEY = 2, 3, 4
+AWAIT_WALLET_NAME, AWAIT_WALLET_ADDRESS, AWAIT_PRIVATE_KEY, AWAIT_WEB_APP_DATA = 2, 3, 4, 9
 AWAIT_ALERT_SYMBOL, AWAIT_ALERT_CONDITION, AWAIT_ALERT_PRICE = 5, 6, 7
+AWAIT_REBALANCE_CONFIRMATION = 8
 
-# Global flag for simulation mode, configurable via .env file
-DRY_RUN_MODE = os.getenv("DRY_RUN_MODE", "True").lower() in ("true", "1", "t")
-
-# A simple, hardcoded map for common token symbols to their Ethereum addresses
-# We map BTC to WBTC address as it's the token used in DeFi swaps.
-TOKEN_ADDRESSES = {
-    "ETH": "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
-    "USDC": "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48",
-    "USDT": "0xdac17f958d2ee523a2206206994597c13d831ec7",
-    "WBTC": "0x2260fac5e5542a773aa44fbcfedf7c193bc2c599",
-    "BTC": "0x2260fac5e5542a773aa44fbcfedf7c193bc2c599",  # Map BTC to WBTC
-    "DAI": "0x6b175474e89094c44da98b954eedeac495271d0f",
-    "MATIC": "0x7d1afa7b718fb893db30a3abc0cfc608aacfebb0",
-}
-
-# Map of token symbols to their decimal precision
-TOKEN_DECIMALS = {
-    "ETH": 18,
-    "USDC": 6,
-    "USDT": 6,
-    "WBTC": 8,
-    "BTC": 8,  # WBTC has 8 decimals
-    "DAI": 18,
-    "MATIC": 18,
-}
-
-CHAIN_ID_MAP = {
-    "ethereum": 1,
-    "arbitrum": 42161,
-    "polygon": 137,
-}
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handles the /start command, registers the user, and provides a friendly welcome."""
@@ -201,6 +179,9 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int
     elif intent == "get_insights":
         await insights(update, context)
         return ConversationHandler.END
+
+    elif intent == "execute_rebalance":
+        return await rebalance_portfolio_start(update, context)
 
     elif intent == "greeting":
         await update.message.reply_text("Hello! How can I assist you with your trades today?")
@@ -368,7 +349,13 @@ async def confirm_swap(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
         await query.edit_message_text(text=f"[{'DRY RUN' if DRY_RUN_MODE else 'LIVE'}] {status_message}. Error: {swap_response.get('error')}")
 
     context.user_data.pop('swap_details', None)
-    return ConversationHandler.END
+
+    # Check if we are in a rebalance flow
+    if 'rebalance_plan' in context.user_data and context.user_data['rebalance_plan']:
+        # Present the next swap for confirmation
+        return await present_next_rebalance_swap(update, context)
+    else:
+        return ConversationHandler.END
 
 async def cancel_swap(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Cancels the swap conversation."""
@@ -376,6 +363,12 @@ async def cancel_swap(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int
     await query.answer()
     await query.edit_message_text(text="Swap cancelled.")
     context.user_data.pop('swap_details', None)
+    
+    # If in a rebalance flow, cancel the entire plan
+    if 'rebalance_plan' in context.user_data:
+        context.user_data.pop('rebalance_plan', None)
+        await query.message.reply_text("Portfolio rebalance cancelled.")
+
     return ConversationHandler.END
 
 async def sell_token_intent(update: Update, context: ContextTypes.DEFAULT_TYPE, entities: dict) -> int:
@@ -495,6 +488,51 @@ async def insights(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     insights_text = insights_client.generate_insights(user_id)
     await update.message.reply_text(insights_text)
 
+async def rebalance_portfolio_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Starts the portfolio rebalance conversation."""
+    user = update.effective_user
+    await update.message.reply_text("Calculating your portfolio rebalance plan... This may take a moment.")
+
+    plan = portfolio_service.suggest_rebalance(user.id)
+
+    if not plan:
+        await update.message.reply_text("Your portfolio is already balanced, or there's nothing to rebalance.")
+        return ConversationHandler.END
+
+    context.user_data['rebalance_plan'] = plan
+
+    summary_message = "Here is the proposed rebalance plan:\n\n"
+    for i, trade in enumerate(plan):
+        summary_message += f"**Trade {i+1}**: Sell {trade['from_amount']:.6f} {trade['from']} for {trade['to']} (~${trade['usd_amount']:.2f})\n"
+    
+    await update.message.reply_text(summary_message, parse_mode='Markdown')
+    
+    return await present_next_rebalance_swap(update, context)
+
+async def present_next_rebalance_swap(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Presents the next swap in the rebalance plan for confirmation."""
+    plan = context.user_data.get('rebalance_plan')
+    if not plan:
+        await update.callback_query.edit_message_text("✅ Portfolio rebalance complete!")
+        return ConversationHandler.END
+
+    trade = plan.pop(0)
+    
+    # Use the sell_token_intent to set up the confirmation
+    entities = {
+        "symbol": trade['from'],
+        "amount": str(trade['from_amount']),
+        "currency": trade['to']
+    }
+    
+    # We need to decide whether to use the message or callback_query object to send the reply
+    if update.callback_query:
+        # If we are in a sequence of swaps, we need to send a new message
+        await update.callback_query.message.reply_text("Now for the next trade:")
+        return await sell_token_intent(update.callback_query.message, context, entities)
+    else:
+        return await sell_token_intent(update, context, entities)
+
 # --- Portfolio Command ---
 async def portfolio(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Synchronize and display the user's portfolio."""
@@ -535,42 +573,49 @@ async def received_wallet_name(update: Update, context: ContextTypes.DEFAULT_TYP
     return AWAIT_WALLET_ADDRESS
 
 async def received_wallet_address(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """Receives the wallet address and asks for the private key."""
+    """Receives the wallet address and sends a button to open the web app for private key entry."""
     context.user_data['wallet_address'] = update.message.text
-    await update.message.reply_text("Great. Now, please provide the private key. This will be encrypted and stored securely.")
-    return AWAIT_PRIVATE_KEY
+    
+    keyboard = [[InlineKeyboardButton("Enter Private Key Securely", web_app=WebAppInfo(url=f"{WEBHOOK_URL}/web-app/index.html"))]]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    
+    await update.message.reply_text(
+        "Great. Now, please click the button below to securely enter your private key.",
+        reply_markup=reply_markup
+    )
+    return AWAIT_WEB_APP_DATA
 
 async def received_private_key(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """Receives the private key, saves the wallet, and ends the conversation."""
+    """Receives the private key from the web app, saves the wallet, and ends the conversation."""
     user = update.effective_user
-    private_key = update.message.text
+    private_key = update.message.web_app_data.data
     wallet_name = context.user_data.get('wallet_name')
     wallet_address = context.user_data.get('wallet_address')
 
-    encrypted_private_key = encrypt_data(private_key)
-
-    conn = get_db_connection()
-    if conn is None:
-        await update.message.reply_text("Database connection failed. Please try again later.")
-        return ConversationHandler.END
-
     try:
-        with conn.cursor() as cur:
-            cur.execute("SELECT id FROM users WHERE telegram_id = %s;", (user.id,))
-            user_id = cur.fetchone()[0]
+        # Basic validation for wallet address
+        if not wallet_address or not wallet_address.startswith('0x'):
+            raise InvalidWalletAddressError("Invalid wallet address format.")
 
-            cur.execute(
-                "INSERT INTO wallets (user_id, name, address, encrypted_private_key) VALUES (%s, %s, %s, %s);",
-                (user_id, wallet_name, wallet_address, encrypted_private_key)
-            )
-            conn.commit()
-            await update.message.reply_text(f"✅ Wallet '{wallet_name}' added successfully!")
+        encrypted_private_key = encrypt_data(private_key)
+        
+        add_wallet(user.id, wallet_name, wallet_address, encrypted_private_key)
+        
+        await update.message.reply_text(f"✅ Wallet '{wallet_name}' added successfully!")
+
+    except InvalidWalletAddressError as e:
+        logger.warning(f"Invalid wallet address provided by user {user.id}: {wallet_address}")
+        await update.message.reply_text(str(e))
+    except WalletAlreadyExistsError:
+        logger.warning(f"User {user.id} tried to add a duplicate wallet: {wallet_address}")
+        await update.message.reply_text("This wallet address has already been added to your profile.")
+    except DatabaseConnectionError as e:
+        logger.error(f"Database connection error while adding wallet for user {user.id}: {e}")
+        await update.message.reply_text("I'm having trouble connecting to the database. Please try again later.")
     except Exception as e:
-        logger.error(f"Error adding wallet for user {user.id}: {e}")
-        await update.message.reply_text("An error occurred while saving your wallet.")
+        logger.error(f"An unexpected error occurred while adding wallet for user {user.id}: {e}", exc_info=True)
+        await update.message.reply_text("An unexpected error occurred while saving your wallet. Please contact support.")
     finally:
-        if conn:
-            conn.close()
         context.user_data.clear()
 
     return ConversationHandler.END
@@ -784,7 +829,7 @@ conv_handler = ConversationHandler(
         # States for adding a wallet
         AWAIT_WALLET_NAME: [MessageHandler(filters.TEXT & ~filters.COMMAND, received_wallet_name)],
         AWAIT_WALLET_ADDRESS: [MessageHandler(filters.TEXT & ~filters.COMMAND, received_wallet_address)],
-        AWAIT_PRIVATE_KEY: [MessageHandler(filters.TEXT & ~filters.COMMAND, received_private_key)],
+        AWAIT_WEB_APP_DATA: [MessageHandler(filters.StatusUpdate.WEB_APP_DATA, received_private_key)],
         # States for adding an alert
         AWAIT_ALERT_SYMBOL: [MessageHandler(filters.TEXT & ~filters.COMMAND, received_alert_symbol)],
         AWAIT_ALERT_CONDITION: [CallbackQueryHandler(received_alert_condition, pattern="^alert_")],
@@ -793,6 +838,8 @@ conv_handler = ConversationHandler(
     fallbacks=[CommandHandler("start", start)],
     per_message=False,
 )
+
+app.mount("/web-app", StaticFiles(directory=str(project_root / "src/web_app")), name="web_app")
 
 bot_app.add_handler(conv_handler)
 bot_app.add_handler(CallbackQueryHandler(help_command, pattern='^help$'))
@@ -826,7 +873,6 @@ async def startup_event():
         # Start the bot application to handle webhook updates
         await bot_app.initialize()
         await bot_app.start()
-        await bot_app.updater.start_polling()
     else:
         logger.info("WEBHOOK_URL not set. Starting in polling mode.")
         # Start the bot application in polling mode

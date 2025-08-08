@@ -1,11 +1,16 @@
 import os
 import requests
+import os
+import requests
 import logging
 import hmac
 import base64
 import time
+import json
 from datetime import datetime, timezone
 from dotenv import load_dotenv
+
+from src.constants import DRY_RUN_MODE
 
 # Load environment variables from .env file
 load_dotenv()
@@ -85,61 +90,67 @@ class OKXClient:
         
         return {"success": False, "error": "Failed to fetch quote after multiple retries."}
 
-    def execute_swap(self, from_token_address: str, to_token_address: str, amount: str, wallet_address: str, chainId: int = 1, slippage: str = "1", dry_run: bool = True) -> dict:
+    def execute_swap(self, from_token_address: str, to_token_address: str, amount: str, wallet_address: str, chainId: int = 1, slippage: str = "1", dry_run: bool = None) -> dict:
         """
-        Executes a swap. If dry_run is True, it only fetches the quote and simulates the transaction.
+        Executes a swap. It always fetches a quote first.
+        If dry_run is True, it only simulates the transaction.
         If dry_run is False, it executes a real swap on the blockchain.
         """
+        if dry_run is None:
+            dry_run = DRY_RUN_MODE
+        # Always get a quote first
+        quote_response = self.get_live_quote(from_token_address, to_token_address, amount, chainId)
+
+        if not quote_response.get("success"):
+            return quote_response  # Propagate the error from get_live_quote
+
         if dry_run:
             logger.info(f"Executing DRY RUN swap from {from_token_address} to {to_token_address}")
-            quote_response = self.get_live_quote(from_token_address, to_token_address, amount, chainId)
-            
-            if quote_response.get("success"):
-                return {
-                    "success": True,
-                    "status": "simulated",
-                    "data": quote_response["data"],
-                    "message": "✅ Swap simulated successfully (no real transaction)"
+            return {
+                "success": True,
+                "status": "simulated",
+                "data": quote_response["data"],
+                "message": "✅ Swap simulated successfully (no real transaction)"
+            }
+        
+        # Proceed with the real swap if not a dry run
+        logger.info(f"Executing REAL swap for wallet {wallet_address}")
+        for attempt in range(self.max_retries):
+            try:
+                request_path = '/api/v5/dex/aggregator/swap'
+                body = {
+                    "fromTokenAddress": from_token_address,
+                    "toTokenAddress": to_token_address,
+                    "amount": amount,
+                    "walletAddress": wallet_address,
+                    "slippage": slippage,
+                    "chainId": chainId
                 }
-            else:
-                return quote_response # Propagate the error from get_live_quote
-        else:
-            logger.info(f"Executing REAL swap for wallet {wallet_address}")
-            for attempt in range(self.max_retries):
-                try:
-                    request_path = '/api/v5/dex/aggregator/swap'
-                    body = {
-                        "fromTokenAddress": from_token_address,
-                        "toTokenAddress": to_token_address,
-                        "amount": amount,
-                        "walletAddress": wallet_address,
-                        "slippage": slippage,
-                        "chainId": chainId
-                    }
-                    
-                    headers = self._get_request_headers('POST', request_path, str(body))
-                    url = f"{self.base_url}{request_path}"
-                    
-                    logger.info(f"Sending POST request to OKX: {url}")
-                    response = requests.post(url, headers=headers, json=body, timeout=15)
-                    response.raise_for_status()
-                    data = response.json()
+                
+                body_str = json.dumps(body)
+                headers = self._get_request_headers('POST', request_path, body_str)
+                url = f"{self.base_url}{request_path}"
+                
+                logger.info(f"Sending POST request to OKX: {url}")
+                response = requests.post(url, headers=headers, json=body, timeout=15)
+                response.raise_for_status()
+                data = response.json()
 
-                    if data.get("code") == "0":
-                        logger.info(f"Successfully executed swap: {data.get('msg')}")
-                        return {"success": True, "data": data.get("data", [{}])[0]}
-                    else:
-                        error_msg = data.get("msg", "Unknown API error")
-                        logger.error(f"Error executing swap on OKX API: {error_msg}")
-                        return {"success": False, "error": f"API Error: {error_msg}"}
-                except requests.exceptions.HTTPError as e:
-                    logger.warning(f"HTTP Error on attempt {attempt + 1}: {e}. Retrying in {self.retry_delay}s...")
-                    time.sleep(self.retry_delay)
-                except requests.exceptions.RequestException as e:
-                    logger.error(f"Error executing swap: {e}")
-                    return {"success": False, "error": f"A network error occurred: {e}"}
-            
-            return {"success": False, "error": "Failed to execute swap after multiple retries."}
+                if data.get("code") == "0":
+                    logger.info(f"Successfully executed swap: {data.get('msg')}")
+                    return {"success": True, "data": data.get("data", [{}])[0]}
+                else:
+                    error_msg = data.get("msg", "Unknown API error")
+                    logger.error(f"Error executing swap on OKX API: {error_msg}")
+                    return {"success": False, "error": f"API Error: {error_msg}"}
+            except requests.exceptions.HTTPError as e:
+                logger.warning(f"HTTP Error on attempt {attempt + 1}: {e}. Retrying in {self.retry_delay}s...")
+                time.sleep(self.retry_delay)
+            except requests.exceptions.RequestException as e:
+                logger.error(f"Error executing swap: {e}")
+                return {"success": False, "error": f"A network error occurred: {e}"}
+        
+        return {"success": False, "error": "Failed to execute swap after multiple retries."}
 
 
 if __name__ == '__main__':

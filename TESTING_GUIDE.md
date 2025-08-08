@@ -36,7 +36,7 @@ Here is a comprehensive guide to testing the Esther bot's features using natural
 
 **Test 2: Add a New Wallet**
 *   **Your Message:** `I want to add a new wallet`
-*   **Expected Bot Response:** Esther will ask you to provide the wallet address and then the private key, confirming once it has been securely saved. For example: "Please provide the wallet address you would like to add."
+*   **Expected Bot Response:** Esther will guide you through a conversational flow to get the wallet name and address. It will then present a button to open a secure web app where you can enter your private key. Upon submission, the bot will confirm that the wallet has been saved.
 
 ---
 
@@ -96,3 +96,29 @@ Here is a comprehensive guide to testing the Esther bot's features using natural
 **Test 1: Set Price Alert**
 *   **Your Message:** `Alert me when BTC goes above 115000`
 *   **Expected Bot Response:** A confirmation message stating that the alert has been set (e.g., "Alert set: I will notify you if BTC > $115,000"). When the condition is met, you should receive a separate notification.
+
+---
+
+### 10. Portfolio Rebalance
+
+**Test 1: Suggest and Execute Rebalance**
+*   **Your Message:** `Rebalance my portfolio to 50% BTC and 50% ETH`
+*   **Expected Bot Response:**
+    1.  A summary of the proposed swaps to achieve the target allocation.
+    2.  A confirmation prompt for the first swap in the plan.
+    3.  After confirming each swap, a message indicating the progress (e.g., "Swap 1 of 2 executed successfully").
+    4.  A final message confirming that the rebalance is complete.
+
+---
+
+### 11. Testing with DRY_RUN_MODE
+
+**Test 1: Verify Dry Run is Active**
+*   **Setup:** Ensure `DRY_RUN_MODE="True"` in your `.env` file.
+*   **Your Message:** `Buy 0.1 ETH with USDT`
+*   **Expected Bot Response:** After confirming the swap, the final message should explicitly state that the transaction was a simulation. For example: "[DRY RUN] ✅ Swap Simulated Successfully! ... This was a simulation. No real transaction was executed."
+
+**Test 2: Verify Live Mode is Active**
+*   **Setup:** Ensure `DRY_RUN_MODE="False"` in your `.env` file.
+*   **Your Message:** `Buy 0.1 ETH with USDT`
+*   **Expected Bot Response:** After confirming the swap, the final message should indicate a live transaction and include a transaction hash. For example: "[LIVE] ✅ Swap Executed Successfully! ... Transaction Hash: `0x...`"

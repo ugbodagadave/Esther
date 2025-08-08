@@ -257,6 +257,33 @@ def run_e2e_test():
 
     print("\n--- End-to-End Test Finished ---")
 
+def test_e2e_rebalance_suggestion():
+    """Test the full rebalance suggestion workflow."""
+    print("\n--- E2E Rebalance Suggestion ---")
+    try:
+        portfolio_service = PortfolioService()
+        dummy_telegram_id = 999999999 # Same dummy user from portfolio sync test
+        
+        # Ensure the user has a portfolio to rebalance
+        synced = portfolio_service.sync_balances(dummy_telegram_id)
+        if not synced:
+            raise Exception("Balance sync failed before rebalance test")
+
+        print("    Query: Suggesting a rebalance to 50% BTC and 50% ETH...")
+        target_alloc = {"WBTC": 50, "ETH": 50} # Use WBTC as it's the swappable version
+        plan = portfolio_service.suggest_rebalance(dummy_telegram_id, target_alloc=target_alloc)
+
+        if plan:
+            print("    ✅ SUCCESS: Rebalance plan generated successfully.")
+            print(f"    -> Plan: {plan}")
+        else:
+            print("    ✅ SUCCESS: Portfolio is likely already balanced or empty.")
+
+    except Exception as e:
+        print(f"    ❌ FAILURE: Rebalance suggestion test encountered an error: {e}")
+        traceback.print_exc()
+
 
 if __name__ == "__main__":
     run_e2e_test()
+    test_e2e_rebalance_suggestion()
