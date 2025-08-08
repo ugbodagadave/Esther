@@ -90,4 +90,28 @@ class TestPortfolioService(unittest.TestCase):
         self.assertAlmostEqual(snapshot['assets'][0]['quantity'], 0.5)
         # Check if the quantity for ETH was calculated correctly (2.0)
         self.assertAlmostEqual(snapshot['assets'][1]['quantity'], 2.0)
-        conn.close.assert_called_once() 
+        conn.close.assert_called_once()
+
+    @patch('src.portfolio.get_db_connection')
+    @patch.object(PortfolioService, 'get_snapshot')
+    def test_get_portfolio_performance(self, mock_get_snapshot, mock_get_conn):
+        """Test the portfolio performance calculation."""
+        # --- Arrange ---
+        conn, cur = self._mock_db_conn()
+        mock_get_conn.return_value = conn
+
+        # Mock current and past portfolio values
+        mock_get_snapshot.return_value = {"total_value_usd": 1100.0}
+        cur.fetchone.return_value = (Decimal("1000.0"),)
+
+        service = PortfolioService()
+
+        # --- Act ---
+        performance = service.get_portfolio_performance(user_id=12345, period_days=7)
+
+        # --- Assert ---
+        self.assertAlmostEqual(performance['current_value'], 1100.0)
+        self.assertAlmostEqual(performance['past_value'], 1000.0)
+        self.assertAlmostEqual(performance['absolute_change'], 100.0)
+        self.assertAlmostEqual(performance['percentage_change'], 10.0)
+        conn.close.assert_called_once()

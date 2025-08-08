@@ -172,5 +172,31 @@ class TestOKXClient(unittest.TestCase):
         self.assertEqual(result['data']['txHash'], "0xreal")
         mock_post.assert_called_once()
 
+    @patch.dict(os.environ, {
+        "OKX_API_KEY": "test_key",
+        "OKX_API_SECRET": "test_secret",
+        "OKX_API_PASSPHRASE": "test_passphrase"
+    })
+    @patch('src.okx_client.requests.get')
+    def test_get_historical_price_success(self, mock_get):
+        """Test successful fetching of historical price data."""
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {
+            "code": "0",
+            "data": [{"ts": "1672531200000", "price": "16547.2"}]
+        }
+        mock_get.return_value = mock_response
+
+        client = OKXClient()
+        result = client.get_historical_price("token_addr", 1, "1M")
+
+        self.assertTrue(result['success'])
+        self.assertEqual(result['data']['price'], "16547.2")
+        mock_get.assert_called_once()
+        called_url = mock_get.call_args[0][0]
+        self.assertIn("tokenAddress=token_addr", called_url)
+        self.assertIn("period=1M", called_url)
+
 if __name__ == '__main__':
     unittest.main()

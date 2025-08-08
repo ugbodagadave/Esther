@@ -284,6 +284,54 @@ def test_e2e_rebalance_suggestion():
         traceback.print_exc()
 
 
+def test_e2e_portfolio_performance():
+    """Test the full portfolio performance workflow."""
+    print("\n--- E2E Portfolio Performance ---")
+    try:
+        portfolio_service = PortfolioService()
+        dummy_telegram_id = 999999999 # Same dummy user from portfolio sync test
+        
+        # Ensure the user has a portfolio to test
+        synced = portfolio_service.sync_balances(dummy_telegram_id)
+        if not synced:
+            raise Exception("Balance sync failed before performance test")
+
+        # Save a snapshot for today
+        snapshot = portfolio_service.get_snapshot(dummy_telegram_id)
+        if snapshot and snapshot.get("total_value_usd") > 0:
+            conn = get_db_connection()
+            if not conn:
+                raise Exception("Could not connect to db to save snapshot")
+            with conn.cursor() as cur:
+                cur.execute("SELECT id FROM users WHERE telegram_id = %s;", (dummy_telegram_id,))
+                user_pk = cur.fetchone()[0]
+                # Save a fake historical record for 8 days ago
+                cur.execute(
+                    """
+                    INSERT INTO portfolio_history (user_id, total_value_usd, snapshot_date)
+                    VALUES (%s, %s, CURRENT_DATE - INTERVAL '8 days')
+                    ON CONFLICT (user_id, snapshot_date) DO UPDATE SET total_value_usd = EXCLUDED.total_value_usd;
+                    """,
+                    (user_pk, snapshot['total_value_usd'] * 0.9) # Simulate a 10% gain
+                )
+                conn.commit()
+            conn.close()
+
+        print("    Query: Calculating 7-day portfolio performance...")
+        performance = portfolio_service.get_portfolio_performance(dummy_telegram_id, period_days=7)
+
+        if performance:
+            print("    ✅ SUCCESS: Portfolio performance calculated successfully.")
+            print(f"    -> Performance Data: {performance}")
+        else:
+            print("    ❌ FAILURE: Portfolio performance calculation failed.")
+
+    except Exception as e:
+        print(f"    ❌ FAILURE: Portfolio performance test encountered an error: {e}")
+        traceback.print_exc()
+
+
 if __name__ == "__main__":
     run_e2e_test()
     test_e2e_rebalance_suggestion()
+    test_e2e_portfolio_performance()

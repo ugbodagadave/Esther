@@ -42,7 +42,29 @@ class TestDatabase(unittest.TestCase):
         executed_sql = " ".join([call[0][0] for call in mock_cursor.execute.call_args_list])
         self.assertIn("CREATE TABLE IF NOT EXISTS wallets", executed_sql)
         self.assertIn("ALTER TABLE wallets ADD COLUMN chain_id", executed_sql)
+        self.assertIn("CREATE TABLE IF NOT EXISTS portfolio_history", executed_sql)
         
+        mock_conn.commit.assert_called_once()
+        mock_conn.close.assert_called_once()
+
+    @patch('src.database.get_db_connection')
+    def test_save_portfolio_snapshot(self, mock_get_conn):
+        """Test saving a portfolio snapshot."""
+        mock_conn = MagicMock()
+        mock_cursor = MagicMock()
+        mock_get_conn.return_value = mock_conn
+        mock_conn.cursor.return_value.__enter__.return_value = mock_cursor
+
+        database.save_portfolio_snapshot(1, 1234.56)
+
+        mock_cursor.execute.assert_called_once_with(
+            """
+                INSERT INTO portfolio_history (user_id, total_value_usd, snapshot_date)
+                VALUES (%s, %s, CURRENT_DATE)
+                ON CONFLICT (user_id, snapshot_date) DO UPDATE SET total_value_usd = EXCLUDED.total_value_usd;
+                """,
+            (1, 1234.56)
+        )
         mock_conn.commit.assert_called_once()
         mock_conn.close.assert_called_once()
 

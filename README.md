@@ -19,6 +19,7 @@ Esther is designed to be a comprehensive AI trading assistant. Here are its core
 | **Portfolio Tracking** | Get a real-time snapshot of your wallet balances and their USD value. | `/api/v5/dex/balance/all-token-balances-by-address` |
 | **Price Alerts** | Set custom price alerts to get notified of market movements. | `/api/v5/dex/market/candlesticks-history` |
 | **Portfolio Rebalancing**| Automatically generate and execute a plan to rebalance your portfolio. | `/api/v5/dex/aggregator/swap` |
+| **Portfolio Performance**| Track the historical performance of your crypto assets. | `/api/v5/dex/historical-index-price` |
 
 For a detailed explanation of how we integrated the OKX DEX API, see our [OKX DEX API Integration Guide](./okx_dex_api_integration.md).
 

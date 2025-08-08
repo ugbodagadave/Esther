@@ -182,6 +182,7 @@ Esther now keeps a real-time view of every user's on-chain balances **without re
 ### Diversification & Performance Analytics
 * `get_diversification()` – returns a `{symbol: %}` map based on last valuation.
 * `get_roi(window_days)` – naive ROI using the first candle from `/api/v5/dex/market/candlesticks-history` vs current value.
+* `get_portfolio_performance(period_days)` – calculates portfolio performance over a specified period by comparing the current portfolio value with the historical value stored in the `portfolio_history` table.
 
 ## 8. Rebalance Engine
 

@@ -25,7 +25,7 @@ def get_db_connection():
         return conn
     except OperationalError as e:
         logger.error(f"Could not connect to the database: {e}")
-        raise DatabaseConnectionError(f"Could not connect to the database: {e}")
+        return None
 
 def initialize_database():
     """
@@ -129,6 +129,18 @@ def initialize_database():
                     price_usd NUMERIC NOT NULL
                 );
             """)
+
+            # Create portfolio_history table
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS portfolio_history (
+                    id SERIAL PRIMARY KEY,
+                    user_id INTEGER NOT NULL REFERENCES users(id),
+                    total_value_usd NUMERIC NOT NULL,
+                    snapshot_date DATE NOT NULL,
+                    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+                    UNIQUE(user_id, snapshot_date)
+                );
+            """)
             
             conn.commit()
             logger.info("Database tables initialized successfully.")
@@ -171,6 +183,30 @@ def add_wallet(user_id, wallet_name, wallet_address, encrypted_private_key, chai
             raise e
     except (OperationalError, psycopg2.Error) as e:
         logger.error(f"Error adding wallet for user {user_id}: {e}")
+        if conn:
+            conn.rollback()
+        raise
+    finally:
+        if conn:
+            conn.close()
+
+def save_portfolio_snapshot(user_id, total_value_usd):
+    """Saves a daily snapshot of the user's portfolio value."""
+    try:
+        conn = get_db_connection()
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                INSERT INTO portfolio_history (user_id, total_value_usd, snapshot_date)
+                VALUES (%s, %s, CURRENT_DATE)
+                ON CONFLICT (user_id, snapshot_date) DO UPDATE SET total_value_usd = EXCLUDED.total_value_usd;
+                """,
+                (user_id, total_value_usd)
+            )
+            conn.commit()
+            logger.info(f"Portfolio snapshot saved for user {user_id}.")
+    except (OperationalError, psycopg2.Error) as e:
+        logger.error(f"Error saving portfolio snapshot for user {user_id}: {e}")
         if conn:
             conn.rollback()
         raise

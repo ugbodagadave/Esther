@@ -152,6 +152,45 @@ class OKXClient:
         
         return {"success": False, "error": "Failed to execute swap after multiple retries."}
 
+    def get_historical_price(self, token_address: str, chainId: int, period: str) -> dict:
+        """
+        Fetches historical price data for a token.
+        """
+        for attempt in range(self.max_retries):
+            try:
+                request_path = '/api/v5/dex/historical-index-price'
+                params = {
+                    "chainId": chainId,
+                    "tokenAddress": token_address,
+                    "period": period
+                }
+                
+                query_string = '&'.join([f'{k}={v}' for k, v in params.items()])
+                full_request_path = f"{request_path}?{query_string}"
+
+                headers = self._get_request_headers('GET', full_request_path)
+                url = f"{self.base_url}{full_request_path}"
+                
+                logger.info(f"Sending GET request to OKX for historical price: {url}")
+                response = requests.get(url, headers=headers, timeout=10)
+                response.raise_for_status()
+                data = response.json()
+
+                if data.get("code") == "0":
+                    return {"success": True, "data": data.get("data", [{}])[0]}
+                else:
+                    error_msg = data.get("msg", "Unknown API error")
+                    logger.error(f"Error fetching historical price from OKX API: {error_msg}")
+                    return {"success": False, "error": f"API Error: {error_msg}"}
+            except requests.exceptions.HTTPError as e:
+                logger.warning(f"HTTP Error on attempt {attempt + 1}: {e}. Retrying in {self.retry_delay}s...")
+                time.sleep(self.retry_delay)
+            except requests.exceptions.RequestException as e:
+                logger.error(f"Error fetching historical price: {e}")
+                return {"success": False, "error": f"A network error occurred: {e}"}
+        
+        return {"success": False, "error": "Failed to fetch historical price after multiple retries."}
+
 
 if __name__ == '__main__':
     # Example usage to test API credentials

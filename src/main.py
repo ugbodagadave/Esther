@@ -183,6 +183,10 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int
     elif intent == "execute_rebalance":
         return await rebalance_portfolio_start(update, context)
 
+    elif intent == "get_portfolio_performance":
+        await portfolio_performance(update, context, entities)
+        return ConversationHandler.END
+
     elif intent == "greeting":
         await update.message.reply_text("Hello! How can I assist you with your trades today?")
         return ConversationHandler.END
@@ -487,6 +491,51 @@ async def insights(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     
     insights_text = insights_client.generate_insights(user_id)
     await update.message.reply_text(insights_text)
+
+async def portfolio_performance(update: Update, context: ContextTypes.DEFAULT_TYPE, entities: dict):
+    """Handles the get_portfolio_performance intent."""
+    user = update.effective_user
+    period = entities.get("period", "7d") # Default to 7 days
+    
+    # Convert period string to days (this is a simplification)
+    period_days = 7
+    if "month" in period:
+        period_days = 30
+    elif "year" in period:
+        period_days = 365
+    else:
+        try:
+            period_days = int(period.replace('d', ''))
+        except (ValueError, TypeError):
+            period_days = 7
+
+    await update.message.reply_text(f"Calculating your portfolio performance for the last {period_days} days...")
+
+    performance_data = portfolio_service.get_portfolio_performance(user.id, period_days)
+
+    if not performance_data:
+        await update.message.reply_text("Could not calculate portfolio performance. Please ensure you have a portfolio history.")
+        return
+
+    current_value = performance_data.get("current_value", 0)
+    past_value = performance_data.get("past_value", 0)
+    absolute_change = performance_data.get("absolute_change", 0)
+    percentage_change = performance_data.get("percentage_change", 0)
+
+    if percentage_change == "inf":
+        percentage_change_str = "∞"
+    else:
+        percentage_change_str = f"{percentage_change:+.2f}%"
+
+    response_message = (
+        f"📈 *Portfolio Performance ({period_days} Days)*\n\n"
+        f"Current Value: `${current_value:,.2f}`\n"
+        f"Past Value: `${past_value:,.2f}`\n"
+        f"Absolute Change: `${absolute_change:,.2f}`\n"
+        f"Percentage Change: `{percentage_change_str}`"
+    )
+
+    await update.message.reply_text(response_message, parse_mode='Markdown')
 
 async def rebalance_portfolio_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Starts the portfolio rebalance conversation."""
