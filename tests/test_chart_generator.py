@@ -8,13 +8,11 @@ class TestChartGenerator(unittest.TestCase):
         """
         Tests that the price chart is generated correctly.
         """
-        historical_data = {
-            "prices": [
-                {"price": "100", "time": "1672531200000"},
-                {"price": "110", "time": "1672617600000"},
-                {"price": "105", "time": "1672704000000"}
-            ]
-        }
+        historical_data = [
+            {"price": "100", "ts": "1672531200000"},
+            {"price": "110", "ts": "1672617600000"},
+            {"price": "105", "ts": "1672704000000"}
+        ]
         token_symbol = "BTC"
         period = "3d"
 
