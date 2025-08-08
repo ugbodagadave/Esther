@@ -115,7 +115,15 @@ Here is a comprehensive guide to testing the Esther bot's features using natural
 
 ---
 
-### 11. Testing with DRY_RUN_MODE
+### 11. Price Charts
+
+**Test 1: Generate Price Chart**
+*   **Your Message:** `Show me the price chart for BTC over the last 7 days`
+*   **Expected Bot Response:** A PNG image of the price chart for BTC over the last 7 days, with a caption.
+
+---
+
+### 12. Testing with DRY_RUN_MODE
 
 **Test 1: Verify Dry Run is Active**
 *   **Setup:** Ensure `DRY_RUN_MODE="True"` in your `.env` file.

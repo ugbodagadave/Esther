@@ -13,6 +13,7 @@ from src.okx_explorer import OKXExplorer
 from src.portfolio import PortfolioService
 from src.database import initialize_database, get_db_connection
 from src.encryption import encrypt_data
+from src.chart_generator import generate_price_chart
 import traceback
 
 
@@ -284,6 +285,48 @@ def test_e2e_rebalance_suggestion():
         traceback.print_exc()
 
 
+def test_e2e_price_chart():
+    """Test the full price chart workflow."""
+    print("\n--- E2E Price Chart ---")
+    try:
+        nlp_client = NLPClient()
+        okx_client = OKXClient()
+
+        # Test NLP intent
+        print("    Query: 'show me the price chart for btc'")
+        intent_data = nlp_client.parse_intent("show me the price chart for btc")
+        if intent_data.get('intent') == 'get_price_chart' and intent_data.get('entities', {}).get('symbol') == 'BTC':
+            print("    ✅ SUCCESS: Correctly parsed 'get_price_chart' intent.")
+        else:
+            print(f"    ❌ FAILURE: Incorrectly parsed 'get_price_chart'. Got: {intent_data}")
+            return
+
+        # Test OKX historical data
+        print("    Query: Fetching historical data for BTC...")
+        historical_data = okx_client.get_historical_price(
+            token_address="0x7130d2a12b9bcbfae4f2634d864a1ee1ce3ead9c", # WBTC on BSC
+            chainId=56,
+            period="7d"
+        )
+
+        if historical_data.get("success"):
+            print("    ✅ SUCCESS: OKX historical price API responded successfully.")
+            # Test chart generation
+            print("    Query: Generating price chart...")
+            chart_image = generate_price_chart(historical_data['data'], "BTC", "7d")
+            if isinstance(chart_image, bytes) and len(chart_image) > 0:
+                print("    ✅ SUCCESS: Price chart generated successfully.")
+            else:
+                print("    ❌ FAILURE: Price chart generation failed.")
+        else:
+            print("    ❌ FAILURE: OKX historical price API returned an error.")
+            print(f"    -> Error: {historical_data.get('error')}")
+
+    except Exception as e:
+        print(f"    ❌ FAILURE: Price chart test encountered an error: {e}")
+        traceback.print_exc()
+
+
 def test_e2e_portfolio_performance():
     """Test the full portfolio performance workflow."""
     print("\n--- E2E Portfolio Performance ---")
@@ -335,3 +378,4 @@ if __name__ == "__main__":
     run_e2e_test()
     test_e2e_rebalance_suggestion()
     test_e2e_portfolio_performance()
+    test_e2e_price_chart()

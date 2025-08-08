@@ -50,6 +50,7 @@ from src.encryption import encrypt_data, decrypt_data
 from src.insights import InsightsClient
 from src.exceptions import WalletAlreadyExistsError, InvalidWalletAddressError, DatabaseConnectionError
 from src.portfolio import PortfolioService
+from src.chart_generator import generate_price_chart
 from src.constants import (
     TOKEN_ADDRESSES,
     TOKEN_DECIMALS,
@@ -189,6 +190,10 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int
         await portfolio_performance(update, context, entities)
         return ConversationHandler.END
 
+    elif intent == "get_price_chart":
+        await get_price_chart_intent(update, context, entities)
+        return ConversationHandler.END
+
     elif intent == "greeting":
         await update.message.reply_text("Hello! How can I assist you with your trades today?")
         return ConversationHandler.END
@@ -196,6 +201,35 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int
     else:
         await update.message.reply_text("I'm not sure how to help with that. You can ask me for the price of a token or to buy a token.")
         return ConversationHandler.END
+
+
+async def get_price_chart_intent(update: Update, context: ContextTypes.DEFAULT_TYPE, entities: dict):
+    """Handles the get_price_chart intent."""
+    symbol = entities.get("symbol")
+    period = entities.get("period", "7d")  # Default to 7 days
+
+    if not symbol:
+        await update.message.reply_text("Please specify a token symbol (e.g., BTC, ETH).")
+        return
+
+    token_address = TOKEN_ADDRESSES.get(symbol.upper())
+    if not token_address:
+        await update.message.reply_text(f"Sorry, I don't have the address for the token {symbol.upper()}.")
+        return
+
+    await update.message.reply_text(f"Generating price chart for {symbol.upper()} over the last {period}...")
+
+    # Assuming chainId 1 (Ethereum) for now
+    historical_data_response = okx_client.get_historical_price(token_address, 1, period)
+
+    if not historical_data_response.get("success"):
+        await update.message.reply_text(f"Sorry, I couldn't fetch historical data. Error: {historical_data_response.get('error')}")
+        return
+
+    chart_image = generate_price_chart(historical_data_response['data'], symbol.upper(), period)
+
+    await update.message.reply_photo(photo=chart_image, caption=f"Price chart for {symbol.upper()} ({period})")
+
 
 async def get_price_intent(update: Update, context: ContextTypes.DEFAULT_TYPE, entities: dict):
     """Handles the get_price intent."""

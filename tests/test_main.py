@@ -15,6 +15,7 @@ from src.main import (
     received_private_key,
     _parse_period_to_days,
     portfolio_performance,
+    get_price_chart_intent,
 )
 
 class TestPeriodParsing(unittest.TestCase):
@@ -292,6 +293,32 @@ class TestMainHandlers(unittest.IsolatedAsyncioTestCase):
         
         update.message.reply_text.assert_called_once_with("✅ Wallet 'Test Wallet' added successfully!")
         self.assertEqual(result, ConversationHandler.END)
+
+    @patch('src.main.generate_price_chart')
+    @patch('src.main.okx_client.get_historical_price')
+    async def test_get_price_chart_intent(self, mock_get_historical_price, mock_generate_price_chart):
+        """Test the get_price_chart intent handler."""
+        # Arrange
+        update, context = await self._create_update_context("price chart for btc")
+        entities = {"symbol": "BTC", "period": "7d"}
+
+        mock_get_historical_price.return_value = {
+            "success": True,
+            "data": {"prices": [{"price": "60000", "ts": "1672531200000"}]}
+        }
+        mock_generate_price_chart.return_value = b"fake_chart_image"
+        update.message.reply_photo = AsyncMock()
+
+        # Act
+        await get_price_chart_intent(update, context, entities)
+
+        # Assert
+        mock_get_historical_price.assert_called_once()
+        mock_generate_price_chart.assert_called_once()
+        update.message.reply_photo.assert_called_once_with(
+            photo=b"fake_chart_image",
+            caption="Price chart for BTC (7d)"
+        )
 
 if __name__ == '__main__':
     unittest.main()
