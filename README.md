@@ -4,47 +4,35 @@
   <img src="esther-banner.png" alt="Esther AI Trading Agent Banner">
 </div>
 
-**Esther** is an AI Agent that lives in your Telegram chat. It makes trading easy and accessible for everyone by integrating with the OKX DEX aggregator, which allows users to swap cryptocurrencies across multiple blockchains and DEXs for the most competitive prices. With Esther, you can trade, get market updates, and manage your crypto portfolio just by having a natural conversation.
+**Esther** is an AI Agent that lives in your Telegram chat. It makes trading easy and accessible for everyone by integrating with the **OKX DEX API**, which allows users to swap cryptocurrencies across multiple blockchains and DEXs for the most competitive prices. With Esther, you can trade, get market updates, and manage your crypto portfolio just by having a natural conversation.
 
-## 🌟 Our Goal
-Decentralized Finance (DeFi) can be confusing. Our goal with Esther is to make it simple. Esther is designed to be a helpful and trustworthy guide for both beginners and experienced traders in the world of crypto.
+This project is submitted for the **OKX ETHCC Hackathon**, in the **DeFi, RWAs & Autonomous Apps** track.
 
-## ✨ What Esther Can Do
+## ✨ Core Functionalities
 
-### Key Features
--   **Trade with Natural Language**:
-    -   **Check Prices**: "What's the price of ETH?" or "How much is Bitcoin worth?"
-    -   **Buy and Sell Tokens**: "Buy 0.1 ETH with USDC" or "I want to sell some Bitcoin for USDT".
-    -   **Set Smart Orders**: "Set a stop-loss for BTC at 60000" or "Alert me when ETH reaches 3500".
-    -   **Track & Rebalance Portfolio**: "Show me my portfolio" or "What's in my wallet?" displays live balances + USD value.
-    -   **Suggest Rebalance Plan**: "Suggest a rebalance to 50% BTC and 50% ETH" to get a plan for aligning your assets.
-    -   **Execute Rebalance Plan**: "Rebalance my portfolio" or "Execute the rebalance plan" to align your assets with a target allocation.
--   **Manage Your Wallets**: "Show me my wallets" or "I want to add a new wallet" - manage your wallet addresses securely with encrypted private keys entered through a secure web interface.
--   **Get Smart Insights**: "Give me market insights" or "What's the market analysis?" - get personalized advice and analysis on your crypto holdings.
--   **Trade Safely**: Every trade must be confirmed by you, so you never have to worry about accidental transactions.
--   **Stay Updated with Price Alerts**: Set custom alerts for any cryptocurrency (e.g., "Alert me if BTC goes above 70000").
--   **Practice with a Demo Mode**: A "Dry Run" mode lets you practice trading with real market data without using real money.
--   **Manage Your Account**: Esther automatically creates and manages your user profile.
--   **Cross-Chain Swaps**: Swap tokens across different blockchains, like from Ethereum to Polygon, with a single command.
--   **Powered by Advanced AI**: Esther uses Google's Gemini 2.5 Pro & Flash models to understand your natural language commands and provide intelligent responses.
--   **Reliable and Always On**: Esther is deployed on Render, a modern and reliable cloud platform, with a health check to ensure it's always running.
+Esther is designed to be a comprehensive AI trading assistant. Here are its core functionalities and the endpoints that power them:
 
-### What's Coming Next
--   **Learn as You Go**: An in-app guide to help you understand DeFi concepts.
+| Functionality | Description | OKX DEX API Endpoint(s) |
+| :--- | :--- | :--- |
+| **Live Price Quotes** | Get real-time price quotes for any token pair. | `/api/v5/dex/aggregator/quote` |
+| **Token Swaps** | Execute trades across multiple DEXs to get the best price. | `/api/v5/dex/aggregator/swap` |
+| **Portfolio Tracking** | Get a real-time snapshot of your wallet balances and their USD value. | `/api/v5/dex/balance/all-token-balances-by-address` |
+| **Price Alerts** | Set custom price alerts to get notified of market movements. | `/api/v5/dex/market/candlesticks-history` |
+| **Portfolio Rebalancing**| Automatically generate and execute a plan to rebalance your portfolio. | `/api/v5/dex/aggregator/swap` |
+
+For a detailed explanation of how we integrated the OKX DEX API, see our [OKX DEX API Integration Guide](./okx_dex_api_integration.md).
+
+For a more detailed breakdown of how these features work, please see the [How It Works](./how-it-works.md) guide.
 
 ## 🛠️ The Technology Behind Esther
 
 -   **Programming Language**: Python
--   **AI and Language Processing**: Google Gemini 2.5 Pro & Flash (Intelligent Model Selection)
+-   **AI and Language Processing**: Google Gemini 2.5 Pro & Flash
 -   **Bot Framework**: `python-telegram-bot`
 -   **Web Server**: FastAPI
 -   **Database**: PostgreSQL
--   **Crypto Exchange**: OKX DEX API
+-   **Crypto Exchange**: **OKX DEX API**
 -   **Cloud Hosting**: Render
-
-For a more technical look at how Esther works, check out our [How It Works](./how-it-works.md) guide.
-
-For a detailed explanation of how we integrated the OKX DEX API, see our [OKX DEX API Integration Guide](./okx_dex_api_integration.md).
 
 ## 🚀 How to Get Started
 
@@ -53,8 +41,8 @@ For a detailed explanation of how we integrated the OKX DEX API, see our [OKX DE
 -   Python (version 3.9 or higher)
 -   A Telegram Bot Token
 -   A Google Gemini API Key
--   An OKX DEX API Key, Secret, Passphrase **and Project ID** (required for DEX portfolio and market data endpoints)
--   A PostgreSQL database URL (you can get one for free from Render)
+-   An OKX DEX API Key, Secret, Passphrase **and Project ID**
+-   A PostgreSQL database URL
 
 ### Step-by-Step Setup
 
@@ -64,7 +52,7 @@ For a detailed explanation of how we integrated the OKX DEX API, see our [OKX DE
     cd Esther
     ```
 
-2.  **Set Up Your Workspace and Install a Few Things:**
+2.  **Set Up Your Workspace and Install Dependencies:**
     ```bash
     python -m venv venv
     source venv/bin/activate  # On Windows, use `venv\Scripts\activate`
@@ -72,7 +60,7 @@ For a detailed explanation of how we integrated the OKX DEX API, see our [OKX DE
     ```
 
 3.  **Add Your Secret Keys:**
-    Create a file named `.env` in the main folder and add your secret keys, like this:
+    Create a file named `.env` in the main folder and add your secret keys:
     ```dotenv
     # For Telegram and the AI
     TELEGRAM_BOT_TOKEN="your_telegram_bot_token"
@@ -82,94 +70,25 @@ For a detailed explanation of how we integrated the OKX DEX API, see our [OKX DE
     OKX_API_KEY="your_okx_api_key"
     OKX_API_SECRET="your_okx_api_secret"
     OKX_API_PASSPHRASE="your_okx_api_passphrase"
-    # The Project ID that groups your keys and quota in OKX Web3 – required for portfolio features
     OKX_PROJECT_ID="your_okx_project_id"
 
     # For the Database
     DATABASE_URL="your_postgresql_connection_string"
-    
-    # A test wallet for practice
-    TEST_WALLET_ADDRESS="your_ethereum_test_wallet_address"
-    TEST_WALLET_PRIVATE_KEY="your_ethereum_test_wallet_private_key"
-    ADMIN_SECRET_KEY="your_admin_secret_key"
     ```
 
-5.  **Set Up the Database:**
-    The app will automatically create the tables it needs when you run it for the first time.
-
-6.  **Start the Bot:**
+4.  **Start the Bot:**
     ```bash
     uvicorn src.main:app --host 0.0.0.0 --port 8080
     ```
-    This will start the bot, and it will begin listening for your commands in Telegram.
 
-## 💬 Conversational Features
+## 🧪 Testing
 
-Esther understands natural language, so you can interact with it just like talking to a friend:
+To ensure all functionalities are working correctly, you can refer to the [**TESTING_GUIDE.md**](./TESTING_GUIDE.md). This guide provides a comprehensive set of natural language prompts to test all of Esther's features, from basic price checks to complex portfolio rebalancing.
 
-### Example Conversations
-- **"Hello Esther!"** → Esther introduces herself and asks what you'd like to do
-- **"What's the price of Bitcoin?"** → Gets current BTC price
-- **"I want to buy some Ethereum"** → Starts the wallet addition process
-- **"Show me my portfolio"** → Displays your current holdings and values
-- **"Give me market insights"** → Provides personalized market analysis
-- **"What can you do?"** → Lists all available features
+## 💡 Potential for X Layer Integration
 
-### Intelligent Model Selection
-Esther automatically chooses the best AI model for your request:
-- **Gemini 2.5 Flash**: Fast responses for simple queries and basic tasks
-- **Gemini 2.5 Pro**: Deep analysis for complex trading decisions and insights
+X Layer, a high-performance, EVM-compatible Layer 2 network, offers a significant opportunity to enhance Esther's capabilities. By integrating with X Layer, we can provide users with faster, cheaper, and more scalable transactions. For a detailed explanation of our X Layer integration strategy, please see the [OKX DEX API Integration Guide](./okx_dex_api_integration.md).
 
-## ⚙️ Settings
+## 🙏 Acknowledgements
 
-### ⚙️ Settings
-
-#### Demo Mode (`DRY_RUN_MODE`)
-For safe practice, Esther includes a "Dry Run" mode that simulates trades using real market data without executing any real-money transactions. This feature is enabled by default to prevent accidental trades.
-
-To control this setting, add the `DRY_RUN_MODE` variable to your `.env` file:
-```dotenv
-# Set to "True" to simulate all transactions (default behavior)
-DRY_RUN_MODE="True"
-
-# Set to "False" to execute real trades on the OKX DEX
-# DRY_RUN_MODE="False"
-```
-When `DRY_RUN_MODE` is active, any command that would normally result in a blockchain transaction will instead return a simulated success message, allowing you to test the bot's functionality without risk.
-
-### Admin Secret Key
-This key is used to protect the new admin endpoint for clearing the database during development.
-
-## 📄 License
-
-This project is licensed under the MIT License. You can find the full license text in the `LICENSE` file.
-
-## Temporary Admin Tools (For Development)
-During development, you may need to clear the PostgreSQL database to reset all users, wallets, and portfolio data. A temporary, secure admin page has been added for this purpose.
-
-To clear the database:
-1.  Ensure you have set the `ADMIN_SECRET_KEY` environment variable in your `.env` file or in your Render dashboard. This should be a long, random string.
-2.  Visit the following URL in your browser:
-    `https://esther-bot-9l9d.onrender.com/admin/clear-db-page/<your_secret_key>`
-    
-    Replace `<your_secret_key>` with the secret key you set.
-3.  Click the "Clear Database Now" button on the page to confirm the action.
-
-### Running the End-to-End Test
-The `e2e_test.py` script is provided to perform live checks against the Gemini and OKX APIs.
-It requires the following environment variables to be set:
-
-- `GEMINI_API_KEY`
-- `OKX_API_KEY`
-- `OKX_API_SECRET`
-- `OKX_API_PASSPHRASE`
-- `OKX_PROJECT_ID`
-- `TEST_WALLET_ADDRESS`
-- `TEST_WALLET_PRIVATE_KEY`
-
-Run the test with:
-```bash
-python e2e_test.py
-```
-
-This will test all major functionality including conversational NLP, portfolio management, and API integrations.
+We would like to extend our sincere gratitude to **OKX** for providing the powerful and versatile DEX API that serves as the backbone of this project. The comprehensive features and robust performance of the OKX DEX API have been instrumental in bringing Esther to life.
