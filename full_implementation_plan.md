@@ -30,13 +30,12 @@ This document enumerates the remaining gaps, technical debt, and placeholders in
   - [ ] Documentation: note BTC address aliasing in `how-it-works.md` and memory bank.
 
 ### A4. Price alerts robustness
-- **Status**: PARTIAL
-- **Now**: Monitoring uses dynamic decimals and correct imports; OKX client has retries.
-- **Next**: Add lightweight rate limiting/backoff in the alert loop.
+- **Status**: DONE
+- **Now**: Monitoring uses dynamic decimals and correct imports; OKX client has retries; per-alert delay + jitter and error backoff are configurable via env.
 
 ### A5. Insights use placeholders
-- **Status**: TODO
-- **Plan**: Pull real snapshot via `PortfolioService.get_snapshot()` and enrich with live prices.
+- **Status**: DONE
+- **Now**: `InsightsClient` uses `PortfolioService.get_snapshot()` for holdings; prompt includes minimal live price context.
 
 ### A6. Portfolio performance persistence cadence
 - **Status**: PARTIAL
@@ -80,11 +79,13 @@ This document enumerates the remaining gaps, technical debt, and placeholders in
 - Update `README.md`, `how-it-works.md`, and `okx_dex_api_integration.md` to reflect the changes. (ONGOING)
 
 ## E. Phase 1 – Actionable To-Do (1–2 days)
-1.  Add BTC→WBTC aliasing (A3) and tests.
-2.  Add minimal alert loop backoff (A4).
-3.  Update docs accordingly.
+1.  Add BTC→WBTC aliasing (A3) and tests. (DONE)
+2.  Add minimal alert loop backoff (A4). (DONE)
+3.  Update docs accordingly. (DONE)
+4.  Use real snapshot data for Insights (A5). (DONE)
 
 ## F. Phase 2 – Live Trading & Advanced Orders
 1.  Persist and evaluate advanced orders (A7).
 2.  Rebalance slippage config and per-leg simulation (A8).
-3.  Write tests and update documentation.
+3.  Add `/snapshot` admin command (A6) and tests.
+4.  Write tests and update documentation.

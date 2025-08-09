@@ -31,3 +31,14 @@
   - For live trades (`DRY_RUN_MODE` = False), the default wallet’s encrypted private key is decrypted in-memory for signing.
 - `TokenResolver` is lazily instantiated inside `confirm_swap` to avoid NoneType issues when handlers are invoked without full app startup.
 - BTC Handling: For EVM address contexts (quotes/swaps), `BTC` is aliased to `WBTC` for address/decimals; for charts, `BTC` uses the `BTC-USD` instrument ID.
+
+## 6. Monitoring Backoff & Throttling (A4)
+- Alert checks use a small per-alert delay with jitter to avoid bursts.
+- On quote errors or suspected rate limiting, the worker backs off briefly before continuing.
+- Environment variables:
+  - `ALERT_QUOTE_DELAY_MS` (default 100)
+  - `ALERT_ERROR_BACKOFF_MS` (default 500)
+
+## 7. Insights Data Source (A5)
+- Insights now consume `PortfolioService.get_snapshot()` to build holdings `{symbol: quantity}`.
+- Minimal enrichment from OKX DEX quote endpoints is included in the prompt context.

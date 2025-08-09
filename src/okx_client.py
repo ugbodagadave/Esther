@@ -178,7 +178,7 @@ class OKXClient:
             bar = "1D"
             limit = "7"
             okx_period = "1D"
-        elif period == "1m":
+        elif period == "1m" or period == "30d":
             begin = int((now - timedelta(days=30)).timestamp() * 1000)
             bar = "1D"
             limit = "30"
@@ -240,6 +240,10 @@ class OKXClient:
                 else:
                     error_msg = data.get("msg", "Unknown API error")
                     logger.error(f"Error fetching historical price from OKX API: {error_msg}")
+                    # Retry on API error as well (not only HTTP errors)
+                    if attempt < self.max_retries - 1:
+                        time.sleep(self.retry_delay)
+                        continue
                     return {"success": False, "error": f"API Error: {error_msg}"}
             except requests.exceptions.HTTPError as e:
                 logger.warning(f"HTTP Error on attempt {attempt + 1}: {e}. Retrying in {self.retry_delay}s...")

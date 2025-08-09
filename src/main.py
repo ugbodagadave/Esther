@@ -216,7 +216,7 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int
 async def get_price_chart_intent(update: Update, context: ContextTypes.DEFAULT_TYPE, entities: dict):
     """Handles the get_price_chart intent."""
     symbol = entities.get("symbol")
-    period = entities.get("period", "7d")  # Default to 7 days
+    raw_period = entities.get("period", "7d")  # Default to 7 days
 
     if not symbol:
         await update.message.reply_text("Please specify a token symbol (e.g., BTC, ETH).")
@@ -226,6 +226,9 @@ async def get_price_chart_intent(update: Update, context: ContextTypes.DEFAULT_T
     if not token_address:
         await update.message.reply_text(f"Sorry, I don't have the address for the token {symbol.upper()}.")
         return
+
+    # Normalize flexible period inputs to supported values for OKX client
+    period = _normalize_chart_period(raw_period)
 
     await update.message.reply_text(f"Generating price chart for {symbol.upper()} over the last {period}...")
 
@@ -609,34 +612,20 @@ async def insights(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     insights_text = insights_client.generate_insights(user_id)
     await update.message.reply_text(insights_text)
 
-def _parse_period_to_days(period_str: str) -> int:
-    """
-    Parses a flexible time period string into a number of days.
-    Handles formats like "7d", "14 days", "last month", "1 year".
-    """
+def _normalize_chart_period(period_str: str) -> str:
+    """Map flexible inputs like 'last 30 days' to supported strings: '24h', '7d', '30d'."""
     if not isinstance(period_str, str):
-        return 7  # Default
-
-    period_str = period_str.lower().strip()
-
-    # Handle "last month", "last year"
-    if "month" in period_str:
-        return 30
-    if "year" in period_str:
-        return 365
-
-    # Handle "7d", "14days", "1y" etc.
-    match = re.match(r"(\d+)\s*(d|day|days|y|year|years)?", period_str)
-    if match:
-        unit = match.group(2)
-        if unit in ('y', 'year', 'years'):
-            return int(match.group(1)) * 365
-        try:
-            return int(match.group(1))
-        except (ValueError, TypeError):
-            pass
-            
-    return 7 # Default if no other format matches
+        return '7d'
+    s = period_str.lower().strip()
+    # Handle common phrases
+    if s in ("24h", "1d", "day", "1 day", "last day"):
+        return "24h"
+    if "30" in s or "month" in s or s in ("1m", "30d", "last month", "1 month", "30 days"):
+        return "30d"
+    if "7" in s or "week" in s or s in ("7d", "last week"):
+        return "7d"
+    # Default
+    return '7d'
 
 async def portfolio_performance(update: Update, context: ContextTypes.DEFAULT_TYPE, entities: dict):
     """Handles the get_portfolio_performance intent."""
@@ -1293,3 +1282,32 @@ def show_clear_database_page(secret_key: str):
     """
     from fastapi.responses import HTMLResponse
     return HTMLResponse(content=html_content)
+
+def _parse_period_to_days(period_str: str) -> int:
+    """
+    Parses a flexible time period string into a number of days.
+    Handles formats like "7d", "14 days", "last month", "1 year".
+    """
+    if not isinstance(period_str, str):
+        return 7  # Default
+
+    s = period_str.lower().strip()
+
+    # Handle "last month", "last year"
+    if "month" in s:
+        return 30
+    if "year" in s or s in ("1y",):
+        return 365
+
+    # Handle "7d", "14days", numeric days
+    match = re.match(r"(\d+)\s*(d|day|days|y|year|years)?", s)
+    if match:
+        unit = match.group(2)
+        if unit in ('y', 'year', 'years'):
+            return int(match.group(1)) * 365
+        try:
+            return int(match.group(1))
+        except (ValueError, TypeError):
+            pass
+            
+    return 7 # Default if no other format matches

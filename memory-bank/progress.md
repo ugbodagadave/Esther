@@ -8,8 +8,10 @@ The project has entered Phase 2, focusing on implementing live trading functiona
 ## 2. What Works
 - **Live Trading User Settings**: Users can now set a default wallet and enable/disable live trading using natural language or the `/setdefaultwallet` and `/enablelivetrading` commands. Validation now occurs even during simulations when live trading is enabled.
 - **Confirm Swap Flow**: Fixed and hardened. Validates presence of default wallet if live trading is enabled; aborts with clear messages when missing/not found; lazily initializes `TokenResolver` to avoid startup/test race conditions.
+- **Insights (Real Data)**: Insights now use `PortfolioService.get_snapshot()` to build holdings before invoking Gemini Pro. Minimal OKX price enrichment is applied.
+- **Alert Throttling/Backoff**: Price alert checks now include per-alert delay + jitter and error backoff with `ALERT_QUOTE_DELAY_MS` and `ALERT_ERROR_BACKOFF_MS` envs.
 - **E2E Coverage**: Extended to NLP intents (`set_default_wallet`, `enable_live_trading`), DB-level confirmation of default wallet/live trading, portfolio, rebalance, performance, price chart, quotes, and simulated swaps.
-- **Docs Updated**: `how-it-works.md`, project `README.md`, `TESTING_GUIDE.md`, and `error_handling.md` reflect the above behaviors.
+- **Docs Updated**: `how-it-works.md`, project `README.md`, `TESTING_GUIDE.md`, and memory-bank docs reflect the above behaviors.
 - **DB Migration for Live Trading**: The `users` table has been updated with `default_wallet_id` and `live_trading_enabled` columns.
 - **Simple Price Charts**: The new feature to allow users to request and view simple price charts for a given token and time period is fully implemented and working.
 - **Complete Project Foundation**: All core documentation (`Memory Bank`, `prd.md`, `plan.md`, etc.) is in place.
@@ -32,7 +34,7 @@ The project has entered Phase 2, focusing on implementing live trading functiona
 - **Personalized Market Insights**: A new `/insights` command provides users with personalized market analysis and recommendations.
 - **Cross-Chain Swaps**: The bot now supports trading tokens across different blockchains, including Ethereum, Arbitrum, and Polygon.
 - **Portfolio Performance Tracker**: The initial implementation of the portfolio performance tracker is complete.
-- **Code Stability**: The entire unit test suite has been run, and all 67 tests are passing. E2E scripts have been updated to cover user settings, NLP intents, and core workflows.
+- **Code Stability**: The entire unit test suite has been run, and all 69 tests are passing. E2E scripts have been updated to cover user settings, NLP intents, and core workflows.
 - **Bug Fixes Implemented**:
 - **Price Chart Bug Fix**: Fixed a critical bug where the price chart for BTC was showing incorrect prices.
     - **Portfolio Performance Tracker**: Fixed a critical bug where the time period was not being correctly parsed from user input.
@@ -47,15 +49,14 @@ The project has entered Phase 2, focusing on implementing live trading functiona
     - **OKX Client**: Added the `OK-ACCESS-PROJECT` header to all requests in `okx_client.py` to ensure API parity.
 
 ## 3. What's Left to Build
-- **Advanced Orders**:
-    - Implement the database schema for advanced orders.
-    - Extend the monitoring service to evaluate order conditions.
-    - Implement user notifications for triggered orders.
+- **A6 – Manual Snapshot Command**: Add a `/snapshot` admin command (idempotent daily save) and tests.
+- **A7 – Advanced Orders**: Persist stop-loss/take-profit, evaluate in monitoring, and notify.
+- **A8 – Rebalance Slippage**: Per-trade slippage config and per-leg simulation in DRY_RUN.
 - **Education & UX Enhancements**: On-demand learning modules and richer conversational guidance.
 - **Real-time Notifications**: Begin work on the observer pattern for real-time market alerts.
 
 ## 4. Known Issues & Blockers
-- Monitor OKX/Gemini rate limits and transient 500s; retry logic is in place but may need tuning under load.
+- Monitor OKX/Gemini rate limits and transient 500s; retry and backoff are in place but may need tuning under load.
 - **Potential Blockers**:
     - **API Access**: Access to OKX DEX, Gemini, and News APIs will be required. The process for obtaining and securely managing these keys needs to be addressed.
     - **Render Free Tier Limitations**: The constraints of the free tier may become a blocker during later stages of development if the application's resource usage exceeds the allocated limits. This needs to be monitored closely.
