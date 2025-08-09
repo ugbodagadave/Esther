@@ -6,7 +6,7 @@
 The project has entered Phase 2, focusing on implementing live trading functionality and advanced order types.
 
 ## 2. What Works
-- **Live Trading User Settings**: Users can now set a default wallet and enable/disable live trading using the `/setdefaultwallet` and `/enablelivetrading` commands.
+- **Live Trading User Settings**: Users can now set a default wallet and enable/disable live trading using natural language or the `/setdefaultwallet` and `/enablelivetrading` commands.
 - **DB Migration for Live Trading**: The `users` table has been updated with `default_wallet_id` and `live_trading_enabled` columns.
 - **Simple Price Charts**: The new feature to allow users to request and view simple price charts for a given token and time period is fully implemented and working.
 - **Complete Project Foundation**: All core documentation (`Memory Bank`, `prd.md`, `plan.md`, etc.) is in place.

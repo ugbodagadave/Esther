@@ -4,7 +4,7 @@
 The current focus is on implementing the live trading flow, as outlined in Phase 2 of the `full_implementation_plan.md`.
 
 ## 2. Recent Changes & Decisions
-- **Live Trading User Settings**: Implemented the `/setdefaultwallet` and `/enablelivetrading` commands to allow users to manage their live trading preferences.
+- **Live Trading User Settings**: Implemented the `/setdefaultwallet` and `/enablelivetrading` commands, and their corresponding natural language intents, to allow users to manage their live trading preferences.
 - **DB Migration for Live Trading**: Added `users.default_wallet_id` and `users.live_trading_enabled` columns to the `users` table to support the live trading feature.
 - **Price Chart Bug Fix**: Fixed a critical bug where the price chart for BTC was showing incorrect prices. The issue was caused by using the WBTC token address instead of the correct instrument ID for BTC. The `get_historical_price` function has been refactored to handle both instrument IDs and token addresses, using the correct API endpoint for each.
 - **Matplotlib Backend**: Configured `matplotlib` to use the `Agg` backend to prevent GUI-related errors in a server environment.
