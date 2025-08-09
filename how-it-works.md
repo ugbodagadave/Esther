@@ -66,10 +66,10 @@ Here is the step-by-step journey of a user command, from Telegram to execution a
     *   **User Action**: The user clicks either "Confirm" or "Cancel".
     *   **Callback Handling**: A `CallbackQueryHandler` captures the user's choice.
     *   **Swap Execution**: If the user confirms, the `confirm_swap` function is called. It retrieves the swap details from `context.user_data` and calls the `execute_swap` method in the **External Services Layer**.
-    *   **Dry Run vs. Live Mode**: The `execute_swap` function is called with a `dry_run` parameter that defaults to the global `DRY_RUN_MODE` setting.
-        *   The function *always* begins by fetching a live quote from the OKX DEX API.
-        *   If `dry_run` is `True`, the function returns a simulated success message with the quote data, and no transaction is sent.
-        *   If `dry_run` is `False`, the function proceeds to send a signed request to the `/api/v5/dex/aggregator/swap` endpoint to execute a real transaction on the blockchain.
+    *   **Dry Run vs. Live Mode**: The `confirm_swap` function now checks if `live_trading_enabled` is `True` for the user.
+        *   If `dry_run` is `True` (default), the function returns a simulated success message with the quote data, and no transaction is sent.
+        *   If `live_trading_enabled` is `True`, the function resolves the user's `default_wallet_id`, fetches the corresponding wallet, decrypts the private key in-memory, and uses it to sign and execute a real transaction via the OKX DEX aggregator.
+        *   If `live_trading_enabled` is `False`, the bot informs the user that live trading is disabled and provides instructions on how to enable it.
     *   **Cancellation**: If the user cancels, the `cancel_swap` function is called, the conversation ends, and the stored swap details are cleared.
 6.  **Response and Logging**:
     *   The result of the quote API call is received.
@@ -154,7 +154,9 @@ The choice between Gemini Pro and Flash is dynamic and crucial for balancing per
 Security is paramount. The following measures are integral to the design:
 -   **Environment Variables**: All system-level API keys and secrets are managed exclusively through environment variables and are never hardcoded.
 -   **Secure Web App for Private Keys**: To enhance security, the bot uses a Telegram Web App for private key submission. Instead of sending sensitive data through chat, users are directed to a secure, isolated web interface. This prevents private keys from being stored in chat history and adds a layer of protection against unauthorized access.
--   **Database Encryption**: User-specific sensitive data, particularly OKX DEX API keys, are encrypted using a strong algorithm (e.g., AES-256) before being stored in the PostgreSQL database. The encryption key itself is managed as a secure environment variable.
+-   **Database Encryption**: User-specific sensitive data, particularly OKX DEX API keys and wallet private keys, are encrypted using a strong algorithm (e.g., AES-256) before being stored in the PostgreSQL database. The encryption key itself is managed as a secure environment variable.
+-   **In-Memory Decryption**: Private keys are only decrypted in-memory at the moment of transaction signing and are never stored in plaintext.
+-   **User-Controlled Live Trading**: Live trading is disabled by default. Users must explicitly enable it and set a default wallet, giving them full control over their funds.
 -   **Immutable Transaction Confirmation**: The pre-execution confirmation step is a mandatory, non-skippable part of the workflow for any action that modifies a user's assets.
 -   **Principle of Least Privilege**: The OKX DEX API keys requested from the user should have the minimum required permissions for the bot's functionality.
 -   **Database Schema Migration**: Automatic schema initialization ensures the database structure is always up-to-date, preventing runtime errors.

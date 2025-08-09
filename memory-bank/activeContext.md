@@ -1,9 +1,10 @@
 # Active Context: Esther
 
 ## 1. Current Focus
-The current focus is on ensuring the stability and correctness of the newly implemented "Simple Price Charts" feature.
+The current focus is on implementing the live trading flow, as outlined in Phase 2 of the `full_implementation_plan.md`.
 
 ## 2. Recent Changes & Decisions
+- **DB Migration for Live Trading**: Added `users.default_wallet_id` and `users.live_trading_enabled` columns to the `users` table to support the live trading feature.
 - **Price Chart Bug Fix**: Fixed a critical bug where the price chart for BTC was showing incorrect prices. The issue was caused by using the WBTC token address instead of the correct instrument ID for BTC. The `get_historical_price` function has been refactored to handle both instrument IDs and token addresses, using the correct API endpoint for each.
 - **Matplotlib Backend**: Configured `matplotlib` to use the `Agg` backend to prevent GUI-related errors in a server environment.
 - **Simple Price Charts Feature**: Implemented the core feature, including the NLP intent, data fetching, chart generation, and Telegram bot handler.
@@ -24,7 +25,9 @@ The current focus is on ensuring the stability and correctness of the newly impl
 - **OKX Client**: Added the `OK-ACCESS-PROJECT` header to all requests in `okx_client.py` to ensure API parity.
 
 ## 3. Next Steps
-1.  **On-Demand Education**: Begin work on an integrated learning module to explain DeFi concepts on the fly.
+1.  **Implement Live Trading Flow**: Continue with the implementation of the live trading flow, including user settings, updating the `confirm_swap` function, and writing comprehensive tests.
+2.  **Implement Advanced Orders**: Begin work on the advanced orders feature, including database migrations, monitoring, and notifications.
+3.  **On-Demand Education**: Begin work on an integrated learning module to explain DeFi concepts on the fly.
 
 ## 4. Active Learnings & Insights
 - API endpoints can change, and it's important to have a robust testing and validation process to catch these changes early.

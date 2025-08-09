@@ -1,11 +1,12 @@
 # Project Progress: Esther
 
 ## 1. Current Status
-**Phase 3: Feature Expansion**
+**Phase 2: Live Trading & Advanced Orders**
 
-The project is moving into a feature expansion phase. The "Simple Price Charts" feature has been implemented and is now stable.
+The project has entered Phase 2, focusing on implementing live trading functionality and advanced order types.
 
 ## 2. What Works
+- **DB Migration for Live Trading**: The `users` table has been updated with `default_wallet_id` and `live_trading_enabled` columns.
 - **Simple Price Charts**: The new feature to allow users to request and view simple price charts for a given token and time period is fully implemented and working.
 - **Complete Project Foundation**: All core documentation (`Memory Bank`, `prd.md`, `plan.md`, etc.) is in place.
 - **Telegram Bot**: The bot is live, connects to Telegram, and can handle basic commands (`/start`, `/help`).
@@ -42,6 +43,14 @@ The project is moving into a feature expansion phase. The "Simple Price Charts" 
     - **OKX Client**: Added the `OK-ACCESS-PROJECT` header to all requests in `okx_client.py` to ensure API parity.
 
 ## 3. What's Left to Build
+- **Live Trading Flow**:
+    - Implement `/setdefaultwallet` and `/enablelivetrading` commands.
+    - Update `confirm_swap` to handle live trades.
+    - Write comprehensive tests for the new functionality.
+- **Advanced Orders**:
+    - Implement the database schema for advanced orders.
+    - Extend the monitoring service to evaluate order conditions.
+    - Implement user notifications for triggered orders.
 - **On-Demand Education**: An integrated learning module to explain DeFi concepts on the fly.
 - **Real-time Notifications**: Begin work on the observer pattern for real-time market alerts.
 

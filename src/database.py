@@ -41,8 +41,36 @@ def initialize_database():
                     id SERIAL PRIMARY KEY,
                     telegram_id BIGINT UNIQUE NOT NULL,
                     username VARCHAR(255),
-                    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+                    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+                    default_wallet_id INTEGER REFERENCES wallets(id) ON DELETE SET NULL,
+                    live_trading_enabled BOOLEAN DEFAULT FALSE
                 );
+            """)
+
+            # Add default_wallet_id to users table if it doesn't exist
+            cur.execute("""
+                DO $$
+                BEGIN
+                    IF NOT EXISTS (
+                        SELECT 1 FROM information_schema.columns
+                        WHERE table_name='users' AND column_name='default_wallet_id'
+                    ) THEN
+                        ALTER TABLE users ADD COLUMN default_wallet_id INTEGER REFERENCES wallets(id) ON DELETE SET NULL;
+                    END IF;
+                END$$;
+            """)
+
+            # Add live_trading_enabled to users table if it doesn't exist
+            cur.execute("""
+                DO $$
+                BEGIN
+                    IF NOT EXISTS (
+                        SELECT 1 FROM information_schema.columns
+                        WHERE table_name='users' AND column_name='live_trading_enabled'
+                    ) THEN
+                        ALTER TABLE users ADD COLUMN live_trading_enabled BOOLEAN DEFAULT FALSE;
+                    END IF;
+                END$$;
             """)
             
             # Create credentials table
