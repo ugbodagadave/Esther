@@ -113,7 +113,39 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                 )
     except Exception as e:
         logger.error(f"Database error during /start for user {user.id}: {e}")
-        await update.message.reply_text("An error occurred while accessing your account.")
+        # If the schema was cleared after startup, try to re-initialize on the fly
+        if "relation \"users\" does not exist" in str(e).lower():
+            try:
+                initialize_database()
+                # Retry once after initializing schema
+                conn_retry = get_db_connection()
+                if conn_retry is not None:
+                    with conn_retry.cursor() as cur:
+                        cur.execute("SELECT id FROM users WHERE telegram_id = %s;", (user.id,))
+                        result = cur.fetchone()
+                        if result is None:
+                            cur.execute(
+                                "INSERT INTO users (telegram_id, username) VALUES (%s, %s);",
+                                (user.id, user.username)
+                            )
+                            conn_retry.commit()
+                            logger.info(f"New user {user.username} ({user.id}) created after DB init.")
+                            await update.message.reply_text(
+                                "Hello! I'm Esther — your friendly DeFi co-pilot. Ready when you are! 🚀",
+                                reply_markup=reply_markup
+                            )
+                        else:
+                            await update.message.reply_text(
+                                "Welcome back! What can I do for you today? 😊",
+                                reply_markup=reply_markup
+                            )
+                else:
+                    await update.message.reply_text("Database connection failed. Please try again shortly.")
+            except Exception as e2:
+                logger.error(f"Retry after DB init failed during /start for user {user.id}: {e2}")
+                await update.message.reply_text("An error occurred while initializing your account. Please try again.")
+        else:
+            await update.message.reply_text("An error occurred while accessing your account.")
     finally:
         if conn:
             conn.close()
@@ -1286,6 +1318,7 @@ def show_clear_database_page(secret_key: str):
         <div class="container">
             <h1>Confirm Database Clearing</h1>
             <p>Clicking this button will permanently delete all data.</p>
+            <p><strong>After clearing:</strong> either restart the app to run startup initialization, or if your first /start shows an account access error, simply send <code>/start</code> once more so Esther can rebuild the schema automatically.</p>
             <form action="/admin/clear-database/{secret_key}" method="post">
                 <button type="submit">Clear Database Now</button>
             </form>
