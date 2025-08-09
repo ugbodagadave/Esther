@@ -60,6 +60,8 @@ class NLPClient:
         - execute_rebalance: User wants to execute a portfolio rebalance.
         - get_portfolio_performance: User wants to know their portfolio performance.
         - get_price_chart: User wants to see a price chart for a token.
+        - set_default_wallet: User wants to set their default wallet for trading.
+        - enable_live_trading: User wants to enable or disable live trading.
         
         For trading intents (buy, sell), extract the following entities if present:
         - symbol: The token symbol (e.g., ETH, BTC).
@@ -88,6 +90,8 @@ class NLPClient:
         Example for execute_rebalance: {{"intent": "execute_rebalance", "entities": {{}}}}
         Example for get_portfolio_performance: {{"intent": "get_portfolio_performance", "entities": {{"period": "7d"}}}}
         Example for get_price_chart: {{"intent": "get_price_chart", "entities": {{"symbol": "BTC", "period": "7d"}}}}
+        Example for set_default_wallet: {{"intent": "set_default_wallet", "entities": {{}}}}
+        Example for enable_live_trading: {{"intent": "enable_live_trading", "entities": {{}}}}
 
         Query: "{text}"
         """

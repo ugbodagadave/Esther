@@ -214,6 +214,40 @@ class TestMainHandlers(unittest.IsolatedAsyncioTestCase):
         mock_insights.assert_called_once_with(update, context)
         self.assertEqual(result, ConversationHandler.END)
 
+    @patch('src.main.set_default_wallet_start')
+    @patch('src.main.nlp_client')
+    async def test_handle_text_set_default_wallet(self, mock_nlp_client, mock_set_default_wallet_start):
+        """Test that 'set_default_wallet' intent calls the correct handler."""
+        # Arrange
+        update, context = await self._create_update_context("set my default wallet")
+        mock_nlp_client.parse_intent.return_value = {"intent": "set_default_wallet", "entities": {}}
+        mock_set_default_wallet_start.return_value = AWAIT_WALLET_SELECTION
+
+        # Act
+        result = await handle_text(update, context)
+
+        # Assert
+        mock_nlp_client.parse_intent.assert_called_once_with("set my default wallet", model_type='flash')
+        mock_set_default_wallet_start.assert_called_once_with(update, context)
+        self.assertEqual(result, AWAIT_WALLET_SELECTION)
+
+    @patch('src.main.enable_live_trading_start')
+    @patch('src.main.nlp_client')
+    async def test_handle_text_enable_live_trading(self, mock_nlp_client, mock_enable_live_trading_start):
+        """Test that 'enable_live_trading' intent calls the correct handler."""
+        # Arrange
+        update, context = await self._create_update_context("enable live trading")
+        mock_nlp_client.parse_intent.return_value = {"intent": "enable_live_trading", "entities": {}}
+        mock_enable_live_trading_start.return_value = AWAIT_LIVE_TRADING_CONFIRMATION
+
+        # Act
+        result = await handle_text(update, context)
+
+        # Assert
+        mock_nlp_client.parse_intent.assert_called_once_with("enable live trading", model_type='flash')
+        mock_enable_live_trading_start.assert_called_once_with(update, context)
+        self.assertEqual(result, AWAIT_LIVE_TRADING_CONFIRMATION)
+
     @patch('src.main.okx_client.execute_swap')
     @patch('src.main.DRY_RUN_MODE', True)
     async def test_confirm_swap_respects_dry_run_mode(self, mock_execute_swap):

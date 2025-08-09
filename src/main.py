@@ -198,6 +198,12 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int
         await get_price_chart_intent(update, context, entities)
         return ConversationHandler.END
 
+    elif intent == "set_default_wallet":
+        return await set_default_wallet_start(update, context)
+
+    elif intent == "enable_live_trading":
+        return await enable_live_trading_start(update, context)
+
     elif intent == "greeting":
         await update.message.reply_text("Hello! How can I assist you with your trades today?")
         return ConversationHandler.END
