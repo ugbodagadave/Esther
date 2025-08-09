@@ -17,10 +17,11 @@ Esther is designed to be a comprehensive AI trading assistant. Here are its core
 | **Live Price Quotes** | Get real-time price quotes for any token pair. | `/api/v5/dex/aggregator/quote` |
 | **Token Swaps** | Execute trades across multiple DEXs to get the best price. | `/api/v5/dex/aggregator/swap` |
 | **Portfolio Tracking** | Get a real-time snapshot of your wallet balances and their USD value. | `/api/v5/dex/balance/all-token-balances-by-address` |
-| **Price Alerts** | Set custom price alerts to get notified of market movements. | `/api/v5/dex/market/candlesticks-history` |
+| **Price Alerts** | Set custom price alerts to get notified of market movements. | `/api/v5/dex/aggregator/quote` |
 | **Portfolio Rebalancing**| Automatically generate and execute a plan to rebalance your portfolio. | `/api/v5/dex/aggregator/swap` |
 | **Portfolio Performance**| Track the historical performance of your crypto assets. | `/api/v5/dex/historical-index-price` |
 | **Price Charts**| Generate a price chart for a token over a specified period. | `/api/v5/market/history-candles`, `/api/v5/wallet/token/historical-price` |
+| **Token Resolution**| Dynamically resolve token metadata to ensure accurate pricing. | (Internal) |
 
 For a detailed explanation of how we integrated the OKX DEX API, see our [OKX DEX API Integration Guide](./okx_dex_api_integration.md).
 
@@ -35,6 +36,7 @@ For a more detailed breakdown of how these features work, please see the [How It
 -   **Database**: PostgreSQL
 -   **Crypto Exchange**: **OKX DEX API**
 -   **Cloud Hosting**: Render
+-   **L2 Focus**: OKX X Layer (zkEVM, Polygon CDK, OKB gas)
 
 ## 🚀 How to Get Started
 
@@ -89,7 +91,20 @@ To ensure all functionalities are working correctly, you can refer to the [**TES
 
 ## 💡 Potential for X Layer Integration
 
-X Layer, a high-performance, EVM-compatible Layer 2 network, offers a significant opportunity to enhance Esther's capabilities. By integrating with X Layer, we can provide users with faster, cheaper, and more scalable transactions. For a detailed explanation of our X Layer integration strategy, please see the [OKX DEX API Integration Guide](./okx_dex_api_integration.md).
+- X Layer is OKX’s zkEVM Layer‑2 built with Polygon CDK, using **OKB** as the gas token and offering full EVM compatibility with low fees and fast finality.
+- Esther can target X Layer by supplying its chain identifier to existing OKX Aggregator quote/swap calls and including it in portfolio balance sync—no contract rewrites required.
+- For first‑time users, the bot can deep‑link to OKX Bridge to fund X Layer quickly.
+
+See the concise plan in `okx_dex_api_integration.md`.
+
+## ⚙️ Live Trading vs Dry Run
+
+- By default, Esther runs in simulation mode controlled by the `DRY_RUN_MODE` environment variable (default: `True`).
+- To execute real swaps:
+  - Set `DRY_RUN_MODE="False"` in `.env`.
+  - Enable live trading in-chat via `/enablelivetrading`.
+  - Set a default wallet via `/setdefaultwallet`.
+- When live trading is enabled but `DRY_RUN_MODE` remains `True`, swaps are still simulated; however, the bot validates that a default wallet exists in your account. If missing or not found, the operation aborts with a clear message.
 
 ## 🙏 Acknowledgements
 

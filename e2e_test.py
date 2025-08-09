@@ -251,7 +251,63 @@ def run_e2e_test():
             print("    ✅ SUCCESS: Correctly parsed 'show_portfolio' intent.")
         else:
             print(f"    ❌ FAILURE: Incorrectly parsed 'show_portfolio'. Got: {intent_data}")
-            
+
+        # Test "greeting"
+        print("    Query: 'hello esther'")
+        intent_data = nlp_client.parse_intent("hello esther")
+        if intent_data.get('intent') == 'greeting':
+            print("    ✅ SUCCESS: Correctly parsed 'greeting' intent.")
+        else:
+            print(f"    ❌ FAILURE: Incorrectly parsed 'greeting'. Got: {intent_data}")
+
+        # Test "get_price"
+        print("    Query: 'what is the price of btc'")
+        intent_data = nlp_client.parse_intent("what is the price of btc")
+        if intent_data.get('intent') == 'get_price':
+            print("    ✅ SUCCESS: Correctly parsed 'get_price' intent.")
+        else:
+            print(f"    ❌ FAILURE: Incorrectly parsed 'get_price'. Got: {intent_data}")
+
+        # Test "set_stop_loss"
+        print("    Query: 'set stop loss for BTC at 60000'")
+        intent_data = nlp_client.parse_intent("set stop loss for BTC at 60000")
+        if intent_data.get('intent') == 'set_stop_loss':
+            print("    ✅ SUCCESS: Correctly parsed 'set_stop_loss' intent.")
+        else:
+            print(f"    ❌ FAILURE: Incorrectly parsed 'set_stop_loss'. Got: {intent_data}")
+
+        # Test "set_take_profit"
+        print("    Query: 'set take profit for ETH at 3500'")
+        intent_data = nlp_client.parse_intent("set take profit for ETH at 3500")
+        if intent_data.get('intent') == 'set_take_profit':
+            print("    ✅ SUCCESS: Correctly parsed 'set_take_profit' intent.")
+        else:
+            print(f"    ❌ FAILURE: Incorrectly parsed 'set_take_profit'. Got: {intent_data}")
+
+        # Test "get_insights"
+        print("    Query: 'give me market insights'")
+        intent_data = nlp_client.parse_intent("give me market insights")
+        if intent_data.get('intent') == 'get_insights':
+            print("    ✅ SUCCESS: Correctly parsed 'get_insights' intent.")
+        else:
+            print(f"    ❌ FAILURE: Incorrectly parsed 'get_insights'. Got: {intent_data}")
+
+        # Test "set_default_wallet"
+        print("    Query: 'set my default wallet'")
+        intent_data = nlp_client.parse_intent("set my default wallet")
+        if intent_data.get('intent') == 'set_default_wallet':
+            print("    ✅ SUCCESS: Correctly parsed 'set_default_wallet' intent.")
+        else:
+            print(f"    ❌ FAILURE: Incorrectly parsed 'set_default_wallet'. Got: {intent_data}")
+
+        # Test "enable_live_trading"
+        print("    Query: 'enable live trading'")
+        intent_data = nlp_client.parse_intent("enable live trading")
+        if intent_data.get('intent') == 'enable_live_trading':
+            print("    ✅ SUCCESS: Correctly parsed 'enable_live_trading' intent.")
+        else:
+            print(f"    ❌ FAILURE: Incorrectly parsed 'enable_live_trading'. Got: {intent_data}")
+     
     except Exception as e:
         print(f"    ❌ FAILURE: Conversational NLP tests encountered an error: {e}")
         traceback.print_exc()
@@ -374,8 +430,90 @@ def test_e2e_portfolio_performance():
         traceback.print_exc()
 
 
+def test_e2e_user_settings_live_trading():
+    """Test setting default wallet and enabling live trading (DB-level to mirror handlers)."""
+    print("\n--- E2E User Settings: Default Wallet and Live Trading ---")
+    try:
+        load_dotenv()
+        initialize_database()
+
+        test_wallet_address = os.getenv("TEST_WALLET_ADDRESS")
+        test_wallet_pk = os.getenv("TEST_WALLET_PRIVATE_KEY")
+        if not test_wallet_address or not test_wallet_pk:
+            print("    ❌ FAILURE: TEST_WALLET_ADDRESS and TEST_WALLET_PRIVATE_KEY must be in .env for this test.")
+            return
+
+        conn = get_db_connection()
+        if not conn:
+            print("    ❌ FAILURE: Could not connect to the database for user settings test.")
+            return
+
+        dummy_telegram_id = 888888888
+        with conn.cursor() as cur:
+            # Ensure clean state
+            cur.execute("SELECT id FROM users WHERE telegram_id = %s;", (dummy_telegram_id,))
+            user_record = cur.fetchone()
+            if user_record:
+                user_pk = user_record[0]
+                cur.execute("DELETE FROM wallets WHERE user_id = %s;", (user_pk,))
+            cur.execute("DELETE FROM users WHERE telegram_id = %s;", (dummy_telegram_id,))
+            conn.commit()
+
+            # Create user
+            cur.execute("INSERT INTO users (telegram_id, username) VALUES (%s, %s) RETURNING id;", (dummy_telegram_id, 'e2e_user_settings'))
+            user_pk = cur.fetchone()[0]
+
+            # Add a wallet
+            encrypted_sk = encrypt_data(test_wallet_pk)
+            cur.execute(
+                "INSERT INTO wallets (user_id, name, address, encrypted_private_key, chain_id) VALUES (%s, %s, %s, %s, %s) RETURNING id;",
+                (user_pk, 'default_wallet', test_wallet_address, encrypted_sk, 1)
+            )
+            wallet_id = cur.fetchone()[0]
+
+            # Set default wallet (mirrors set_default_wallet_callback)
+            cur.execute("UPDATE users SET default_wallet_id = %s WHERE id = %s;", (wallet_id, user_pk))
+
+            # Enable live trading (mirrors enable_live_trading_callback)
+            cur.execute("UPDATE users SET live_trading_enabled = %s WHERE id = %s;", (True, user_pk))
+            conn.commit()
+
+            # Verify
+            cur.execute("SELECT default_wallet_id, live_trading_enabled FROM users WHERE id = %s;", (user_pk,))
+            default_wallet_id, live_enabled = cur.fetchone()
+
+        conn.close()
+
+        if default_wallet_id == wallet_id and live_enabled:
+            print("    ✅ SUCCESS: Default wallet set and live trading enabled in DB.")
+        else:
+            print("    ❌ FAILURE: Failed to set default wallet and/or enable live trading.")
+
+    except Exception as e:
+        print(f"    ❌ FAILURE: User settings test encountered an error: {e}")
+        traceback.print_exc()
+
+
 if __name__ == "__main__":
     run_e2e_test()
+    test_e2e_user_settings_live_trading()
     test_e2e_rebalance_suggestion()
     test_e2e_portfolio_performance()
     test_e2e_price_chart()
+    
+    # Optional: Insights E2E (requires Gemini and OKX creds, and a wallet for dummy user 999999999)
+    try:
+        from src.insights import InsightsClient
+        if os.getenv("GEMINI_API_KEY"):
+            print("\n--- E2E Insights Generation ---")
+            client = InsightsClient()
+            text = client.generate_insights(user_id=999999999)
+            if isinstance(text, str) and len(text) > 0:
+                print("    ✅ SUCCESS: Insights generated.")
+            else:
+                print("    ❌ FAILURE: Insights generation returned empty text.")
+        else:
+            print("\n(SKIP) E2E Insights: GEMINI_API_KEY not set.")
+    except Exception as e:
+        print(f"    ❌ FAILURE: Insights E2E encountered an error: {e}")
+        traceback.print_exc()

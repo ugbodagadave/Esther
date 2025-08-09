@@ -66,10 +66,14 @@ Here is the step-by-step journey of a user command, from Telegram to execution a
     *   **User Action**: The user clicks either "Confirm" or "Cancel".
     *   **Callback Handling**: A `CallbackQueryHandler` captures the user's choice.
     *   **Swap Execution**: If the user confirms, the `confirm_swap` function is called. It retrieves the swap details from `context.user_data` and calls the `execute_swap` method in the **External Services Layer**.
-    *   **Dry Run vs. Live Mode**: The `execute_swap` function is called with a `dry_run` parameter that defaults to the global `DRY_RUN_MODE` setting.
-        *   The function *always* begins by fetching a live quote from the OKX DEX API.
-        *   If `dry_run` is `True`, the function returns a simulated success message with the quote data, and no transaction is sent.
-        *   If `dry_run` is `False`, the function proceeds to send a signed request to the `/api/v5/dex/aggregator/swap` endpoint to execute a real transaction on the blockchain.
+    *   **Dry Run vs. Live Mode**: The `confirm_swap` function evaluates two flags:
+        - `live_trading_enabled` (per-user setting in DB)
+        - Global `DRY_RUN_MODE` (from environment)
+      Behavior:
+        - When `DRY_RUN_MODE` is `True` (default), swaps are simulated. If the user has turned on live trading, the bot still validates that a default wallet exists and is present in the database; otherwise it aborts with a clear message.
+        - When `DRY_RUN_MODE` is `False` and `live_trading_enabled` is `True`, the bot loads the default wallet, decrypts the private key in-memory, and executes a live swap.
+        - When `live_trading_enabled` is `False`, swaps are simulated and the bot may use a configured test wallet address.
+      Additionally, `TokenResolver` is lazily initialized inside `confirm_swap` if it has not yet been set (e.g., when tests invoke handlers without full app startup).
     *   **Cancellation**: If the user cancels, the `cancel_swap` function is called, the conversation ends, and the stored swap details are cleared.
 6.  **Response and Logging**:
     *   The result of the quote API call is received.
@@ -79,10 +83,32 @@ Here is the step-by-step journey of a user command, from Telegram to execution a
 7.  **Background Monitoring (Price Alerts)**:
     *   A separate, continuously running process (`src/monitoring.py`) handles real-time price alerts.
     *   **Periodic Checks**: Every 60 seconds, this process queries the `alerts` table in the **PostgreSQL Database** for all active alerts.
-    *   **Live Price Fetch**: For each active alert, it calls the **OKX DEX API** to get the current price of the monitored token.
+    *   **Live Price Fetch**: For each active alert, it calls the **OKX DEX API** to get the current price of the monitored token. It dynamically calculates the amount to quote based on the token's decimals, ensuring an accurate price check for any token.
     *   **Condition Check**: It compares the live price against the alert's target price and condition (e.g., `current_price > target_price`).
     *   **Notification**: If an alert is triggered, the monitoring service uses the **Telegram Bot API** to send a direct message to the user.
     *   **Deactivation**: Once an alert is triggered, it is marked as inactive in the database to prevent duplicate notifications.
+
+## 3.5 Personality & Conversational Style
+
+- Warm, concise, beginner‑friendly tone with light emojis where helpful
+- Offers example prompts when unsure what the user means
+- Clear confirmations and next‑step hints in multi‑step flows
+- Friendly but cautious insights; always includes a brief non‑advice disclaimer
+
+## 3.6 Help Menu ("What I can do")
+
+- Portfolio & Performance
+  - Show my portfolio; Portfolio performance (e.g., "30d"); Price chart (e.g., "BTC 7d")
+- Wallets
+  - Add a new wallet (secure Web App), List wallets, Delete wallet, Set default wallet
+- Trading & Quotes
+  - Buy/Sell tokens, Quick price checks
+- Alerts
+  - Set a price alert, List active alerts
+- Insights & Rebalance
+  - Generate insights, Rebalance plan
+- Live trading controls
+  - Enable/disable live trading (off by default)
 
 ## 4. Conversational NLP & Natural Language Understanding
 
@@ -104,6 +130,8 @@ The NLP module uses Google's Gemini models to parse user messages into structure
 - `get_insights`: "Give me market insights", "What's the market analysis?"
 - `execute_rebalance`: "Rebalance my portfolio", "Execute the rebalance plan"
 - `get_price_chart`: "Show me the price chart for BTC", "Chart for ETH over 7d"
+- `set_default_wallet`: "Set my default wallet", "/setdefaultwallet"
+- `enable_live_trading`: "Enable live trading", "/enablelivetrading"
 
 ### 4.2 Two-Tier Model Selection Strategy
 Esther intelligently chooses between Gemini models based on task complexity:
@@ -154,7 +182,9 @@ The choice between Gemini Pro and Flash is dynamic and crucial for balancing per
 Security is paramount. The following measures are integral to the design:
 -   **Environment Variables**: All system-level API keys and secrets are managed exclusively through environment variables and are never hardcoded.
 -   **Secure Web App for Private Keys**: To enhance security, the bot uses a Telegram Web App for private key submission. Instead of sending sensitive data through chat, users are directed to a secure, isolated web interface. This prevents private keys from being stored in chat history and adds a layer of protection against unauthorized access.
--   **Database Encryption**: User-specific sensitive data, particularly OKX DEX API keys, are encrypted using a strong algorithm (e.g., AES-256) before being stored in the PostgreSQL database. The encryption key itself is managed as a secure environment variable.
+-   **Database Encryption**: User-specific sensitive data, particularly OKX DEX API keys and wallet private keys, are encrypted using a strong algorithm (e.g., AES-256) before being stored in the PostgreSQL database. The encryption key itself is managed as a secure environment variable.
+-   **In-Memory Decryption**: Private keys are only decrypted in-memory at the moment of transaction signing and are never stored in plaintext.
+-   **User-Controlled Live Trading**: Live trading is disabled by default. Users must explicitly enable it and set a default wallet, giving them full control over their funds.
 -   **Immutable Transaction Confirmation**: The pre-execution confirmation step is a mandatory, non-skippable part of the workflow for any action that modifies a user's assets.
 -   **Principle of Least Privilege**: The OKX DEX API keys requested from the user should have the minimum required permissions for the bot's functionality.
 -   **Database Schema Migration**: Automatic schema initialization ensures the database structure is always up-to-date, preventing runtime errors.
@@ -168,6 +198,7 @@ Esther now keeps a real-time view of every user's on-chain balances **without re
      * `/api/v5/dex/balance/all-token-balances-by-address` – This single endpoint provides a consolidated list of native and token balances, along with their USD prices, across multiple chains.
    * All requests include the **`OK-ACCESS-PROJECT`** header. The value comes from the
      `OKX_PROJECT_ID` environment variable you obtain in the OKX *Developer Center → Projects* page.
+     This is handled automatically by the `OKXClient`.
      Without this header the API gateway returns an error.
    * Results are normalised into a common schema and pushed into the `holdings` table (one row per token, per user).
 2. **Valuation**
@@ -179,6 +210,19 @@ Esther now keeps a real-time view of every user's on-chain balances **without re
 4. **User Query Flow** (`/portfolio` or "Show me my portfolio")
    * Telegram handler → calls `PortfolioService.sync_balances()` (best-effort) → `PortfolioService.get_snapshot()`
    * A Markdown table is returned summarising quantity and USD value of each asset along with a grand total.
+
+### Insights Generation (uses real snapshot)
+- `InsightsClient.generate_insights(user_id)` now uses `PortfolioService.get_snapshot(user_id)` to build a user’s current holdings map `{symbol: quantity}`.
+- It enriches with a minimal set of live prices via the OKX DEX quote endpoint (ETH, BTC baseline), and asks Gemini Pro to generate concise insights.
+- If no portfolio data is available, the insights gracefully fall back to an empty portfolio context.
+
+## 7.5 Background Monitoring Throttling (Price Alerts)
+- Alert checks are performed every minute.
+- Per-alert quote calls are throttled with a small delay and jitter to avoid bursty traffic.
+- On API errors (including suspected rate limits), the worker backs off briefly before continuing.
+- Config:
+  - `ALERT_QUOTE_DELAY_MS` (default: 100) – base delay between alerts, plus small random jitter
+  - `ALERT_ERROR_BACKOFF_MS` (default: 500) – backoff when a quote call fails; increased if error suggests rate limiting
 
 ### Diversification & Performance Analytics
 * `get_diversification()` – returns a `{symbol: %}` map based on last valuation.
@@ -193,6 +237,7 @@ The price chart feature allows users to visualize historical price data for a to
 2.  **Data Fetching**: The `OKXClient` intelligently selects the correct endpoint based on the token type. For instrument IDs like 'BTC-USD', it uses `/api/v5/market/history-candles`. For EVM token addresses, it uses `/api/v5/wallet/token/historical-price`.
 3.  **Chart Rendering**: The `matplotlib` library is used to generate a PNG image of the price chart from the historical data.
 4.  **Response**: The generated chart image is sent back to the user via Telegram.
+5.  **Token Normalization**: For EVM-based swaps/quotes, `TokenResolver` normalizes `BTC` to `WBTC` (address + decimals) to ensure accurate quoting and execution. For charts, `BTC` continues to use the `BTC-USD` instrument ID.
 
 ## 9. Rebalance Engine
 

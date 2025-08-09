@@ -37,3 +37,8 @@ graph TD
 - **Asynchronous Operations**: All I/O-bound operations, such as API calls to OKX DEX or the database, are handled asynchronously using Python's `asyncio`. This is critical for ensuring the bot remains responsive.
 - **Caching**: A caching layer will be implemented for frequently requested data to reduce API calls and database load.
 - **Render Free Tier Constraints**: The system is designed to be lightweight to operate within the limits of Render's free tier. This includes efficient resource management and prioritizing Gemini Flash for simpler tasks.
+
+## 5. Conversation & Validation Patterns
+- **Validation-First Confirmation**: Before executing a swap, validate user settings that affect safety (e.g., live trading enabled requires a default wallet) even if environment is in simulation mode.
+- **Lazy Initialization**: Services created during app startup (e.g., `TokenResolver`) should be lazily checked/instantiated in handlers to prevent test/startup race conditions.
+- **Symbol Normalization**: Normalize symbols that differ between instrument and token contexts (e.g., `BTC`→`WBTC` for EVM swaps; `BTC-USD` for market candles) in a single resolver to keep business logic consistent.

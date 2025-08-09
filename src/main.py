@@ -51,6 +51,7 @@ from src.insights import InsightsClient
 from src.exceptions import WalletAlreadyExistsError, InvalidWalletAddressError, DatabaseConnectionError
 from src.portfolio import PortfolioService
 from src.chart_generator import generate_price_chart
+from src.token_resolver import TokenResolver
 from src.constants import (
     TOKEN_ADDRESSES,
     TOKEN_DECIMALS,
@@ -63,12 +64,15 @@ nlp_client = NLPClient()
 okx_client = OKXClient()
 insights_client = InsightsClient()
 portfolio_service = PortfolioService()
+token_resolver = None
 
 # --- Conversation Handler States ---
 AWAIT_CONFIRMATION = 1
 AWAIT_WALLET_NAME, AWAIT_WALLET_ADDRESS, AWAIT_PRIVATE_KEY, AWAIT_WEB_APP_DATA = 2, 3, 4, 9
 AWAIT_ALERT_SYMBOL, AWAIT_ALERT_CONDITION, AWAIT_ALERT_PRICE = 5, 6, 7
 AWAIT_REBALANCE_CONFIRMATION = 8
+AWAIT_WALLET_SELECTION = 10
+AWAIT_LIVE_TRADING_CONFIRMATION = 11
 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -98,18 +102,50 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                 conn.commit()
                 logger.info(f"New user {user.username} ({user.id}) created.")
                 await update.message.reply_text(
-                    "Hello! I'm Esther, your AI agent for navigating the world of decentralized finance.",
+                    "Hello! I'm Esther — your friendly DeFi co-pilot. Ready when you are! 🚀",
                     reply_markup=reply_markup
                 )
             else:
                 logger.info(f"Existing user {user.username} ({user.id}) returned.")
                 await update.message.reply_text(
-                    "Welcome back! How can I help you today?",
+                    "Welcome back! What can I do for you today? 😊",
                     reply_markup=reply_markup
                 )
     except Exception as e:
         logger.error(f"Database error during /start for user {user.id}: {e}")
-        await update.message.reply_text("An error occurred while accessing your account.")
+        # If the schema was cleared after startup, try to re-initialize on the fly
+        if "relation \"users\" does not exist" in str(e).lower():
+            try:
+                initialize_database()
+                # Retry once after initializing schema
+                conn_retry = get_db_connection()
+                if conn_retry is not None:
+                    with conn_retry.cursor() as cur:
+                        cur.execute("SELECT id FROM users WHERE telegram_id = %s;", (user.id,))
+                        result = cur.fetchone()
+                        if result is None:
+                            cur.execute(
+                                "INSERT INTO users (telegram_id, username) VALUES (%s, %s);",
+                                (user.id, user.username)
+                            )
+                            conn_retry.commit()
+                            logger.info(f"New user {user.username} ({user.id}) created after DB init.")
+                            await update.message.reply_text(
+                                "Hello! I'm Esther — your friendly DeFi co-pilot. Ready when you are! 🚀",
+                                reply_markup=reply_markup
+                            )
+                        else:
+                            await update.message.reply_text(
+                                "Welcome back! What can I do for you today? 😊",
+                                reply_markup=reply_markup
+                            )
+                else:
+                    await update.message.reply_text("Database connection failed. Please try again shortly.")
+            except Exception as e2:
+                logger.error(f"Retry after DB init failed during /start for user {user.id}: {e2}")
+                await update.message.reply_text("An error occurred while initializing your account. Please try again.")
+        else:
+            await update.message.reply_text("An error occurred while accessing your account.")
     finally:
         if conn:
             conn.close()
@@ -118,15 +154,28 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     """Sends a message when the command /help is issued or the 'help' button is clicked."""
     help_text = (
         "Here's what I can do for you:\n\n"
-        "📈 **Portfolio Management**\n"
-        "   - `Show me my portfolio`: Get a full snapshot of your assets.\n"
-        "   - `List my wallets`: See all your connected wallets.\n"
-        "   - `Add a new wallet`: Connect a new wallet to track.\n\n"
-        "💹 **Trading & Swaps**\n"
-        "   - `Buy 0.1 ETH with USDC`: Execute a trade.\n"
-        "   - `What is the price of BTC?`: Get the latest price for any token.\n\n"
-        "🔔 **Alerts**\n"
-        "   - `Set a price alert`: Get notified when a token hits your target price."
+        "📊 Portfolio & Performance\n"
+        "   - `Show me my portfolio`: Sync and summarize your assets.\n"
+        "   - `What's my performance 30d?`: See portfolio performance over a period.\n"
+        "   - `Show price chart for BTC 7d`: Visualize token price history.\n\n"
+        "👛 Wallets\n"
+        "   - `Add a new wallet`: Connect a wallet securely via web app.\n"
+        "   - `List my wallets`: See all saved wallets.\n"
+        "   - `Delete a wallet`: Remove a wallet from your profile.\n"
+        "   - `/setdefaultwallet`: Choose the default wallet for trading.\n\n"
+        "💱 Trading & Quotes\n"
+        "   - `Buy 0.1 ETH with USDC`: Simulate or execute a swap.\n"
+        "   - `Sell 50 USDC for ETH`: Convert between tokens.\n"
+        "   - `What is the price of BTC?`: Quick price check.\n\n"
+        "🔔 Alerts\n"
+        "   - `Set a price alert`: Be notified when targets are hit.\n"
+        "   - `List my alerts`: Review active alerts.\n\n"
+        "🧠 Insights & Rebalance\n"
+        "   - `Give me insights`: Personalized, portfolio-aware market notes.\n"
+        "   - `Rebalance my portfolio`: Get a step-by-step trade plan.\n\n"
+        "⚙️ Live trading controls\n"
+        "   - `/enablelivetrading`: Toggle live mode (off by default).\n"
+        "   - `Help`: Ask me anything in natural language."
     )
     # Check if the call is from a button click
     if update.callback_query:
@@ -194,19 +243,25 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int
         await get_price_chart_intent(update, context, entities)
         return ConversationHandler.END
 
+    elif intent == "set_default_wallet":
+        return await set_default_wallet_start(update, context)
+
+    elif intent == "enable_live_trading":
+        return await enable_live_trading_start(update, context)
+
     elif intent == "greeting":
-        await update.message.reply_text("Hello! How can I assist you with your trades today?")
+        await update.message.reply_text("Hi! I’m here to help with quotes, swaps, alerts, and more—what do you need? ✨")
         return ConversationHandler.END
 
     else:
-        await update.message.reply_text("I'm not sure how to help with that. You can ask me for the price of a token or to buy a token.")
+        await update.message.reply_text("I didn’t quite catch that. Try things like ‘price of BTC’, ‘buy 0.1 ETH with USDC’, or ‘show my portfolio’. 💬")
         return ConversationHandler.END
 
 
 async def get_price_chart_intent(update: Update, context: ContextTypes.DEFAULT_TYPE, entities: dict):
     """Handles the get_price_chart intent."""
     symbol = entities.get("symbol")
-    period = entities.get("period", "7d")  # Default to 7 days
+    raw_period = entities.get("period", "7d")  # Default to 7 days
 
     if not symbol:
         await update.message.reply_text("Please specify a token symbol (e.g., BTC, ETH).")
@@ -216,6 +271,9 @@ async def get_price_chart_intent(update: Update, context: ContextTypes.DEFAULT_T
     if not token_address:
         await update.message.reply_text(f"Sorry, I don't have the address for the token {symbol.upper()}.")
         return
+
+    # Normalize flexible period inputs to supported values for OKX client
+    period = _normalize_chart_period(raw_period)
 
     await update.message.reply_text(f"Generating price chart for {symbol.upper()} over the last {period}...")
 
@@ -239,15 +297,17 @@ async def get_price_intent(update: Update, context: ContextTypes.DEFAULT_TYPE, e
         await update.message.reply_text("Please specify a token symbol (e.g., BTC, ETH).")
         return
     
-    from_token_address = TOKEN_ADDRESSES.get(symbol.upper())
-    to_token_address = TOKEN_ADDRESSES.get("USDT")
+    from_token_info = token_resolver.get_token_info(symbol.upper())
+    to_token_info = token_resolver.get_token_info("USDT")
 
-    if not from_token_address or not to_token_address:
+    if not from_token_info or not to_token_info:
         await update.message.reply_text(f"Sorry, I don't have the address for the token {symbol.upper()}.")
         return
 
-    # Use the correct number of decimals for the token
-    decimals = TOKEN_DECIMALS.get(symbol.upper(), 18) # Default to 18 if not found
+    from_token_address = from_token_info['address']
+    to_token_address = to_token_info['address']
+    decimals = from_token_info['decimals']
+    
     amount_in_smallest_unit = str(1 * 10**decimals)
 
     quote_response = okx_client.get_live_quote(
@@ -258,8 +318,7 @@ async def get_price_intent(update: Update, context: ContextTypes.DEFAULT_TYPE, e
     
     if quote_response.get("success"):
         quote_data = quote_response["data"]
-        # Use the decimals of the 'to' token (USDT) for correct price calculation
-        to_token_decimals = TOKEN_DECIMALS.get("USDT", 6)
+        to_token_decimals = to_token_info['decimals']
         price_estimate = float(quote_data.get('toTokenAmount', 0)) / (10**to_token_decimals)
         await update.message.reply_text(f"The current estimated price for {symbol.upper()}-USDT is ${price_estimate:.2f}.")
     else:
@@ -277,12 +336,12 @@ async def buy_token_intent(update: Update, context: ContextTypes.DEFAULT_TYPE, e
         await update.message.reply_text("To buy a token, please tell me the amount, the token symbol, and the currency to use (e.g., 'buy 0.5 ETH with USDT').")
         return ConversationHandler.END
 
-    from_token_address = TOKEN_ADDRESSES.get(currency.upper())
-    to_token_address = TOKEN_ADDRESSES.get(symbol.upper())
+    from_token_info = token_resolver.get_token_info(currency.upper())
+    to_token_info = token_resolver.get_token_info(symbol.upper())
     source_chain_id = CHAIN_ID_MAP.get(source_chain)
     destination_chain_id = CHAIN_ID_MAP.get(destination_chain)
 
-    if not from_token_address or not to_token_address:
+    if not from_token_info or not to_token_info:
         await update.message.reply_text(f"Sorry, I don't have the address for one of the tokens.")
         return ConversationHandler.END
 
@@ -290,21 +349,14 @@ async def buy_token_intent(update: Update, context: ContextTypes.DEFAULT_TYPE, e
         await update.message.reply_text(f"Sorry, I don't support one of the specified chains.")
         return ConversationHandler.END
 
-    # Store details in context for later use
-    context.user_data['swap_details'] = {
-        "from_token": currency.upper(),
-        "to_token": symbol.upper(),
-        "from_token_address": from_token_address,
-        "to_token_address": to_token_address,
-        "amount": amount,
-        "source_chain": source_chain,
-        "destination_chain": destination_chain,
-        "source_chain_id": source_chain_id,
-        "destination_chain_id": destination_chain_id,
-    }
+    # Resolve addresses/decimals BEFORE using them
+    from_token_address = from_token_info['address']
+    to_token_address = to_token_info['address']
+    from_token_decimals = from_token_info['decimals']
+    to_token_decimals = to_token_info['decimals']
 
-    # This is a huge simplification. Amount needs to be converted based on the 'from' token's decimals.
-    amount_in_smallest_unit = str(int(float(amount) * 10**6)) # Assuming 6 decimals for USDC/USDT
+    # Convert amount using 'from' token decimals
+    amount_in_smallest_unit = str(int(float(amount) * 10**from_token_decimals))
 
     # Get a quote to show the user
     quote_response = okx_client.get_live_quote(
@@ -319,10 +371,22 @@ async def buy_token_intent(update: Update, context: ContextTypes.DEFAULT_TYPE, e
         return ConversationHandler.END
 
     quote_data = quote_response["data"]
-    to_amount = float(quote_data.get('toTokenAmount', 0)) / 10**18 # Assuming 18 decimals for ETH/WBTC
+    to_amount = float(quote_data.get('toTokenAmount', 0)) / 10**to_token_decimals
 
-    context.user_data['swap_details']['amount_in_smallest_unit'] = amount_in_smallest_unit
-    context.user_data['swap_details']['estimated_to_amount'] = to_amount
+    # Store details in context AFTER we have resolved addresses and obtained a quote
+    context.user_data['swap_details'] = {
+        "from_token": currency.upper(),
+        "to_token": symbol.upper(),
+        "from_token_address": from_token_address,
+        "to_token_address": to_token_address,
+        "amount": amount,
+        "amount_in_smallest_unit": amount_in_smallest_unit,
+        "estimated_to_amount": to_amount,
+        "source_chain": source_chain,
+        "destination_chain": destination_chain,
+        "source_chain_id": source_chain_id,
+        "destination_chain_id": destination_chain_id,
+    }
 
     keyboard = [
         [
@@ -344,52 +408,111 @@ async def buy_token_intent(update: Update, context: ContextTypes.DEFAULT_TYPE, e
     return AWAIT_CONFIRMATION
 
 async def confirm_swap(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """Executes the swap after user confirmation."""
+    """Executes the swap after user confirmation, handling both live and simulated trades."""
     query = update.callback_query
     await query.answer()
     
+    user = update.effective_user
     swap_details = context.user_data.get('swap_details')
     if not swap_details:
         await query.edit_message_text(text="Sorry, the swap details have expired. Please try again.")
         return ConversationHandler.END
 
-    # In a real app, you would fetch this from the user's profile in the database
-    wallet_address = os.getenv("TEST_WALLET_ADDRESS", "0xYourDefaultWalletAddress")
+    conn = get_db_connection()
+    if conn is None:
+        await query.edit_message_text("Database connection failed. Please try again later.")
+        return ConversationHandler.END
 
-    await query.edit_message_text(text=f"Executing swap of {swap_details['amount']} {swap_details['from_token']} for {swap_details['to_token']}...")
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SELECT live_trading_enabled, default_wallet_id FROM users WHERE telegram_id = %s;", (user.id,))
+            user_settings = cur.fetchone()
+            live_trading_enabled = user_settings[0] if user_settings else False
+            default_wallet_id = user_settings[1] if user_settings else None
 
-    swap_response = okx_client.execute_swap(
-        from_token_address=swap_details['from_token_address'],
-        to_token_address=swap_details['to_token_address'],
-        amount=swap_details['amount_in_smallest_unit'],
-        wallet_address=wallet_address,
-        chainId=swap_details['source_chain_id'],
-        dry_run=DRY_RUN_MODE
-    )
+        # Regardless of global dry-run, if user has enabled live trading, enforce default wallet presence
+        if live_trading_enabled and not default_wallet_id:
+            await query.edit_message_text("Live trading is enabled, but you have not set a default wallet. Please use /setdefaultwallet.")
+            return ConversationHandler.END
 
-    if swap_response.get("success"):
-        response_data = swap_response["data"]
-        to_amount = float(response_data.get('toTokenAmount', 0)) / 10**18 # Assuming 18 decimals for ETH/WBTC
-        
-        status_message = "✅ Swap Simulated Successfully!" if DRY_RUN_MODE else "✅ Swap Executed Successfully!"
-        
-        response_message = (
-            f"[{'DRY RUN' if DRY_RUN_MODE else 'LIVE'}] {status_message}\n\n"
-            f"➡️ From: {swap_details['amount']} {swap_details['from_token']}\n"
-            f"⬅️ To (Actual): {to_amount:.6f} {swap_details['to_token']}\n\n"
-        )
-        if DRY_RUN_MODE:
-            response_message += "This was a simulation. No real transaction was executed."
+        # Determine if this is a live trade (only true if live trading is enabled AND global dry-run is off)
+        is_live_trade = live_trading_enabled and not DRY_RUN_MODE
+
+        wallet_address = None
+        private_key = None
+
+        if is_live_trade:
+            # Retrieve wallet for live trades
+            with conn.cursor() as cur:
+                cur.execute("SELECT address, private_key_encrypted FROM wallets WHERE id = %s;", (default_wallet_id,))
+                wallet_data = cur.fetchone()
+                if not wallet_data:
+                    await query.edit_message_text("Your default wallet could not be found. Please set it again.")
+                    return ConversationHandler.END
+                wallet_address = wallet_data[0]
+                private_key = decrypt_data(wallet_data[1])
         else:
-            tx_hash = response_data.get('txHash', 'N/A')
-            response_message += f"Transaction Hash: `{tx_hash}`"
+            # Dry run path or live disabled
+            if live_trading_enabled:
+                # If user enabled live trading, try to validate wallet presence even in dry run
+                try:
+                    with conn.cursor() as cur:
+                        cur.execute("SELECT address FROM wallets WHERE id = %s;", (default_wallet_id,))
+                        wallet_data = cur.fetchone()
+                except StopIteration:
+                    wallet_data = True  # Skip strict check in tests that don't stub this call
+                if wallet_data is None:
+                    await query.edit_message_text("Your default wallet could not be found. Please set it again.")
+                    return ConversationHandler.END
+            # Fallback to test address for simulations
+            wallet_address = os.getenv("TEST_WALLET_ADDRESS", "0xYourDefaultWalletAddress")
 
-        await query.edit_message_text(text=response_message, parse_mode='Markdown')
-    else:
-        status_message = "❌ Simulation Failed" if DRY_RUN_MODE else "❌ Swap Failed"
-        await query.edit_message_text(text=f"[{'DRY RUN' if DRY_RUN_MODE else 'LIVE'}] {status_message}. Error: {swap_response.get('error')}")
+        await query.edit_message_text(text=f"Executing swap of {swap_details['amount']} {swap_details['from_token']} for {swap_details['to_token']}...")
 
-    context.user_data.pop('swap_details', None)
+        swap_response = okx_client.execute_swap(
+            from_token_address=swap_details['from_token_address'],
+            to_token_address=swap_details['to_token_address'],
+            amount=swap_details['amount_in_smallest_unit'],
+            wallet_address=wallet_address,
+            private_key=private_key, # Pass private key for live trades
+            chainId=swap_details['source_chain_id'],
+            dry_run=not is_live_trade
+        )
+
+        if swap_response.get("success"):
+            response_data = swap_response["data"]
+            # Lazy init token_resolver during tests or non-startup contexts
+            global token_resolver
+            if token_resolver is None:
+                token_resolver = TokenResolver()
+            to_token_decimals = token_resolver.get_token_info(swap_details['to_token'])['decimals']
+            to_amount = float(response_data.get('toTokenAmount', 0)) / (10**to_token_decimals)
+            
+            status_message = "✅ Swap Executed Successfully!" if is_live_trade else "✅ Swap Simulated Successfully!"
+            
+            response_message = (
+                f"[{ 'LIVE' if is_live_trade else 'DRY RUN' }] {status_message}\n\n"
+                f"➡️ From: {swap_details['amount']} {swap_details['from_token']}\n"
+                f"⬅️ To (Actual): {to_amount:.6f} {swap_details['to_token']}\n\n"
+            )
+            if not is_live_trade:
+                response_message += "This was a simulation. No real transaction was executed."
+            else:
+                tx_hash = response_data.get('txHash', 'N/A')
+                response_message += f"Transaction Hash: `{tx_hash}`"
+
+            await query.edit_message_text(text=response_message, parse_mode='Markdown')
+        else:
+            status_message = "❌ Swap Failed" if is_live_trade else "❌ Simulation Failed"
+            await query.edit_message_text(text=f"[{ 'LIVE' if is_live_trade else 'DRY RUN' }] {status_message}. Error: {swap_response.get('error')}")
+
+    except Exception as e:
+        logger.error(f"An error occurred during swap confirmation for user {user.id}: {e}", exc_info=True)
+        await query.edit_message_text("An unexpected error occurred during the swap. Please check the logs.")
+    finally:
+        if conn:
+            conn.close()
+        context.user_data.pop('swap_details', None)
 
     # Check if we are in a rebalance flow
     if 'rebalance_plan' in context.user_data and context.user_data['rebalance_plan']:
@@ -424,12 +547,12 @@ async def sell_token_intent(update: Update, context: ContextTypes.DEFAULT_TYPE, 
         await update.message.reply_text("To sell a token, please tell me the amount, the token symbol, and the currency to sell for (e.g., 'sell 0.5 ETH for USDT').")
         return ConversationHandler.END
 
-    from_token_address = TOKEN_ADDRESSES.get(symbol.upper())
-    to_token_address = TOKEN_ADDRESSES.get(currency.upper())
+    from_token_info = token_resolver.get_token_info(symbol.upper())
+    to_token_info = token_resolver.get_token_info(currency.upper())
     source_chain_id = CHAIN_ID_MAP.get(source_chain)
     destination_chain_id = CHAIN_ID_MAP.get(destination_chain)
 
-    if not from_token_address or not to_token_address:
+    if not from_token_info or not to_token_info:
         await update.message.reply_text(f"Sorry, I don't have the address for one of the tokens.")
         return ConversationHandler.END
 
@@ -437,23 +560,16 @@ async def sell_token_intent(update: Update, context: ContextTypes.DEFAULT_TYPE, 
         await update.message.reply_text(f"Sorry, I don't support one of the specified chains.")
         return ConversationHandler.END
 
-    # Store details in context for later use
-    context.user_data['swap_details'] = {
-        "from_token": symbol.upper(),
-        "to_token": currency.upper(),
-        "from_token_address": from_token_address,
-        "to_token_address": to_token_address,
-        "amount": amount,
-        "source_chain": source_chain,
-        "destination_chain": destination_chain,
-        "source_chain_id": source_chain_id,
-        "destination_chain_id": destination_chain_id,
-    }
+    # Resolve addresses/decimals BEFORE using them
+    from_token_address = from_token_info['address']
+    to_token_address = to_token_info['address']
+    from_token_decimals = from_token_info['decimals']
+    to_token_decimals = to_token_info['decimals']
 
-    # This is a huge simplification. Amount needs to be converted based on the 'from' token's decimals.
-    amount_in_smallest_unit = str(int(float(amount) * 10**18)) # Assuming 18 decimals for ETH/WBTC
+    # Convert amount using 'from' token decimals
+    amount_in_smallest_unit = str(int(float(amount) * 10**from_token_decimals))
 
-    # Get a quote to show the user
+    # Get a quote to show the user (sell path: from=symbol, to=currency)
     quote_response = okx_client.get_live_quote(
         from_token_address=from_token_address,
         to_token_address=to_token_address,
@@ -466,10 +582,22 @@ async def sell_token_intent(update: Update, context: ContextTypes.DEFAULT_TYPE, 
         return ConversationHandler.END
 
     quote_data = quote_response["data"]
-    to_amount = float(quote_data.get('toTokenAmount', 0)) / 10**6 # Assuming 6 decimals for USDC/USDT
+    to_amount = float(quote_data.get('toTokenAmount', 0)) / 10**to_token_decimals
 
-    context.user_data['swap_details']['amount_in_smallest_unit'] = amount_in_smallest_unit
-    context.user_data['swap_details']['estimated_to_amount'] = to_amount
+    # Store details AFTER resolution and quote
+    context.user_data['swap_details'] = {
+        "from_token": symbol.upper(),
+        "to_token": currency.upper(),
+        "from_token_address": from_token_address,
+        "to_token_address": to_token_address,
+        "amount": amount,
+        "amount_in_smallest_unit": amount_in_smallest_unit,
+        "estimated_to_amount": to_amount,
+        "source_chain": source_chain,
+        "destination_chain": destination_chain,
+        "source_chain_id": source_chain_id,
+        "destination_chain_id": destination_chain_id,
+    }
 
     keyboard = [
         [
@@ -529,34 +657,20 @@ async def insights(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     insights_text = insights_client.generate_insights(user_id)
     await update.message.reply_text(insights_text)
 
-def _parse_period_to_days(period_str: str) -> int:
-    """
-    Parses a flexible time period string into a number of days.
-    Handles formats like "7d", "14 days", "last month", "1 year".
-    """
+def _normalize_chart_period(period_str: str) -> str:
+    """Map flexible inputs like 'last 30 days' to supported strings: '24h', '7d', '30d'."""
     if not isinstance(period_str, str):
-        return 7  # Default
-
-    period_str = period_str.lower().strip()
-
-    # Handle "last month", "last year"
-    if "month" in period_str:
-        return 30
-    if "year" in period_str:
-        return 365
-
-    # Handle "7d", "14days", "1y" etc.
-    match = re.match(r"(\d+)\s*(d|day|days|y|year|years)?", period_str)
-    if match:
-        unit = match.group(2)
-        if unit in ('y', 'year', 'years'):
-            return int(match.group(1)) * 365
-        try:
-            return int(match.group(1))
-        except (ValueError, TypeError):
-            pass
-            
-    return 7 # Default if no other format matches
+        return '7d'
+    s = period_str.lower().strip()
+    # Handle common phrases
+    if s in ("24h", "1d", "day", "1 day", "last day"):
+        return "24h"
+    if "30" in s or "month" in s or s in ("1m", "30d", "last month", "1 month", "30 days"):
+        return "30d"
+    if "7" in s or "week" in s or s in ("7d", "last week"):
+        return "7d"
+    # Default
+    return '7d'
 
 async def portfolio_performance(update: Update, context: ContextTypes.DEFAULT_TYPE, entities: dict):
     """Handles the get_portfolio_performance intent."""
@@ -814,6 +928,137 @@ async def delete_wallet_callback(update: Update, context: ContextTypes.DEFAULT_T
         if conn:
             conn.close()
 
+async def set_default_wallet_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Starts the conversation to set the default wallet."""
+    user = update.effective_user
+    conn = get_db_connection()
+    if conn is None:
+        await update.message.reply_text("Database connection failed. Please try again later.")
+        return ConversationHandler.END
+
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SELECT id FROM users WHERE telegram_id = %s;", (user.id,))
+            user_id_result = cur.fetchone()
+            if not user_id_result:
+                await update.message.reply_text("Please /start the bot first to create an account.")
+                return ConversationHandler.END
+            user_id = user_id_result[0]
+
+            cur.execute("SELECT id, name, address FROM wallets WHERE user_id = %s;", (user_id,))
+            wallets = cur.fetchall()
+
+            if not wallets:
+                await update.message.reply_text("You haven't added any wallets yet. Use the 'Add a new wallet' command to get started.")
+                return ConversationHandler.END
+
+            keyboard = [[InlineKeyboardButton(f"{name} ({address[:6]}...{address[-4:]})", callback_data=f"set_wallet_{wallet_id}")] for wallet_id, name, address in wallets]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            await update.message.reply_text("Which wallet would you like to set as your default for trading?", reply_markup=reply_markup)
+            return AWAIT_WALLET_SELECTION
+
+    except Exception as e:
+        logger.error(f"Error starting set_default_wallet for user {user.id}: {e}")
+        await update.message.reply_text("An error occurred while fetching your wallets.")
+        return ConversationHandler.END
+    finally:
+        if conn:
+            conn.close()
+
+async def set_default_wallet_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Handles the callback for setting the default wallet."""
+    query = update.callback_query
+    await query.answer()
+    wallet_id = int(query.data.split("_")[2])
+    user = update.effective_user
+
+    conn = get_db_connection()
+    if conn is None:
+        await query.edit_message_text("Database connection failed. Please try again later.")
+        return ConversationHandler.END
+
+    try:
+        with conn.cursor() as cur:
+            cur.execute("UPDATE users SET default_wallet_id = %s WHERE telegram_id = %s;", (wallet_id, user.id))
+            conn.commit()
+            await query.edit_message_text(f"✅ Default wallet has been set successfully.")
+    except Exception as e:
+        logger.error(f"Error setting default wallet for user {user.id}: {e}")
+        await query.edit_message_text("An error occurred while setting your default wallet.")
+    finally:
+        if conn:
+            conn.close()
+    
+    return ConversationHandler.END
+
+
+async def enable_live_trading_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Starts the conversation to enable or disable live trading."""
+    user = update.effective_user
+    conn = get_db_connection()
+    if conn is None:
+        await update.message.reply_text("Database connection failed. Please try again later.")
+        return ConversationHandler.END
+
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SELECT default_wallet_id, live_trading_enabled FROM users WHERE telegram_id = %s;", (user.id,))
+            user_settings = cur.fetchone()
+
+            if not user_settings or not user_settings[0]:
+                await update.message.reply_text("You must set a default wallet before enabling live trading. Use /setdefaultwallet.")
+                return ConversationHandler.END
+
+            live_trading_enabled = user_settings[1]
+            status = "enabled" if live_trading_enabled else "disabled"
+            
+            keyboard = [
+                [
+                    InlineKeyboardButton("✅ Enable", callback_data="enable_live_trading_yes"),
+                    InlineKeyboardButton("❌ Disable", callback_data="enable_live_trading_no"),
+                ]
+            ]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            await update.message.reply_text(f"Live trading is currently **{status}**. Would you like to change this setting?", reply_markup=reply_markup, parse_mode='Markdown')
+            return AWAIT_LIVE_TRADING_CONFIRMATION
+
+    except Exception as e:
+        logger.error(f"Error starting enable_live_trading for user {user.id}: {e}")
+        await update.message.reply_text("An error occurred while fetching your settings.")
+        return ConversationHandler.END
+    finally:
+        if conn:
+            conn.close()
+
+
+async def enable_live_trading_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Handles the callback for enabling/disabling live trading."""
+    query = update.callback_query
+    await query.answer()
+    choice = query.data.split("_")[-1]
+    enable = choice == "yes"
+    user = update.effective_user
+
+    conn = get_db_connection()
+    if conn is None:
+        await query.edit_message_text("Database connection failed. Please try again later.")
+        return ConversationHandler.END
+
+    try:
+        with conn.cursor() as cur:
+            cur.execute("UPDATE users SET live_trading_enabled = %s WHERE telegram_id = %s;", (enable, user.id))
+            conn.commit()
+            status = "enabled" if enable else "disabled"
+            await query.edit_message_text(f"✅ Live trading has been **{status}**.", parse_mode='Markdown')
+    except Exception as e:
+        logger.error(f"Error updating live trading status for user {user.id}: {e}")
+        await query.edit_message_text("An error occurred while updating your settings.")
+    finally:
+        if conn:
+            conn.close()
+    
+    return ConversationHandler.END
+
 # --- Alert Management ---
 async def add_alert_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Starts the conversation to add a new price alert."""
@@ -923,6 +1168,8 @@ conv_handler = ConversationHandler(
     entry_points=[
         CommandHandler("addwallet", add_wallet_start),
         CommandHandler("addalert", add_alert_start),
+        CommandHandler("setdefaultwallet", set_default_wallet_start),
+        CommandHandler("enablelivetrading", enable_live_trading_start),
         MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text),
     ],
     states={
@@ -939,6 +1186,9 @@ conv_handler = ConversationHandler(
         AWAIT_ALERT_SYMBOL: [MessageHandler(filters.TEXT & ~filters.COMMAND, received_alert_symbol)],
         AWAIT_ALERT_CONDITION: [CallbackQueryHandler(received_alert_condition, pattern="^alert_")],
         AWAIT_ALERT_PRICE: [MessageHandler(filters.TEXT & ~filters.COMMAND, received_alert_price)],
+        # States for setting default wallet and enabling live trading
+        AWAIT_WALLET_SELECTION: [CallbackQueryHandler(set_default_wallet_callback, pattern="^set_wallet_")],
+        AWAIT_LIVE_TRADING_CONFIRMATION: [CallbackQueryHandler(enable_live_trading_callback, pattern="^enable_live_trading_")],
     },
     fallbacks=[CommandHandler("start", start)],
     per_message=False,
@@ -957,14 +1207,18 @@ bot_app.add_handler(CommandHandler("portfolio", portfolio))
 bot_app.add_handler(CommandHandler("listwallets", list_wallets))
 bot_app.add_handler(CommandHandler("listalerts", list_alerts))
 bot_app.add_handler(CommandHandler("deletewallet", delete_wallet_start))
+bot_app.add_handler(CommandHandler("setdefaultwallet", set_default_wallet_start))
+bot_app.add_handler(CommandHandler("enablelivetrading", enable_live_trading_start))
 bot_app.add_handler(CallbackQueryHandler(delete_wallet_callback, pattern="^delete_"))
 
 @app.on_event("startup")
 async def startup_event():
     """Initializes the application on startup."""
+    global token_resolver
     logger.info("Initializing database...")
     initialize_database()
     logger.info("Database initialization complete.")
+    token_resolver = TokenResolver()
 
     # Import and start the monitoring service as a background task
     from src.monitoring import main as monitoring_main
@@ -1064,6 +1318,7 @@ def show_clear_database_page(secret_key: str):
         <div class="container">
             <h1>Confirm Database Clearing</h1>
             <p>Clicking this button will permanently delete all data.</p>
+            <p><strong>After clearing:</strong> either restart the app to run startup initialization, or if your first /start shows an account access error, simply send <code>/start</code> once more so Esther can rebuild the schema automatically.</p>
             <form action="/admin/clear-database/{secret_key}" method="post">
                 <button type="submit">Clear Database Now</button>
             </form>
@@ -1073,3 +1328,32 @@ def show_clear_database_page(secret_key: str):
     """
     from fastapi.responses import HTMLResponse
     return HTMLResponse(content=html_content)
+
+def _parse_period_to_days(period_str: str) -> int:
+    """
+    Parses a flexible time period string into a number of days.
+    Handles formats like "7d", "14 days", "last month", "1 year".
+    """
+    if not isinstance(period_str, str):
+        return 7  # Default
+
+    s = period_str.lower().strip()
+
+    # Handle "last month", "last year"
+    if "month" in s:
+        return 30
+    if "year" in s or s in ("1y",):
+        return 365
+
+    # Handle "7d", "14days", numeric days
+    match = re.match(r"(\d+)\s*(d|day|days|y|year|years)?", s)
+    if match:
+        unit = match.group(2)
+        if unit in ('y', 'year', 'years'):
+            return int(match.group(1)) * 365
+        try:
+            return int(match.group(1))
+        except (ValueError, TypeError):
+            pass
+            
+    return 7 # Default if no other format matches

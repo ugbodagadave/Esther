@@ -10,7 +10,7 @@ import json
 from datetime import datetime, timezone, timedelta
 from dotenv import load_dotenv
 
-from src.constants import DRY_RUN_MODE
+from src.constants import DRY_RUN_MODE, OKX_PROJECT_ID
 
 # Load environment variables from .env file
 load_dotenv()
@@ -42,13 +42,16 @@ class OKXClient:
         message = timestamp + method + request_path + body
         signature = sign(message, self.api_secret)
         
-        return {
+        headers = {
             'OK-ACCESS-KEY': self.api_key,
             'OK-ACCESS-SIGN': signature,
             'OK-ACCESS-TIMESTAMP': timestamp,
             'OK-ACCESS-PASSPHRASE': self.passphrase,
             'Content-Type': 'application/json'
         }
+        if OKX_PROJECT_ID:
+            headers['OK-ACCESS-PROJECT'] = OKX_PROJECT_ID
+        return headers
 
     def get_live_quote(self, from_token_address: str, to_token_address: str, amount: str, chainId: int = 1) -> dict:
         """
@@ -90,14 +93,16 @@ class OKXClient:
         
         return {"success": False, "error": "Failed to fetch quote after multiple retries."}
 
-    def execute_swap(self, from_token_address: str, to_token_address: str, amount: str, wallet_address: str, chainId: int = 1, slippage: str = "1", dry_run: bool = None) -> dict:
+    def execute_swap(self, from_token_address: str, to_token_address: str, amount: str, wallet_address: str, private_key: str = None, chainId: int = 1, slippage: str = "1", dry_run: bool = None) -> dict:
         """
         Executes a swap. It always fetches a quote first.
         If dry_run is True, it only simulates the transaction.
         If dry_run is False, it executes a real swap on the blockchain.
+        A private_key is required for real swaps.
         """
         if dry_run is None:
             dry_run = DRY_RUN_MODE
+        
         # Always get a quote first
         quote_response = self.get_live_quote(from_token_address, to_token_address, amount, chainId)
 
@@ -113,6 +118,9 @@ class OKXClient:
                 "message": "✅ Swap simulated successfully (no real transaction)"
             }
         
+        if not private_key:
+            return {"success": False, "error": "Private key is required for live swaps."}
+
         # Proceed with the real swap if not a dry run
         logger.info(f"Executing REAL swap for wallet {wallet_address}")
         for attempt in range(self.max_retries):
@@ -123,6 +131,7 @@ class OKXClient:
                     "toTokenAddress": to_token_address,
                     "amount": amount,
                     "walletAddress": wallet_address,
+                    "privateKey": private_key,
                     "slippage": slippage,
                     "chainId": chainId
                 }
@@ -169,7 +178,7 @@ class OKXClient:
             bar = "1D"
             limit = "7"
             okx_period = "1D"
-        elif period == "1m":
+        elif period == "1m" or period == "30d":
             begin = int((now - timedelta(days=30)).timestamp() * 1000)
             bar = "1D"
             limit = "30"
@@ -202,6 +211,13 @@ class OKXClient:
             }
             base_url = self.base_url
 
+            # Prepare an optional fallback for native ETH using Market API candles
+            eth_zero_addr = "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+            fallback_inst_id = None
+            if token_address.lower() == eth_zero_addr:
+                # Use market candles for ETH if wallet API is unavailable
+                fallback_inst_id = "ETH-USD"
+
         for attempt in range(self.max_retries):
             try:
                 query_string = '&'.join([f'{k}={v}' for k, v in params.items()])
@@ -231,6 +247,33 @@ class OKXClient:
                 else:
                     error_msg = data.get("msg", "Unknown API error")
                     logger.error(f"Error fetching historical price from OKX API: {error_msg}")
+                    # Retry on API error as well (not only HTTP errors)
+                    if attempt < self.max_retries - 1:
+                        time.sleep(self.retry_delay)
+                        continue
+                    # If ETH and wallet endpoint is flaky, try Market API candles as a fallback
+                    if fallback_inst_id:
+                        try:
+                            m_request_path = '/api/v5/market/history-candles'
+                            m_params = {"instId": fallback_inst_id, "bar": bar, "limit": limit}
+                            m_qs = '&'.join([f'{k}={v}' for k, v in m_params.items()])
+                            m_full = f"{m_request_path}?{m_qs}"
+                            headers = self._get_request_headers('GET', m_full)
+                            url = f"https://www.okx.com{m_full}"
+                            logger.info(f"Fallback: Sending GET request to OKX Market API: {url}")
+                            resp = requests.get(url, headers=headers, timeout=10)
+                            resp.raise_for_status()
+                            m_data = resp.json()
+                            if m_data.get("code") == "0":
+                                raw_data = m_data.get("data", [])
+                                processed_data = [{"ts": item[0], "price": item[4]} for item in raw_data]
+                                return {"success": True, "data": processed_data}
+                            else:
+                                f_msg = m_data.get("msg", "Unknown API error")
+                                logger.error(f"Fallback market candles error: {f_msg}")
+                        except Exception as _:
+                            # Swallow and return original error below
+                            pass
                     return {"success": False, "error": f"API Error: {error_msg}"}
             except requests.exceptions.HTTPError as e:
                 logger.warning(f"HTTP Error on attempt {attempt + 1}: {e}. Retrying in {self.retry_delay}s...")
@@ -239,6 +282,25 @@ class OKXClient:
                 logger.error(f"Error fetching historical price: {e}")
                 return {"success": False, "error": f"A network error occurred: {e}"}
         
+        # Final fallback if defined and loop finished due to HTTP errors
+        if 'fallback_inst_id' in locals() and fallback_inst_id:
+            try:
+                m_request_path = '/api/v5/market/history-candles'
+                m_params = {"instId": fallback_inst_id, "bar": bar, "limit": limit}
+                m_qs = '&'.join([f'{k}={v}' for k, v in m_params.items()])
+                m_full = f"{m_request_path}?{m_qs}"
+                headers = self._get_request_headers('GET', m_full)
+                url = f"https://www.okx.com{m_full}"
+                logger.info(f"Final fallback: Sending GET request to OKX Market API: {url}")
+                resp = requests.get(url, headers=headers, timeout=10)
+                resp.raise_for_status()
+                m_data = resp.json()
+                if m_data.get("code") == "0":
+                    raw_data = m_data.get("data", [])
+                    processed_data = [{"ts": item[0], "price": item[4]} for item in raw_data]
+                    return {"success": True, "data": processed_data}
+            except Exception as _:
+                pass
         return {"success": False, "error": "Failed to fetch historical price after multiple retries."}
 
 

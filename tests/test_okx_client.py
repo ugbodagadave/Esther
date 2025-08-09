@@ -3,7 +3,7 @@ from unittest.mock import patch, MagicMock
 import os
 import requests
 from src.okx_client import OKXClient
-from src.constants import DRY_RUN_MODE
+from src.constants import DRY_RUN_MODE, OKX_PROJECT_ID
 
 class TestOKXClient(unittest.TestCase):
 
@@ -73,10 +73,12 @@ class TestOKXClient(unittest.TestCase):
         mock_post.return_value = mock_response
 
         client = OKXClient()
-        result = client.execute_swap("from", "to", "100", "wallet_addr", dry_run=False)
+        result = client.execute_swap("from", "to", "100", "wallet_addr", private_key="pk_test", dry_run=False)
         
         self.assertTrue(result['success'])
         self.assertEqual(result['data']['txHash'], "0x12345")
+        mock_post.assert_called_once()
+        self.assertEqual(mock_post.call_args.kwargs['json']['privateKey'], "pk_test")
 
     @patch('src.okx_client.requests.get', side_effect=requests.exceptions.HTTPError("500 Server Error"))
     @patch('time.sleep', return_value=None) # Mock time.sleep to avoid delays
@@ -96,7 +98,7 @@ class TestOKXClient(unittest.TestCase):
         """Test the retry logic for execute_swap."""
         mock_get_live_quote.return_value = {"success": True, "data": {}}
         client = OKXClient(max_retries=3, retry_delay=0.1)
-        result = client.execute_swap("from", "to", "100", "wallet_addr", dry_run=False)
+        result = client.execute_swap("from", "to", "100", "wallet_addr", private_key="pk_test", dry_run=False)
 
         self.assertFalse(result['success'])
         self.assertEqual(result['error'], "Failed to execute swap after multiple retries.")
@@ -164,13 +166,22 @@ class TestOKXClient(unittest.TestCase):
         mock_post.return_value = mock_response
 
         client = OKXClient()
-        # Call execute_swap without the dry_run parameter
-        result = client.execute_swap("from", "to", "100", "wallet_addr")
+        # Call execute_swap without the dry_run parameter, but with a private key
+        result = client.execute_swap("from", "to", "100", "wallet_addr", private_key="pk_test")
 
         self.assertTrue(result['success'])
         self.assertNotIn('status', result) # Real swaps don't have a 'status' field
         self.assertEqual(result['data']['txHash'], "0xreal")
         mock_post.assert_called_once()
+
+    @patch('src.okx_client.OKXClient.get_live_quote')
+    def test_execute_swap_real_run_no_private_key(self, mock_get_live_quote):
+        """Test that a real swap fails if no private key is provided."""
+        mock_get_live_quote.return_value = {"success": True, "data": {}}
+        client = OKXClient()
+        result = client.execute_swap("from", "to", "100", "wallet_addr", dry_run=False)
+        self.assertFalse(result['success'])
+        self.assertEqual(result['error'], "Private key is required for live swaps.")
 
     @patch.dict(os.environ, {
         "OKX_API_KEY": "test_key",
@@ -200,6 +211,28 @@ class TestOKXClient(unittest.TestCase):
         self.assertIn("tokenAddress=token_addr", called_url)
         self.assertIn("chainIndex=1", called_url)
         self.assertIn("period=1D", called_url)
+
+    @patch.dict(os.environ, {
+        "OKX_API_KEY": "test_key",
+        "OKX_API_SECRET": "test_secret",
+        "OKX_API_PASSPHRASE": "test_passphrase"
+    })
+    @patch('src.okx_client.OKX_PROJECT_ID', 'test_project_id')
+    @patch('src.okx_client.requests.get')
+    def test_ok_access_project_header(self, mock_get):
+        """Test that the OK-ACCESS-PROJECT header is added when OKX_PROJECT_ID is set."""
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {"code": "0", "data": [{}]}
+        mock_get.return_value = mock_response
+
+        client = OKXClient()
+        client.get_live_quote("from_addr", "to_addr", "100")
+
+        mock_get.assert_called_once()
+        headers = mock_get.call_args[1]['headers']
+        self.assertIn('OK-ACCESS-PROJECT', headers)
+        self.assertEqual(headers['OK-ACCESS-PROJECT'], 'test_project_id')
 
 if __name__ == '__main__':
     unittest.main()

@@ -31,47 +31,29 @@ def initialize_database():
     """
     Initializes the database by creating the necessary tables if they don't exist
     and adding any missing columns to existing tables.
+    Creates tables in a dependency-safe order so a fresh database initializes cleanly.
     """
     try:
         conn = get_db_connection()
         with conn.cursor() as cur:
-            # Create users table
-            cur.execute("""
-                CREATE TABLE IF NOT EXISTS users (
-                    id SERIAL PRIMARY KEY,
-                    telegram_id BIGINT UNIQUE NOT NULL,
-                    username VARCHAR(255),
-                    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-                );
-            """)
-            
-            # Create credentials table
-            cur.execute("""
-                CREATE TABLE IF NOT EXISTS credentials (
-                    id SERIAL PRIMARY KEY,
-                    user_id INTEGER UNIQUE NOT NULL REFERENCES users(id),
-                    encrypted_okx_api_key TEXT,
-                    encrypted_okx_api_secret TEXT,
-                    encrypted_okx_passphrase TEXT,
-                    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-                );
-            """)
-
-            # Create wallets table
-            cur.execute("""
+            # 1) Create wallets first (referenced by users)
+            cur.execute(
+                """
                 CREATE TABLE IF NOT EXISTS wallets (
                     id SERIAL PRIMARY KEY,
-                    user_id INTEGER NOT NULL REFERENCES users(id),
+                    user_id INTEGER,
                     name VARCHAR(255) NOT NULL,
                     address VARCHAR(255) UNIQUE NOT NULL,
                     encrypted_private_key TEXT NOT NULL,
                     chain_id INTEGER DEFAULT 1,
                     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
                 );
-            """)
+                """
+            )
 
-            # Add chain_id to wallets table if it doesn't exist (for backward compatibility)
-            cur.execute("""
+            # Ensure chain_id column exists (backward compatibility)
+            cur.execute(
+                """
                 DO $$
                 BEGIN
                     IF NOT EXISTS (
@@ -81,10 +63,69 @@ def initialize_database():
                         ALTER TABLE wallets ADD COLUMN chain_id INTEGER DEFAULT 1;
                     END IF;
                 END$$;
-            """)
+                """
+            )
 
-            # Create alerts table
-            cur.execute("""
+            # 2) Create users (may reference wallets)
+            cur.execute(
+                """
+                CREATE TABLE IF NOT EXISTS users (
+                    id SERIAL PRIMARY KEY,
+                    telegram_id BIGINT UNIQUE NOT NULL,
+                    username VARCHAR(255),
+                    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+                    default_wallet_id INTEGER REFERENCES wallets(id) ON DELETE SET NULL,
+                    live_trading_enabled BOOLEAN DEFAULT FALSE
+                );
+                """
+            )
+
+            # 3) Add missing columns to users (idempotent)
+            cur.execute(
+                """
+                DO $$
+                BEGIN
+                    IF NOT EXISTS (
+                        SELECT 1 FROM information_schema.columns
+                        WHERE table_name='users' AND column_name='default_wallet_id'
+                    ) THEN
+                        ALTER TABLE users ADD COLUMN default_wallet_id INTEGER REFERENCES wallets(id) ON DELETE SET NULL;
+                    END IF;
+                END$$;
+                """
+            )
+
+            cur.execute(
+                """
+                DO $$
+                BEGIN
+                    IF NOT EXISTS (
+                        SELECT 1 FROM information_schema.columns
+                        WHERE table_name='users' AND column_name='live_trading_enabled'
+                    ) THEN
+                        ALTER TABLE users ADD COLUMN live_trading_enabled BOOLEAN DEFAULT FALSE;
+                    END IF;
+                END$$;
+                """
+            )
+
+            # 4) Credentials (depends on users)
+            cur.execute(
+                """
+                CREATE TABLE IF NOT EXISTS credentials (
+                    id SERIAL PRIMARY KEY,
+                    user_id INTEGER UNIQUE NOT NULL REFERENCES users(id),
+                    encrypted_okx_api_key TEXT,
+                    encrypted_okx_api_secret TEXT,
+                    encrypted_okx_passphrase TEXT,
+                    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+                );
+                """
+            )
+
+            # 5) Alerts (depends on users)
+            cur.execute(
+                """
                 CREATE TABLE IF NOT EXISTS alerts (
                     id SERIAL PRIMARY KEY,
                     user_id INTEGER NOT NULL REFERENCES users(id),
@@ -94,19 +135,23 @@ def initialize_database():
                     is_active BOOLEAN DEFAULT TRUE,
                     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
                 );
-            """)
+                """
+            )
 
-            # Create portfolios table
-            cur.execute("""
+            # 6) Portfolios (depends on users)
+            cur.execute(
+                """
                 CREATE TABLE IF NOT EXISTS portfolios (
                     id SERIAL PRIMARY KEY,
                     user_id INTEGER NOT NULL REFERENCES users(id),
                     last_synced TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
                 );
-            """)
+                """
+            )
 
-            # Create holdings table
-            cur.execute("""
+            # 7) Holdings (depends on portfolios)
+            cur.execute(
+                """
                 CREATE TABLE IF NOT EXISTS holdings (
                     id SERIAL PRIMARY KEY,
                     portfolio_id INTEGER NOT NULL REFERENCES portfolios(id) ON DELETE CASCADE,
@@ -118,20 +163,24 @@ def initialize_database():
                     value_usd NUMERIC,
                     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
                 );
-            """)
+                """
+            )
 
-            # Create prices table
-            cur.execute("""
+            # 8) Prices (independent)
+            cur.execute(
+                """
                 CREATE TABLE IF NOT EXISTS prices (
                     id SERIAL PRIMARY KEY,
                     symbol VARCHAR(255),
                     timestamp TIMESTAMP WITH TIME ZONE NOT NULL,
                     price_usd NUMERIC NOT NULL
                 );
-            """)
+                """
+            )
 
-            # Create portfolio_history table
-            cur.execute("""
+            # 9) Portfolio history (depends on users)
+            cur.execute(
+                """
                 CREATE TABLE IF NOT EXISTS portfolio_history (
                     id SERIAL PRIMARY KEY,
                     user_id INTEGER NOT NULL REFERENCES users(id),
@@ -140,8 +189,22 @@ def initialize_database():
                     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
                     UNIQUE(user_id, snapshot_date)
                 );
-            """)
-            
+                """
+            )
+
+            # 10) Tokens metadata (independent)
+            cur.execute(
+                """
+                CREATE TABLE IF NOT EXISTS tokens (
+                    symbol VARCHAR(255) NOT NULL,
+                    chain_id INTEGER NOT NULL,
+                    address TEXT NOT NULL,
+                    decimals INTEGER NOT NULL,
+                    PRIMARY KEY(symbol, chain_id)
+                );
+                """
+            )
+
             conn.commit()
             logger.info("Database tables initialized successfully.")
     except (OperationalError, psycopg2.Error) as e:

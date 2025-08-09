@@ -3,6 +3,7 @@ import google.generativeai as genai
 import logging
 from src.database import get_db_connection
 from src.okx_client import OKXClient
+from src.portfolio import PortfolioService
 
 # Enable logging
 logging.basicConfig(
@@ -18,36 +19,15 @@ class InsightsClient:
         genai.configure(api_key=self.api_key)
         self.pro_model = genai.GenerativeModel('gemini-2.5-pro')
         self.okx_client = OKXClient()
+        self.portfolio_service = PortfolioService()
 
     def get_user_portfolio(self, user_id: int) -> dict:
-        """
-        Retrieves a user's portfolio from the database.
-        In a real application, this would involve fetching token balances from the blockchain.
-        For now, we will just return a dummy portfolio.
-        """
-        conn = get_db_connection()
-        if conn is None:
+        """Return a simplified snapshot of the user's portfolio from PortfolioService."""
+        snap = self.portfolio_service.get_snapshot(user_id)
+        if not snap or not snap.get("assets"):
             return {}
-
-        try:
-            with conn.cursor() as cur:
-                cur.execute("SELECT id FROM users WHERE telegram_id = %s;", (user_id,))
-                user_id = cur.fetchone()[0]
-
-                # This is a simplified portfolio representation.
-                # In a real app, you would fetch token balances from the blockchain.
-                cur.execute("SELECT name FROM wallets WHERE user_id = %s;", (user_id,))
-                wallets = cur.fetchall()
-                if wallets:
-                    return {"ETH": 1.5, "USDC": 1000}
-                else:
-                    return {}
-        except Exception as e:
-            logger.error(f"Error fetching portfolio for user {user_id}: {e}")
-            return {}
-        finally:
-            if conn:
-                conn.close()
+        # Convert to simple {symbol: quantity}
+        return {a["symbol"]: a["quantity"] for a in snap.get("assets", [])}
 
     def get_market_data(self) -> dict:
         """
@@ -85,14 +65,14 @@ class InsightsClient:
             market_data = self.get_market_data()
 
             prompt = f"""
-            As an expert crypto market analyst, provide personalized insights for a user with the following portfolio:
+            You are Esther, a friendly, concise crypto market copilot. Provide approachable insights for a user with the following portfolio:
             {portfolio}
 
-            Here is the current market data:
+            Market data:
             {market_data}
 
-            Based on the user's portfolio and the current market trends, provide a brief analysis and one or two actionable recommendations.
-            Keep the tone professional, informative, and cautious. Do not give financial advice.
+            Give a short analysis and 1–2 practical suggestions.
+            Style: warm, encouraging, beginner‑friendly, but non‑promissory. Include a brief caution that this is not financial advice.
             """
 
             response = self.pro_model.generate_content(prompt)
