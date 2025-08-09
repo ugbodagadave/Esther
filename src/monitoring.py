@@ -2,6 +2,7 @@ import os
 import time
 import logging
 import asyncio
+import random
 from telegram import Bot
 from src.database import get_db_connection
 from src.okx_client import OKXClient
@@ -21,6 +22,8 @@ portfolio_service = PortfolioService()
 
 # Interval (seconds) for full portfolio sync across all users – default 10 min
 PORTFOLIO_SYNC_INTERVAL = int(os.getenv("PORTFOLIO_SYNC_INTERVAL", "600"))
+ALERT_QUOTE_DELAY_MS = int(os.getenv("ALERT_QUOTE_DELAY_MS", "100"))  # per-alert throttle
+ALERT_ERROR_BACKOFF_MS = int(os.getenv("ALERT_ERROR_BACKOFF_MS", "500"))
 
 async def sync_all_portfolios():
     """Iterate over every user and call PortfolioService.sync_balances.
@@ -82,6 +85,8 @@ async def check_alerts():
                 
                 if not from_token_address or not to_token_address or not decimals:
                     logger.warning(f"Skipping alert {alert_id} due to unknown symbol {symbol}")
+                    # Throttle between alerts regardless
+                    await asyncio.sleep((ALERT_QUOTE_DELAY_MS + random.randint(0, 50)) / 1000)
                     continue
 
                 amount = str(1 * 10**decimals) # 1 whole token in its smallest unit
@@ -106,6 +111,16 @@ async def check_alerts():
                         cur.execute("UPDATE alerts SET is_active = FALSE WHERE id = %s;", (alert_id,))
                         conn.commit()
                         logger.info(f"Triggered and deactivated alert {alert_id} for user {user_id}")
+                    # Throttle between alerts
+                    await asyncio.sleep((ALERT_QUOTE_DELAY_MS + random.randint(0, 50)) / 1000)
+                else:
+                    # Extra backoff on errors (simple heuristic for rate limiting)
+                    err = (quote_response.get("error") or "").lower()
+                    backoff_ms = ALERT_ERROR_BACKOFF_MS
+                    if "429" in err or "rate" in err or "limit" in err:
+                        backoff_ms = max(ALERT_ERROR_BACKOFF_MS, ALERT_QUOTE_DELAY_MS * 5)
+                    logger.warning("Quote failed for alert %s (%s): %s. Backing off %sms.", alert_id, symbol, err, backoff_ms)
+                    await asyncio.sleep(backoff_ms / 1000)
 
     except Exception as e:
         logger.error(f"Error checking alerts: {e}")
