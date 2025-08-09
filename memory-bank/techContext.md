@@ -30,3 +30,4 @@
   - Default wallet must exist; absence aborts the flow with a clear message (even in simulation).
   - For live trades (`DRY_RUN_MODE` = False), the default wallet’s encrypted private key is decrypted in-memory for signing.
 - `TokenResolver` is lazily instantiated inside `confirm_swap` to avoid NoneType issues when handlers are invoked without full app startup.
+- BTC Handling: For EVM address contexts (quotes/swaps), `BTC` is aliased to `WBTC` for address/decimals; for charts, `BTC` uses the `BTC-USD` instrument ID.

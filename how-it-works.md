@@ -202,6 +202,7 @@ The price chart feature allows users to visualize historical price data for a to
 2.  **Data Fetching**: The `OKXClient` intelligently selects the correct endpoint based on the token type. For instrument IDs like 'BTC-USD', it uses `/api/v5/market/history-candles`. For EVM token addresses, it uses `/api/v5/wallet/token/historical-price`.
 3.  **Chart Rendering**: The `matplotlib` library is used to generate a PNG image of the price chart from the historical data.
 4.  **Response**: The generated chart image is sent back to the user via Telegram.
+5.  **Token Normalization**: For EVM-based swaps/quotes, `TokenResolver` normalizes `BTC` to `WBTC` (address + decimals) to ensure accurate quoting and execution. For charts, `BTC` continues to use the `BTC-USD` instrument ID.
 
 ## 9. Rebalance Engine
 

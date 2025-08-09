@@ -34,17 +34,30 @@ class TokenResolver:
                 conn.close()
 
     def get_token_info(self, symbol, chain_id=1):
-        """Resolves token information from the database."""
+        """Resolves token information from the database.
+        Special-cases BTC to use WBTC address/decimals for EVM swaps/quotes.
+        Falls back to constants if DB has no entry.
+        """
         try:
+            # Normalize BTC to WBTC for EVM address contexts
+            lookup_symbol = symbol.upper()
+            if lookup_symbol == 'BTC':
+                lookup_symbol = 'WBTC'
+
             conn = get_db_connection()
             with conn.cursor() as cur:
                 cur.execute(
                     "SELECT address, decimals FROM tokens WHERE symbol = %s AND chain_id = %s;",
-                    (symbol.upper(), chain_id)
+                    (lookup_symbol, chain_id)
                 )
                 result = cur.fetchone()
                 if result:
                     return {"address": result[0], "decimals": result[1]}
+                # Fallback to constants if DB miss
+                const_address = TOKEN_ADDRESSES.get(lookup_symbol)
+                const_decimals = TOKEN_DECIMALS.get(lookup_symbol)
+                if const_address and const_decimals is not None:
+                    return {"address": const_address, "decimals": const_decimals}
                 else:
                     return None
         except Exception as e:

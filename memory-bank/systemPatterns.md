@@ -41,3 +41,4 @@ graph TD
 ## 5. Conversation & Validation Patterns
 - **Validation-First Confirmation**: Before executing a swap, validate user settings that affect safety (e.g., live trading enabled requires a default wallet) even if environment is in simulation mode.
 - **Lazy Initialization**: Services created during app startup (e.g., `TokenResolver`) should be lazily checked/instantiated in handlers to prevent test/startup race conditions.
+- **Symbol Normalization**: Normalize symbols that differ between instrument and token contexts (e.g., `BTC`→`WBTC` for EVM swaps; `BTC-USD` for market candles) in a single resolver to keep business logic consistent.

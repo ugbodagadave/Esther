@@ -12,162 +12,79 @@ This document enumerates the remaining gaps, technical debt, and placeholders in
 ## A. Gaps and How We’ll Close Them
 
 ### A1. Wallet-backed live trading flow is incomplete
-- **Current**: `confirm_swap` uses `TEST_WALLET_ADDRESS` from env. Private keys are encrypted and stored but never used for signing. Cross-chain params are partially ignored.
-- **Plan**:
-  1.  **DB Migration**: Add `users.default_wallet_id` (nullable `INTEGER`, `FOREIGN KEY` to `wallets.id`) and `users.live_trading_enabled` (`BOOLEAN`, `DEFAULT FALSE`).
-  2.  **User Settings**: Implement `/setdefaultwallet` and `/enablelivetrading` commands.
-  3.  **Update `confirm_swap`**:
-      - Resolve `wallet_address` from the designated wallet.
-      - For `DRY_RUN=false`, fetch and decrypt the private key in-memory.
-      - Call OKX DEX aggregator with the signed transaction.
-  4.  **Guardrails**: Require explicit `/enable_live_trading` command.
-  5.  **Cross-chain**: Pass `chainId` consistently.
-- **Testing & Version Control**:
-    - **Test**: Write unit tests for DB migrations, wallet resolution, and live trading guards.
-    - **Git**:
-        - `git add .`
-        - `git commit -m "feat(trading): implement live trading flow"`
-        - `git push`
+- **Status**: DONE
+- **Now**: `/setdefaultwallet` and `/enablelivetrading` implemented; `confirm_swap` validates default wallet when live is enabled (even under DRY_RUN), decrypts key in-memory only for real trades, and consistently passes `chainId`.
+- **Guardrails**: Live trading gated by explicit user enablement and default wallet requirement.
 
 ### A2. OKX headers and API parity
-- **Current**: `OK-ACCESS-PROJECT` header is missing in `okx_client.py`.
-- **Plan**: Add the header to `okx_client.py` requests if `OKX_PROJECT_ID` is set.
-- **Testing & Version Control**:
-    - **Test**: Extend OKX client header tests.
-    - **Git**:
-        - `git add .`
-        - `git commit -m "fix(okx): add OK-ACCESS-PROJECT header to client"`
-        - `git push`
+- **Status**: DONE
+- **Now**: `OK-ACCESS-PROJECT` header added in `okx_client.py` when `OKX_PROJECT_ID` is set.
 
 ### A3. Token address / decimals handling and symbol resolution
-- **Current**: Hardcoded `TOKEN_ADDRESSES` and `TOKEN_DECIMALS`.
-- **Plan**:
-  1.  **DB Table**: Create `tokens(symbol, chain_id, address, decimals)`.
-  2.  **Resolver**: Introduce a token metadata resolver.
-  3.  **Dynamic Resolution**: Patch `get_price` and swap flows to use the resolver.
-  4.  **Normalize BTC**: Use WBTC on EVM for quotes.
-- **Testing & Version Control**:
-    - **Test**: Unit tests for resolver and `get_price` correctness.
-    - **Git**:
-        - `git add .`
-        - `git commit -m "feat(token): implement dynamic token resolution"`
-        - `git push`
+- **Status**: PARTIAL
+- **Now**: `tokens` table created and seeded; `TokenResolver` implemented and integrated. Charts correctly special-case BTC via instrument ID using market candles. Remaining: ensure BTC price/quote flows consistently map to WBTC address for EVM swaps.
+- **TODO (A3)**:
+  - [ ] Add BTC→WBTC aliasing in `TokenResolver.get_token_info()` for EVM/address contexts.
+  - [ ] Fallback to constants when DB entry missing; keep charts using instrument ID.
+  - [ ] Unit tests: verify `get_price` intent for BTC uses WBTC address/decimals; verify swap paths map BTC→WBTC.
+  - [ ] Documentation: note BTC address aliasing in `how-it-works.md` and memory bank.
 
 ### A4. Price alerts robustness
-- **Current**: Uses `1 ETH` for all symbols; missing imports.
-- **Plan**:
-  1.  **Fix Imports**: Add `TOKEN_ADDRESSES` import in `monitoring.py`.
-  2.  **Dynamic Quotes**: Quote minimal representative amount for each token.
-  3.  **Rate Limiting**: Add rate limiting and backoff.
-- **Testing & Version Control**:
-    - **Test**: Alert evaluation tests for varied decimals.
-    - **Git**:
-        - `git add .`
-        - `git commit -m "fix(monitoring): improve price alert robustness"`
-        - `git push`
+- **Status**: PARTIAL
+- **Now**: Monitoring uses dynamic decimals and correct imports; OKX client has retries.
+- **Next**: Add lightweight rate limiting/backoff in the alert loop.
 
 ### A5. Insights use placeholders
-- **Current**: Portfolio and trend are mocked.
-- **Plan**:
-  - Pull real snapshot via `PortfolioService.get_snapshot`.
-  - Enrich with live prices via OKX.
-- **Testing & Version Control**:
-    - **Test**: Mock snapshot data and verify prompt content.
-    - **Git**:
-        - `git add .`
-        - `git commit -m "feat(insights): use real data for portfolio insights"`
-        - `git push`
+- **Status**: TODO
+- **Plan**: Pull real snapshot via `PortfolioService.get_snapshot()` and enrich with live prices.
 
 ### A6. Portfolio performance persistence cadence
-- **Current**: Snapshot saved once per day; no backfill.
-- **Plan**:
-  - Add idempotent “today already saved” check.
-  - Add manual `/snapshot` admin command.
-- **Testing & Version Control**:
-    - **Test**: Ensure duplicate same-day inserts update value.
-    - **Git**:
-        - `git add .`
-        - `git commit -m "feat(portfolio): add manual snapshot and idempotent saves"`
-        - `git push`
+- **Status**: PARTIAL
+- **Now**: Idempotent daily saves via ON CONFLICT. 
+- **Next**: Add manual `/snapshot` admin command.
 
 ### A7. Advanced orders (stop-loss/take-profit)
-- **Current**: Only acknowledgements.
-- **Plan (phase 2)**: Persist orders in DB; extend monitoring to check conditions.
-- **Testing & Version Control**:
-    - **Test**: DB tests for create/list/trigger logic.
-    - **Git**:
-        - `git add .`
-        - `git commit -m "feat(orders): implement advanced order persistence"`
-        - `git push`
+- **Status**: TODO
+- **Plan (phase 2)**: Persist orders in DB; extend monitoring to check and trigger.
 
 ### A8. Rebalance plan execution fidelity
-- **Current**: Greedy single-hop; no slippage config.
-- **Plan**: Allow per-trade slippage configuration; simulate quotes per leg in `DRY_RUN`.
-- **Testing & Version Control**:
-    - **Test**: Unit tests for slippage plumbing.
-    - **Git**:
-        - `git add .`
-        - `git commit -m "feat(rebalance): add slippage configuration"`
-        - `git push`
+- **Status**: TODO
+- **Plan**: Per-trade slippage configuration; simulate quotes per leg in DRY_RUN.
 
 ### A9. Webhook/polling lifecycle and shutdown
-- **Current**: Polling branch calls `bot_app.updater.start_polling()` and `bot_app.start()`.
-- **Plan**: Verify FastAPI startup/shutdown ordering on Render.
-- **Testing & Version Control**:
-    - **Test**: Manual smoke test on Render.
-    - **Git**: No code changes, no commit.
+- **Status**: TODO (manual validation)
+- **Plan**: Verify startup/shutdown ordering on Render.
 
 ### A10. Requirements and docs drift
-- **Current**: `Flask[async]` in requirements; MongoDB mentioned in `plan.md`.
-- **Plan**: Remove `Flask[async]`; clarify PostgreSQL everywhere.
-- **Testing & Version Control**:
-    - **Test**: CI install check; run full tests.
-    - **Git**:
-        - `git add .`
-        - `git commit -m "chore(deps): remove Flask and clarify PostgreSQL usage"`
-        - `git push`
+- **Status**: DONE
+- **Now**: Flask removed; PostgreSQL clarified.
 
 ### A11. Admin clear-DB endpoint hardening
-- **Current**: Guarded by secret only.
-- **Plan**: Add optional IP allowlist; return 404 if key invalid.
-- **Testing & Version Control**:
-    - **Test**: Unit tests for guard logic.
-    - **Git**:
-        - `git add .`
-        - `git commit -m "feat(admin): harden clear-db endpoint"`
-        - `git push`
+- **Status**: TODO
+- **Plan**: Optional IP allowlist; return 404 for invalid key.
 
 ### A12. E2E path for price charts and BTC special-case
-- **Current**: Chain hardcoded to 1 for charts.
-- **Plan**: Continue charts on ETH chain; use market candles for BTC.
-- **Testing & Version Control**:
-    - **Test**: Add chain param tests.
-    - **Git**:
-        - `git add .`
-        - `git commit -m "feat(charts): add chain parameter support"`
-        - `git push`
+- **Status**: PARTIAL
+- **Now**: Charts use instrument ID for BTC; E2E added.
+- **Next**: Add chain parameter support to handler/intent where relevant.
 
 ## B. Database Migrations (Non-breaking)
-- `users`: add `default_wallet_id INTEGER NULL REFERENCES wallets(id)`, `live_trading_enabled BOOLEAN DEFAULT FALSE`.
-- `tokens`: new table for token metadata (`symbol`, `chain_id`, `address`, `decimals`, `PRIMARY KEY(symbol, chain_id)`).
+- `users`: add `default_wallet_id INTEGER NULL REFERENCES wallets(id)`, `live_trading_enabled BOOLEAN DEFAULT FALSE`. (DONE)
+- `tokens`: new table for token metadata (`symbol`, `chain_id`, `address`, `decimals`, `PRIMARY KEY(symbol, chain_id)`). (DONE)
 
 ## C. Testing Strategy
-- Extend unit tests for all new features and fixes.
+- Extend unit tests for all new features and fixes. (ONGOING)
 - All tests must pass before committing and pushing.
 
 ## D. Documentation Updates
-- Update `README.md`, `how-it-works.md`, and `okx_dex_api_integration.md` to reflect the changes.
+- Update `README.md`, `how-it-works.md`, and `okx_dex_api_integration.md` to reflect the changes. (ONGOING)
 
 ## E. Phase 1 – Actionable To-Do (1–2 days)
-1.  Add `OK-ACCESS-PROJECT` header to `okx_client.py`.
-2.  Fix monitoring imports and per-symbol quote amount.
-3.  Create `tokens` table and a simple resolver.
-4.  Normalize price query to use dynamic decimals.
-5.  Remove `Flask[async]` from requirements.
-6.  Write tests for all the above.
-7.  Update documentation.
+1.  Add BTC→WBTC aliasing (A3) and tests.
+2.  Add minimal alert loop backoff (A4).
+3.  Update docs accordingly.
 
 ## F. Phase 2 – Live Trading & Advanced Orders
-1.  Implement live trading flow.
-2.  Persist and evaluate advanced orders.
+1.  Persist and evaluate advanced orders (A7).
+2.  Rebalance slippage config and per-leg simulation (A8).
 3.  Write tests and update documentation.
