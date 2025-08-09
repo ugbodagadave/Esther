@@ -211,6 +211,13 @@ class OKXClient:
             }
             base_url = self.base_url
 
+            # Prepare an optional fallback for native ETH using Market API candles
+            eth_zero_addr = "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+            fallback_inst_id = None
+            if token_address.lower() == eth_zero_addr:
+                # Use market candles for ETH if wallet API is unavailable
+                fallback_inst_id = "ETH-USD"
+
         for attempt in range(self.max_retries):
             try:
                 query_string = '&'.join([f'{k}={v}' for k, v in params.items()])
@@ -244,6 +251,29 @@ class OKXClient:
                     if attempt < self.max_retries - 1:
                         time.sleep(self.retry_delay)
                         continue
+                    # If ETH and wallet endpoint is flaky, try Market API candles as a fallback
+                    if fallback_inst_id:
+                        try:
+                            m_request_path = '/api/v5/market/history-candles'
+                            m_params = {"instId": fallback_inst_id, "bar": bar, "limit": limit}
+                            m_qs = '&'.join([f'{k}={v}' for k, v in m_params.items()])
+                            m_full = f"{m_request_path}?{m_qs}"
+                            headers = self._get_request_headers('GET', m_full)
+                            url = f"https://www.okx.com{m_full}"
+                            logger.info(f"Fallback: Sending GET request to OKX Market API: {url}")
+                            resp = requests.get(url, headers=headers, timeout=10)
+                            resp.raise_for_status()
+                            m_data = resp.json()
+                            if m_data.get("code") == "0":
+                                raw_data = m_data.get("data", [])
+                                processed_data = [{"ts": item[0], "price": item[4]} for item in raw_data]
+                                return {"success": True, "data": processed_data}
+                            else:
+                                f_msg = m_data.get("msg", "Unknown API error")
+                                logger.error(f"Fallback market candles error: {f_msg}")
+                        except Exception as _:
+                            # Swallow and return original error below
+                            pass
                     return {"success": False, "error": f"API Error: {error_msg}"}
             except requests.exceptions.HTTPError as e:
                 logger.warning(f"HTTP Error on attempt {attempt + 1}: {e}. Retrying in {self.retry_delay}s...")
@@ -252,6 +282,25 @@ class OKXClient:
                 logger.error(f"Error fetching historical price: {e}")
                 return {"success": False, "error": f"A network error occurred: {e}"}
         
+        # Final fallback if defined and loop finished due to HTTP errors
+        if 'fallback_inst_id' in locals() and fallback_inst_id:
+            try:
+                m_request_path = '/api/v5/market/history-candles'
+                m_params = {"instId": fallback_inst_id, "bar": bar, "limit": limit}
+                m_qs = '&'.join([f'{k}={v}' for k, v in m_params.items()])
+                m_full = f"{m_request_path}?{m_qs}"
+                headers = self._get_request_headers('GET', m_full)
+                url = f"https://www.okx.com{m_full}"
+                logger.info(f"Final fallback: Sending GET request to OKX Market API: {url}")
+                resp = requests.get(url, headers=headers, timeout=10)
+                resp.raise_for_status()
+                m_data = resp.json()
+                if m_data.get("code") == "0":
+                    raw_data = m_data.get("data", [])
+                    processed_data = [{"ts": item[0], "price": item[4]} for item in raw_data]
+                    return {"success": True, "data": processed_data}
+            except Exception as _:
+                pass
         return {"success": False, "error": "Failed to fetch historical price after multiple retries."}
 
 
