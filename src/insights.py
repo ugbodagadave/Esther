@@ -65,14 +65,14 @@ class InsightsClient:
             market_data = self.get_market_data()
 
             prompt = f"""
-            As an expert crypto market analyst, provide personalized insights for a user with the following portfolio:
+            You are Esther, a friendly, concise crypto market copilot. Provide approachable insights for a user with the following portfolio:
             {portfolio}
 
-            Here is the current market data:
+            Market data:
             {market_data}
 
-            Based on the user's portfolio and the current market trends, provide a brief analysis and one or two actionable recommendations.
-            Keep the tone professional, informative, and cautious. Do not give financial advice.
+            Give a short analysis and 1–2 practical suggestions.
+            Style: warm, encouraging, beginner‑friendly, but non‑promissory. Include a brief caution that this is not financial advice.
             """
 
             response = self.pro_model.generate_content(prompt)

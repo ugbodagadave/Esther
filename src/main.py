@@ -102,13 +102,13 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                 conn.commit()
                 logger.info(f"New user {user.username} ({user.id}) created.")
                 await update.message.reply_text(
-                    "Hello! I'm Esther, your AI agent for navigating the world of decentralized finance.",
+                    "Hello! I'm Esther — your friendly DeFi co-pilot. Ready when you are! 🚀",
                     reply_markup=reply_markup
                 )
             else:
                 logger.info(f"Existing user {user.username} ({user.id}) returned.")
                 await update.message.reply_text(
-                    "Welcome back! How can I help you today?",
+                    "Welcome back! What can I do for you today? 😊",
                     reply_markup=reply_markup
                 )
     except Exception as e:
@@ -122,15 +122,28 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     """Sends a message when the command /help is issued or the 'help' button is clicked."""
     help_text = (
         "Here's what I can do for you:\n\n"
-        "📈 **Portfolio Management**\n"
-        "   - `Show me my portfolio`: Get a full snapshot of your assets.\n"
-        "   - `List my wallets`: See all your connected wallets.\n"
-        "   - `Add a new wallet`: Connect a new wallet to track.\n\n"
-        "💹 **Trading & Swaps**\n"
-        "   - `Buy 0.1 ETH with USDC`: Execute a trade.\n"
-        "   - `What is the price of BTC?`: Get the latest price for any token.\n\n"
-        "🔔 **Alerts**\n"
-        "   - `Set a price alert`: Get notified when a token hits your target price."
+        "📊 Portfolio & Performance\n"
+        "   - `Show me my portfolio`: Sync and summarize your assets.\n"
+        "   - `What's my performance 30d?`: See portfolio performance over a period.\n"
+        "   - `Show price chart for BTC 7d`: Visualize token price history.\n\n"
+        "👛 Wallets\n"
+        "   - `Add a new wallet`: Connect a wallet securely via web app.\n"
+        "   - `List my wallets`: See all saved wallets.\n"
+        "   - `Delete a wallet`: Remove a wallet from your profile.\n"
+        "   - `/setdefaultwallet`: Choose the default wallet for trading.\n\n"
+        "💱 Trading & Quotes\n"
+        "   - `Buy 0.1 ETH with USDC`: Simulate or execute a swap.\n"
+        "   - `Sell 50 USDC for ETH`: Convert between tokens.\n"
+        "   - `What is the price of BTC?`: Quick price check.\n\n"
+        "🔔 Alerts\n"
+        "   - `Set a price alert`: Be notified when targets are hit.\n"
+        "   - `List my alerts`: Review active alerts.\n\n"
+        "🧠 Insights & Rebalance\n"
+        "   - `Give me insights`: Personalized, portfolio-aware market notes.\n"
+        "   - `Rebalance my portfolio`: Get a step-by-step trade plan.\n\n"
+        "⚙️ Live trading controls\n"
+        "   - `/enablelivetrading`: Toggle live mode (off by default).\n"
+        "   - `Help`: Ask me anything in natural language."
     )
     # Check if the call is from a button click
     if update.callback_query:
@@ -205,11 +218,11 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int
         return await enable_live_trading_start(update, context)
 
     elif intent == "greeting":
-        await update.message.reply_text("Hello! How can I assist you with your trades today?")
+        await update.message.reply_text("Hi! I’m here to help with quotes, swaps, alerts, and more—what do you need? ✨")
         return ConversationHandler.END
 
     else:
-        await update.message.reply_text("I'm not sure how to help with that. You can ask me for the price of a token or to buy a token.")
+        await update.message.reply_text("I didn’t quite catch that. Try things like ‘price of BTC’, ‘buy 0.1 ETH with USDC’, or ‘show my portfolio’. 💬")
         return ConversationHandler.END
 
 

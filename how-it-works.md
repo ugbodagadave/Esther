@@ -88,6 +88,28 @@ Here is the step-by-step journey of a user command, from Telegram to execution a
     *   **Notification**: If an alert is triggered, the monitoring service uses the **Telegram Bot API** to send a direct message to the user.
     *   **Deactivation**: Once an alert is triggered, it is marked as inactive in the database to prevent duplicate notifications.
 
+## 3.5 Personality & Conversational Style
+
+- Warm, concise, beginner‑friendly tone with light emojis where helpful
+- Offers example prompts when unsure what the user means
+- Clear confirmations and next‑step hints in multi‑step flows
+- Friendly but cautious insights; always includes a brief non‑advice disclaimer
+
+## 3.6 Help Menu ("What I can do")
+
+- Portfolio & Performance
+  - Show my portfolio; Portfolio performance (e.g., "30d"); Price chart (e.g., "BTC 7d")
+- Wallets
+  - Add a new wallet (secure Web App), List wallets, Delete wallet, Set default wallet
+- Trading & Quotes
+  - Buy/Sell tokens, Quick price checks
+- Alerts
+  - Set a price alert, List active alerts
+- Insights & Rebalance
+  - Generate insights, Rebalance plan
+- Live trading controls
+  - Enable/disable live trading (off by default)
+
 ## 4. Conversational NLP & Natural Language Understanding
 
 Esther has evolved from a command-driven bot to a sophisticated conversational AI that understands natural language. This transformation involves several key components:
