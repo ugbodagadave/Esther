@@ -51,6 +51,7 @@ from src.insights import InsightsClient
 from src.exceptions import WalletAlreadyExistsError, InvalidWalletAddressError, DatabaseConnectionError
 from src.portfolio import PortfolioService
 from src.chart_generator import generate_price_chart
+from src.token_resolver import TokenResolver
 from src.constants import (
     TOKEN_ADDRESSES,
     TOKEN_DECIMALS,
@@ -63,6 +64,7 @@ nlp_client = NLPClient()
 okx_client = OKXClient()
 insights_client = InsightsClient()
 portfolio_service = PortfolioService()
+token_resolver = None
 
 # --- Conversation Handler States ---
 AWAIT_CONFIRMATION = 1
@@ -239,15 +241,17 @@ async def get_price_intent(update: Update, context: ContextTypes.DEFAULT_TYPE, e
         await update.message.reply_text("Please specify a token symbol (e.g., BTC, ETH).")
         return
     
-    from_token_address = TOKEN_ADDRESSES.get(symbol.upper())
-    to_token_address = TOKEN_ADDRESSES.get("USDT")
+    from_token_info = token_resolver.get_token_info(symbol.upper())
+    to_token_info = token_resolver.get_token_info("USDT")
 
-    if not from_token_address or not to_token_address:
+    if not from_token_info or not to_token_info:
         await update.message.reply_text(f"Sorry, I don't have the address for the token {symbol.upper()}.")
         return
 
-    # Use the correct number of decimals for the token
-    decimals = TOKEN_DECIMALS.get(symbol.upper(), 18) # Default to 18 if not found
+    from_token_address = from_token_info['address']
+    to_token_address = to_token_info['address']
+    decimals = from_token_info['decimals']
+    
     amount_in_smallest_unit = str(1 * 10**decimals)
 
     quote_response = okx_client.get_live_quote(
@@ -258,8 +262,7 @@ async def get_price_intent(update: Update, context: ContextTypes.DEFAULT_TYPE, e
     
     if quote_response.get("success"):
         quote_data = quote_response["data"]
-        # Use the decimals of the 'to' token (USDT) for correct price calculation
-        to_token_decimals = TOKEN_DECIMALS.get("USDT", 6)
+        to_token_decimals = to_token_info['decimals']
         price_estimate = float(quote_data.get('toTokenAmount', 0)) / (10**to_token_decimals)
         await update.message.reply_text(f"The current estimated price for {symbol.upper()}-USDT is ${price_estimate:.2f}.")
     else:
@@ -277,12 +280,12 @@ async def buy_token_intent(update: Update, context: ContextTypes.DEFAULT_TYPE, e
         await update.message.reply_text("To buy a token, please tell me the amount, the token symbol, and the currency to use (e.g., 'buy 0.5 ETH with USDT').")
         return ConversationHandler.END
 
-    from_token_address = TOKEN_ADDRESSES.get(currency.upper())
-    to_token_address = TOKEN_ADDRESSES.get(symbol.upper())
+    from_token_info = token_resolver.get_token_info(currency.upper())
+    to_token_info = token_resolver.get_token_info(symbol.upper())
     source_chain_id = CHAIN_ID_MAP.get(source_chain)
     destination_chain_id = CHAIN_ID_MAP.get(destination_chain)
 
-    if not from_token_address or not to_token_address:
+    if not from_token_info or not to_token_info:
         await update.message.reply_text(f"Sorry, I don't have the address for one of the tokens.")
         return ConversationHandler.END
 
@@ -303,8 +306,13 @@ async def buy_token_intent(update: Update, context: ContextTypes.DEFAULT_TYPE, e
         "destination_chain_id": destination_chain_id,
     }
 
+    from_token_address = from_token_info['address']
+    to_token_address = to_token_info['address']
+    from_token_decimals = from_token_info['decimals']
+    to_token_decimals = to_token_info['decimals']
+
     # This is a huge simplification. Amount needs to be converted based on the 'from' token's decimals.
-    amount_in_smallest_unit = str(int(float(amount) * 10**6)) # Assuming 6 decimals for USDC/USDT
+    amount_in_smallest_unit = str(int(float(amount) * 10**from_token_decimals))
 
     # Get a quote to show the user
     quote_response = okx_client.get_live_quote(
@@ -319,7 +327,7 @@ async def buy_token_intent(update: Update, context: ContextTypes.DEFAULT_TYPE, e
         return ConversationHandler.END
 
     quote_data = quote_response["data"]
-    to_amount = float(quote_data.get('toTokenAmount', 0)) / 10**18 # Assuming 18 decimals for ETH/WBTC
+    to_amount = float(quote_data.get('toTokenAmount', 0)) / 10**to_token_decimals
 
     context.user_data['swap_details']['amount_in_smallest_unit'] = amount_in_smallest_unit
     context.user_data['swap_details']['estimated_to_amount'] = to_amount
@@ -424,12 +432,12 @@ async def sell_token_intent(update: Update, context: ContextTypes.DEFAULT_TYPE, 
         await update.message.reply_text("To sell a token, please tell me the amount, the token symbol, and the currency to sell for (e.g., 'sell 0.5 ETH for USDT').")
         return ConversationHandler.END
 
-    from_token_address = TOKEN_ADDRESSES.get(symbol.upper())
-    to_token_address = TOKEN_ADDRESSES.get(currency.upper())
+    from_token_info = token_resolver.get_token_info(symbol.upper())
+    to_token_info = token_resolver.get_token_info(currency.upper())
     source_chain_id = CHAIN_ID_MAP.get(source_chain)
     destination_chain_id = CHAIN_ID_MAP.get(destination_chain)
 
-    if not from_token_address or not to_token_address:
+    if not from_token_info or not to_token_info:
         await update.message.reply_text(f"Sorry, I don't have the address for one of the tokens.")
         return ConversationHandler.END
 
@@ -450,8 +458,13 @@ async def sell_token_intent(update: Update, context: ContextTypes.DEFAULT_TYPE, 
         "destination_chain_id": destination_chain_id,
     }
 
+    from_token_address = from_token_info['address']
+    to_token_address = to_token_info['address']
+    from_token_decimals = from_token_info['decimals']
+    to_token_decimals = to_token_info['decimals']
+
     # This is a huge simplification. Amount needs to be converted based on the 'from' token's decimals.
-    amount_in_smallest_unit = str(int(float(amount) * 10**18)) # Assuming 18 decimals for ETH/WBTC
+    amount_in_smallest_unit = str(int(float(amount) * 10**from_token_decimals))
 
     # Get a quote to show the user
     quote_response = okx_client.get_live_quote(
@@ -466,7 +479,7 @@ async def sell_token_intent(update: Update, context: ContextTypes.DEFAULT_TYPE, 
         return ConversationHandler.END
 
     quote_data = quote_response["data"]
-    to_amount = float(quote_data.get('toTokenAmount', 0)) / 10**6 # Assuming 6 decimals for USDC/USDT
+    to_amount = float(quote_data.get('toTokenAmount', 0)) / 10**to_token_decimals
 
     context.user_data['swap_details']['amount_in_smallest_unit'] = amount_in_smallest_unit
     context.user_data['swap_details']['estimated_to_amount'] = to_amount
@@ -962,9 +975,11 @@ bot_app.add_handler(CallbackQueryHandler(delete_wallet_callback, pattern="^delet
 @app.on_event("startup")
 async def startup_event():
     """Initializes the application on startup."""
+    global token_resolver
     logger.info("Initializing database...")
     initialize_database()
     logger.info("Database initialization complete.")
+    token_resolver = TokenResolver()
 
     # Import and start the monitoring service as a background task
     from src.monitoring import main as monitoring_main
