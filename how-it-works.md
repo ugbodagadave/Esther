@@ -189,6 +189,19 @@ Esther now keeps a real-time view of every user's on-chain balances **without re
    * Telegram handler → calls `PortfolioService.sync_balances()` (best-effort) → `PortfolioService.get_snapshot()`
    * A Markdown table is returned summarising quantity and USD value of each asset along with a grand total.
 
+### Insights Generation (uses real snapshot)
+- `InsightsClient.generate_insights(user_id)` now uses `PortfolioService.get_snapshot(user_id)` to build a user’s current holdings map `{symbol: quantity}`.
+- It enriches with a minimal set of live prices via the OKX DEX quote endpoint (ETH, BTC baseline), and asks Gemini Pro to generate concise insights.
+- If no portfolio data is available, the insights gracefully fall back to an empty portfolio context.
+
+## 7.5 Background Monitoring Throttling (Price Alerts)
+- Alert checks are performed every minute.
+- Per-alert quote calls are throttled with a small delay and jitter to avoid bursty traffic.
+- On API errors (including suspected rate limits), the worker backs off briefly before continuing.
+- Config:
+  - `ALERT_QUOTE_DELAY_MS` (default: 100) – base delay between alerts, plus small random jitter
+  - `ALERT_ERROR_BACKOFF_MS` (default: 500) – backoff when a quote call fails; increased if error suggests rate limiting
+
 ### Diversification & Performance Analytics
 * `get_diversification()` – returns a `{symbol: %}` map based on last valuation.
 * `get_roi(window_days)` – naive ROI using the first candle from `/api/v5/dex/market/candlesticks-history` vs current value.

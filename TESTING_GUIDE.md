@@ -100,6 +100,7 @@ This ensures safe configuration before moving to live mode.
 **Test 1: Get Insights**
 *   **Your Message:** `/insights` or `Give me market insights`
 *   **Expected Bot Response:** A message containing analysis of your holdings, potential market trends, or other relevant insights.
+*   **Notes:** Insights now use your real portfolio snapshot (`PortfolioService.get_snapshot`) to build holdings. If your portfolio is empty, the insights will still respond but with minimal context.
 
 ---
 
@@ -108,6 +109,9 @@ This ensures safe configuration before moving to live mode.
 **Test 1: Set Price Alert**
 *   **Your Message:** `Alert me when BTC goes above 115000`
 *   **Expected Bot Response:** A confirmation message stating that the alert has been set (e.g., "Alert set: I will notify you if BTC > $115,000"). When the condition is met, you should receive a separate notification.
+*   **Notes:** Background alert checks apply lightweight throttling and backoff to avoid API rate limits. You can tweak:
+  * `ALERT_QUOTE_DELAY_MS` (default 100)
+  * `ALERT_ERROR_BACKOFF_MS` (default 500)
 
 ---
 
