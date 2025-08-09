@@ -137,3 +137,32 @@ By making these changes, we could seamlessly integrate Esther with X Layer and p
 - **Response Time Tracking**: Monitors API response times and retry frequency
 - **Error Rate Monitoring**: Tracks API error rates and success percentages
 - **Rate Limit Management**: Ensures compliance with OKX API rate limits
+
+## 6. X Layer Integration Potential (Concise)
+
+X Layer is OKX’s zkEVM Layer‑2 built with Polygon CDK, designed for low fees and full EVM compatibility with OKB as the native gas token.
+
+- What it is: A ZK‑powered Ethereum L2 using Polygon CDK; fully EVM compatible. Sources: [X Layer overview](https://www.okx.com/xlayer), [X Layer public mainnet announcement](https://www.okx.com/learn/x-layer-mainnet), [X Layer developer docs](https://github.com/okx/xlayer-docs).
+- Why it matters for Esther: Cheaper swaps, faster confirmations, and direct alignment with OKX’s Web3 stack (DEX, Wallet, Bridge, Explorer).
+
+### How Esther would integrate X Layer
+
+1) Quote & swap calls
+- Pass X Layer’s chain identifier to the existing OKX Aggregator endpoints used in `OKXClient`.
+- No code rewrite for contracts is needed due to EVM compatibility; token resolution remains address/decimals‑driven.
+
+2) Portfolio tracking
+- Include X Layer in the balance sync by querying the same OKX Web3 DEX/Explorer endpoints for the user’s address on X Layer.
+
+3) UI & NLP
+- Allow users to target X Layer explicitly (e.g., “buy 10 OKB on X Layer”).
+- Map “X Layer” to the appropriate chain parameter internally.
+
+4) Bridging (optional UX enhancement)
+- Offer a convenience deep‑link to OKX Bridge for users funding X Layer the first time.
+
+5) Security & ops
+- Continue signing with the standard OKX headers (`OK-ACCESS-*` + `OK-ACCESS-PROJECT`).
+- DRY‑RUN behavior remains unchanged.
+
+This approach keeps Esther’s current architecture intact while unlocking lower‑cost execution paths on X Layer.

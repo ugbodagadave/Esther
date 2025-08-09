@@ -36,6 +36,7 @@ For a more detailed breakdown of how these features work, please see the [How It
 -   **Database**: PostgreSQL
 -   **Crypto Exchange**: **OKX DEX API**
 -   **Cloud Hosting**: Render
+-   **L2 Focus**: OKX X Layer (zkEVM, Polygon CDK, OKB gas)
 
 ## 🚀 How to Get Started
 
@@ -90,7 +91,11 @@ To ensure all functionalities are working correctly, you can refer to the [**TES
 
 ## 💡 Potential for X Layer Integration
 
-X Layer, a high-performance, EVM-compatible Layer 2 network, offers a significant opportunity to enhance Esther's capabilities. By integrating with X Layer, we can provide users with faster, cheaper, and more scalable transactions. For a detailed explanation of our X Layer integration strategy, please see the [OKX DEX API Integration Guide](./okx_dex_api_integration.md).
+- X Layer is OKX’s zkEVM Layer‑2 built with Polygon CDK, using **OKB** as the gas token and offering full EVM compatibility with low fees and fast finality.
+- Esther can target X Layer by supplying its chain identifier to existing OKX Aggregator quote/swap calls and including it in portfolio balance sync—no contract rewrites required.
+- For first‑time users, the bot can deep‑link to OKX Bridge to fund X Layer quickly.
+
+See the concise plan in `okx_dex_api_integration.md`.
 
 ## ⚙️ Live Trading vs Dry Run
 
