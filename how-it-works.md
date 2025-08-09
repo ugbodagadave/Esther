@@ -104,6 +104,8 @@ The NLP module uses Google's Gemini models to parse user messages into structure
 - `get_insights`: "Give me market insights", "What's the market analysis?"
 - `execute_rebalance`: "Rebalance my portfolio", "Execute the rebalance plan"
 - `get_price_chart`: "Show me the price chart for BTC", "Chart for ETH over 7d"
+- `set_default_wallet`: "Set my default wallet", "/setdefaultwallet"
+- `enable_live_trading`: "Enable live trading", "/enablelivetrading"
 
 ### 4.2 Two-Tier Model Selection Strategy
 Esther intelligently chooses between Gemini models based on task complexity:

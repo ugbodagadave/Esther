@@ -16,6 +16,12 @@ from src.main import (
     _parse_period_to_days,
     portfolio_performance,
     get_price_chart_intent,
+    set_default_wallet_start,
+    set_default_wallet_callback,
+    enable_live_trading_start,
+    enable_live_trading_callback,
+    AWAIT_WALLET_SELECTION,
+    AWAIT_LIVE_TRADING_CONFIRMATION,
 )
 
 class TestPeriodParsing(unittest.TestCase):
@@ -319,6 +325,103 @@ class TestMainHandlers(unittest.IsolatedAsyncioTestCase):
             photo=b"fake_chart_image",
             caption="Price chart for BTC (7d)"
         )
+
+class TestLiveTradingSettings(unittest.IsolatedAsyncioTestCase):
+
+    def setUp(self):
+        """Set up a basic test environment."""
+        self.app = Application.builder().token("test-token").build()
+
+    async def _create_update_context(self, text: str = "") -> tuple[Update, ContextTypes.DEFAULT_TYPE]:
+        """Helper to create mock Update and Context objects."""
+        user = User(id=123, first_name="Test", is_bot=False, username="testuser")
+        
+        update = MagicMock(spec=Update)
+        update.update_id = 12345
+        
+        update.message = MagicMock(spec=Update.message)
+        update.message.text = text
+        update.message.from_user = user
+        update.message.reply_text = AsyncMock()
+        
+        update.effective_user = user
+        
+        context = ContextTypes.DEFAULT_TYPE(application=self.app, chat_id=123, user_id=123)
+        return update, context
+
+    def _mock_db(self):
+        """Helper to mock the database connection and cursor."""
+        conn = MagicMock()
+        cur = MagicMock()
+        conn.cursor.return_value.__enter__.return_value = cur
+        return conn, cur
+
+    @patch('src.main.get_db_connection')
+    async def test_set_default_wallet_start(self, mock_get_conn):
+        """Test starting the set default wallet conversation."""
+        update, context = await self._create_update_context()
+        mock_conn, mock_cur = self._mock_db()
+        mock_get_conn.return_value = mock_conn
+        mock_cur.fetchone.return_value = (1,)  # User ID
+        mock_cur.fetchall.return_value = [(1, "My Wallet", "0x123...abc")]
+
+        result = await set_default_wallet_start(update, context)
+
+        update.message.reply_text.assert_called_once()
+        self.assertIn("Which wallet would you like to set as your default", update.message.reply_text.call_args.args[0])
+        self.assertEqual(result, AWAIT_WALLET_SELECTION)
+
+    @patch('src.main.get_db_connection')
+    async def test_set_default_wallet_callback(self, mock_get_conn):
+        """Test the callback for setting the default wallet."""
+        update, context = await self._create_update_context()
+        query = AsyncMock(spec=Update.callback_query)
+        query.answer = AsyncMock()
+        query.edit_message_text = AsyncMock()
+        query.data = "set_wallet_1"
+        update.callback_query = query
+        
+        mock_conn, mock_cur = self._mock_db()
+        mock_get_conn.return_value = mock_conn
+
+        result = await set_default_wallet_callback(update, context)
+
+        mock_cur.execute.assert_called_once_with("UPDATE users SET default_wallet_id = %s WHERE telegram_id = %s;", (1, 123))
+        query.edit_message_text.assert_called_once_with("✅ Default wallet has been set successfully.")
+        self.assertEqual(result, ConversationHandler.END)
+
+    @patch('src.main.get_db_connection')
+    async def test_enable_live_trading_start(self, mock_get_conn):
+        """Test starting the enable live trading conversation."""
+        update, context = await self._create_update_context()
+        mock_conn, mock_cur = self._mock_db()
+        mock_get_conn.return_value = mock_conn
+        mock_cur.fetchone.return_value = (1, False) # default_wallet_id, live_trading_enabled
+
+        result = await enable_live_trading_start(update, context)
+
+        update.message.reply_text.assert_called_once()
+        self.assertIn("Live trading is currently **disabled**", update.message.reply_text.call_args.args[0])
+        self.assertEqual(result, AWAIT_LIVE_TRADING_CONFIRMATION)
+
+    @patch('src.main.get_db_connection')
+    async def test_enable_live_trading_callback(self, mock_get_conn):
+        """Test the callback for enabling live trading."""
+        update, context = await self._create_update_context()
+        query = AsyncMock(spec=Update.callback_query)
+        query.answer = AsyncMock()
+        query.edit_message_text = AsyncMock()
+        query.data = "enable_live_trading_yes"
+        update.callback_query = query
+        
+        mock_conn, mock_cur = self._mock_db()
+        mock_get_conn.return_value = mock_conn
+
+        result = await enable_live_trading_callback(update, context)
+
+        mock_cur.execute.assert_called_once_with("UPDATE users SET live_trading_enabled = %s WHERE telegram_id = %s;", (True, 123))
+        query.edit_message_text.assert_called_once_with("✅ Live trading has been **enabled**.", parse_mode='Markdown')
+        self.assertEqual(result, ConversationHandler.END)
 
 if __name__ == '__main__':
     unittest.main()

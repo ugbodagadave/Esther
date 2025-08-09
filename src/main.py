@@ -71,6 +71,8 @@ AWAIT_CONFIRMATION = 1
 AWAIT_WALLET_NAME, AWAIT_WALLET_ADDRESS, AWAIT_PRIVATE_KEY, AWAIT_WEB_APP_DATA = 2, 3, 4, 9
 AWAIT_ALERT_SYMBOL, AWAIT_ALERT_CONDITION, AWAIT_ALERT_PRICE = 5, 6, 7
 AWAIT_REBALANCE_CONFIRMATION = 8
+AWAIT_WALLET_SELECTION = 10
+AWAIT_LIVE_TRADING_CONFIRMATION = 11
 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -827,6 +829,137 @@ async def delete_wallet_callback(update: Update, context: ContextTypes.DEFAULT_T
         if conn:
             conn.close()
 
+async def set_default_wallet_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Starts the conversation to set the default wallet."""
+    user = update.effective_user
+    conn = get_db_connection()
+    if conn is None:
+        await update.message.reply_text("Database connection failed. Please try again later.")
+        return ConversationHandler.END
+
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SELECT id FROM users WHERE telegram_id = %s;", (user.id,))
+            user_id_result = cur.fetchone()
+            if not user_id_result:
+                await update.message.reply_text("Please /start the bot first to create an account.")
+                return ConversationHandler.END
+            user_id = user_id_result[0]
+
+            cur.execute("SELECT id, name, address FROM wallets WHERE user_id = %s;", (user_id,))
+            wallets = cur.fetchall()
+
+            if not wallets:
+                await update.message.reply_text("You haven't added any wallets yet. Use the 'Add a new wallet' command to get started.")
+                return ConversationHandler.END
+
+            keyboard = [[InlineKeyboardButton(f"{name} ({address[:6]}...{address[-4:]})", callback_data=f"set_wallet_{wallet_id}")] for wallet_id, name, address in wallets]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            await update.message.reply_text("Which wallet would you like to set as your default for trading?", reply_markup=reply_markup)
+            return AWAIT_WALLET_SELECTION
+
+    except Exception as e:
+        logger.error(f"Error starting set_default_wallet for user {user.id}: {e}")
+        await update.message.reply_text("An error occurred while fetching your wallets.")
+        return ConversationHandler.END
+    finally:
+        if conn:
+            conn.close()
+
+async def set_default_wallet_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Handles the callback for setting the default wallet."""
+    query = update.callback_query
+    await query.answer()
+    wallet_id = int(query.data.split("_")[2])
+    user = update.effective_user
+
+    conn = get_db_connection()
+    if conn is None:
+        await query.edit_message_text("Database connection failed. Please try again later.")
+        return ConversationHandler.END
+
+    try:
+        with conn.cursor() as cur:
+            cur.execute("UPDATE users SET default_wallet_id = %s WHERE telegram_id = %s;", (wallet_id, user.id))
+            conn.commit()
+            await query.edit_message_text(f"✅ Default wallet has been set successfully.")
+    except Exception as e:
+        logger.error(f"Error setting default wallet for user {user.id}: {e}")
+        await query.edit_message_text("An error occurred while setting your default wallet.")
+    finally:
+        if conn:
+            conn.close()
+    
+    return ConversationHandler.END
+
+
+async def enable_live_trading_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Starts the conversation to enable or disable live trading."""
+    user = update.effective_user
+    conn = get_db_connection()
+    if conn is None:
+        await update.message.reply_text("Database connection failed. Please try again later.")
+        return ConversationHandler.END
+
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SELECT default_wallet_id, live_trading_enabled FROM users WHERE telegram_id = %s;", (user.id,))
+            user_settings = cur.fetchone()
+
+            if not user_settings or not user_settings[0]:
+                await update.message.reply_text("You must set a default wallet before enabling live trading. Use /setdefaultwallet.")
+                return ConversationHandler.END
+
+            live_trading_enabled = user_settings[1]
+            status = "enabled" if live_trading_enabled else "disabled"
+            
+            keyboard = [
+                [
+                    InlineKeyboardButton("✅ Enable", callback_data="enable_live_trading_yes"),
+                    InlineKeyboardButton("❌ Disable", callback_data="enable_live_trading_no"),
+                ]
+            ]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            await update.message.reply_text(f"Live trading is currently **{status}**. Would you like to change this setting?", reply_markup=reply_markup, parse_mode='Markdown')
+            return AWAIT_LIVE_TRADING_CONFIRMATION
+
+    except Exception as e:
+        logger.error(f"Error starting enable_live_trading for user {user.id}: {e}")
+        await update.message.reply_text("An error occurred while fetching your settings.")
+        return ConversationHandler.END
+    finally:
+        if conn:
+            conn.close()
+
+
+async def enable_live_trading_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Handles the callback for enabling/disabling live trading."""
+    query = update.callback_query
+    await query.answer()
+    choice = query.data.split("_")[-1]
+    enable = choice == "yes"
+    user = update.effective_user
+
+    conn = get_db_connection()
+    if conn is None:
+        await query.edit_message_text("Database connection failed. Please try again later.")
+        return ConversationHandler.END
+
+    try:
+        with conn.cursor() as cur:
+            cur.execute("UPDATE users SET live_trading_enabled = %s WHERE telegram_id = %s;", (enable, user.id))
+            conn.commit()
+            status = "enabled" if enable else "disabled"
+            await query.edit_message_text(f"✅ Live trading has been **{status}**.", parse_mode='Markdown')
+    except Exception as e:
+        logger.error(f"Error updating live trading status for user {user.id}: {e}")
+        await query.edit_message_text("An error occurred while updating your settings.")
+    finally:
+        if conn:
+            conn.close()
+    
+    return ConversationHandler.END
+
 # --- Alert Management ---
 async def add_alert_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Starts the conversation to add a new price alert."""
@@ -936,6 +1069,8 @@ conv_handler = ConversationHandler(
     entry_points=[
         CommandHandler("addwallet", add_wallet_start),
         CommandHandler("addalert", add_alert_start),
+        CommandHandler("setdefaultwallet", set_default_wallet_start),
+        CommandHandler("enablelivetrading", enable_live_trading_start),
         MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text),
     ],
     states={
@@ -952,6 +1087,9 @@ conv_handler = ConversationHandler(
         AWAIT_ALERT_SYMBOL: [MessageHandler(filters.TEXT & ~filters.COMMAND, received_alert_symbol)],
         AWAIT_ALERT_CONDITION: [CallbackQueryHandler(received_alert_condition, pattern="^alert_")],
         AWAIT_ALERT_PRICE: [MessageHandler(filters.TEXT & ~filters.COMMAND, received_alert_price)],
+        # States for setting default wallet and enabling live trading
+        AWAIT_WALLET_SELECTION: [CallbackQueryHandler(set_default_wallet_callback, pattern="^set_wallet_")],
+        AWAIT_LIVE_TRADING_CONFIRMATION: [CallbackQueryHandler(enable_live_trading_callback, pattern="^enable_live_trading_")],
     },
     fallbacks=[CommandHandler("start", start)],
     per_message=False,
@@ -970,6 +1108,8 @@ bot_app.add_handler(CommandHandler("portfolio", portfolio))
 bot_app.add_handler(CommandHandler("listwallets", list_wallets))
 bot_app.add_handler(CommandHandler("listalerts", list_alerts))
 bot_app.add_handler(CommandHandler("deletewallet", delete_wallet_start))
+bot_app.add_handler(CommandHandler("setdefaultwallet", set_default_wallet_start))
+bot_app.add_handler(CommandHandler("enablelivetrading", enable_live_trading_start))
 bot_app.add_handler(CallbackQueryHandler(delete_wallet_callback, pattern="^delete_"))
 
 @app.on_event("startup")
