@@ -141,6 +141,17 @@ def initialize_database():
                     UNIQUE(user_id, snapshot_date)
                 );
             """)
+
+            # Create tokens table
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS tokens (
+                    symbol VARCHAR(255) NOT NULL,
+                    chain_id INTEGER NOT NULL,
+                    address TEXT NOT NULL,
+                    decimals INTEGER NOT NULL,
+                    PRIMARY KEY(symbol, chain_id)
+                );
+            """)
             
             conn.commit()
             logger.info("Database tables initialized successfully.")
