@@ -3,7 +3,7 @@ from unittest.mock import patch, MagicMock
 import os
 import requests
 from src.okx_client import OKXClient
-from src.constants import DRY_RUN_MODE
+from src.constants import DRY_RUN_MODE, OKX_PROJECT_ID
 
 class TestOKXClient(unittest.TestCase):
 
@@ -200,6 +200,28 @@ class TestOKXClient(unittest.TestCase):
         self.assertIn("tokenAddress=token_addr", called_url)
         self.assertIn("chainIndex=1", called_url)
         self.assertIn("period=1D", called_url)
+
+    @patch.dict(os.environ, {
+        "OKX_API_KEY": "test_key",
+        "OKX_API_SECRET": "test_secret",
+        "OKX_API_PASSPHRASE": "test_passphrase"
+    })
+    @patch('src.okx_client.OKX_PROJECT_ID', 'test_project_id')
+    @patch('src.okx_client.requests.get')
+    def test_ok_access_project_header(self, mock_get):
+        """Test that the OK-ACCESS-PROJECT header is added when OKX_PROJECT_ID is set."""
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {"code": "0", "data": [{}]}
+        mock_get.return_value = mock_response
+
+        client = OKXClient()
+        client.get_live_quote("from_addr", "to_addr", "100")
+
+        mock_get.assert_called_once()
+        headers = mock_get.call_args[1]['headers']
+        self.assertIn('OK-ACCESS-PROJECT', headers)
+        self.assertEqual(headers['OK-ACCESS-PROJECT'], 'test_project_id')
 
 if __name__ == '__main__':
     unittest.main()

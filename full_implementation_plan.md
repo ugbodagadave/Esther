@@ -1,141 +1,173 @@
-# Full Implementation Plan (Esther)
+# Full Implementation Plan (Esther) - Detailed
 
-This document enumerates the remaining gaps, technical debt, and placeholders in the current codebase, and proposes concrete implementation steps, tests, and documentation updates. It is explicitly designed to work on Render free tier and PostgreSQL (Render managed). Any proposal that would materially change the stack is called out for approval.
+This document enumerates the remaining gaps, technical debt, and placeholders in the current codebase, and proposes concrete implementation steps, tests, and documentation updates. It is explicitly designed to work on Render free tier and PostgreSQL (Render managed).
 
 ## Constraints and Principles
 - Render free tier (single dyno-style process): background tasks must run within the FastAPI process; keep CPU/memory modest; avoid heavy cron workers.
 - PostgreSQL on Render: continue using psycopg2; avoid features that require extensions we haven’t enabled.
 - Privacy & security: never store plaintext secrets; continue Fernet encryption; do not execute live swaps by default.
-- Tests-first workflow: add tests, run locally, commit/push only if green.
+- **Tests-first workflow**: add tests, run locally, commit/push only if green.
+- **Git Workflow**: All changes will be committed to the current branch.
 
 ## A. Gaps and How We’ll Close Them
 
 ### A1. Wallet-backed live trading flow is incomplete
-- Current: `confirm_swap` uses `TEST_WALLET_ADDRESS` from env. Private keys are encrypted and stored but never used for signing. Cross-chain params are partially ignored.
-- Plan:
-  1) Add a user setting to designate a “default trading wallet” per Telegram user. Store the selected `wallet_id` in a new `users.default_wallet_id` column (nullable).
-  2) Update `confirm_swap` to resolve `wallet_address` from the designated wallet (fallback to first wallet). For DRY_RUN=false, fetch and decrypt the private key (in-memory only) then call OKX DEX aggregator as designed (note: OKX DEX aggregator typically expects wallet execution; for now we stay with OKX’s swap interface per current client and keep DRY_RUN default true).
-  3) Guardrails: require explicit `/enable_live_trading` command with confirmation to flip a per-user flag (new column `users.live_trading_enabled BOOLEAN DEFAULT FALSE`).
-  4) Cross-chain: pass `chainId` consistently and reflect `destination_chain_id` only for quotes where supported. If cross-chain bridging requires a different endpoint, we will simulate (DRY_RUN) until approved (INPUT NEEDED).
-- Tests:
-  - Unit tests for new DB migrations and wallet resolution.
-  - Handler tests verifying that when live trading is disabled the bot refuses execution and suggests enabling.
-  - Execute swap path in DRY_RUN and LIVE branches (mock HTTP).
-- Docs: Update README → “Enabling Live Trading,” security warnings, and DRY_RUN notes.
-- INPUT NEEDED: Approve whether we should implement actual on-server signing with stored private keys (higher risk) or require user-side wallet signing via embedded OKX Wallet deep-link.
+- **Current**: `confirm_swap` uses `TEST_WALLET_ADDRESS` from env. Private keys are encrypted and stored but never used for signing. Cross-chain params are partially ignored.
+- **Plan**:
+  1.  **DB Migration**: Add `users.default_wallet_id` (nullable `INTEGER`, `FOREIGN KEY` to `wallets.id`) and `users.live_trading_enabled` (`BOOLEAN`, `DEFAULT FALSE`).
+  2.  **User Settings**: Implement `/setdefaultwallet` and `/enablelivetrading` commands.
+  3.  **Update `confirm_swap`**:
+      - Resolve `wallet_address` from the designated wallet.
+      - For `DRY_RUN=false`, fetch and decrypt the private key in-memory.
+      - Call OKX DEX aggregator with the signed transaction.
+  4.  **Guardrails**: Require explicit `/enable_live_trading` command.
+  5.  **Cross-chain**: Pass `chainId` consistently.
+- **Testing & Version Control**:
+    - **Test**: Write unit tests for DB migrations, wallet resolution, and live trading guards.
+    - **Git**:
+        - `git add .`
+        - `git commit -m "feat(trading): implement live trading flow"`
+        - `git push`
 
 ### A2. OKX headers and API parity
-- Current: `OK-ACCESS-PROJECT` header is added in `okx_explorer.py` but not in `okx_client.py`.
-- Plan: Add the same header to `okx_client.py` request headers if `OKX_PROJECT_ID` is set; keep backward compatibility.
-- Tests: Extend OKX client header tests verifying header presence.
-- Docs: Update OKX Integration guide for the header across all endpoints.
+- **Current**: `OK-ACCESS-PROJECT` header is missing in `okx_client.py`.
+- **Plan**: Add the header to `okx_client.py` requests if `OKX_PROJECT_ID` is set.
+- **Testing & Version Control**:
+    - **Test**: Extend OKX client header tests.
+    - **Git**:
+        - `git add .`
+        - `git commit -m "fix(okx): add OK-ACCESS-PROJECT header to client"`
+        - `git push`
 
 ### A3. Token address / decimals handling and symbol resolution
-- Current: Small hardcoded `TOKEN_ADDRESSES` and `TOKEN_DECIMALS`. BTC maps to `BTC-USD` (instrument) for charts but is used like an address for quotes in some flows. Price checks assume 1 token in smallest unit with fixed decimals.
-- Plan:
-  1) Introduce a token metadata resolver that can source decimals and addresses for known chains (OKX explorer/token info if available; else curated list). Cache in DB table `tokens(symbol, chain_id, address, decimals)` with upserts.
-  2) Patch get_price and swap flows to resolve addresses/decimals dynamically; fall back to curated constants.
-  3) Normalize BTC handling: for quotes, use WBTC on EVM when user asks BTC on Ethereum; for charts, continue `BTC-USD` via market candles.
-- Tests: Unit tests for resolver, fallbacks, and get_price intent correctness for multiple symbols/decimals.
-- Docs: Document resolution rules and supported symbols.
+- **Current**: Hardcoded `TOKEN_ADDRESSES` and `TOKEN_DECIMALS`.
+- **Plan**:
+  1.  **DB Table**: Create `tokens(symbol, chain_id, address, decimals)`.
+  2.  **Resolver**: Introduce a token metadata resolver.
+  3.  **Dynamic Resolution**: Patch `get_price` and swap flows to use the resolver.
+  4.  **Normalize BTC**: Use WBTC on EVM for quotes.
+- **Testing & Version Control**:
+    - **Test**: Unit tests for resolver and `get_price` correctness.
+    - **Git**:
+        - `git add .`
+        - `git commit -m "feat(token): implement dynamic token resolution"`
+        - `git push`
 
 ### A4. Price alerts robustness
-- Current: Uses `1 ETH` to compute USD price for any symbol; missing import for `TOKEN_ADDRESSES` in monitoring when imported as a module; no per-symbol quote units.
-- Plan:
-  1) Import `TOKEN_ADDRESSES` (or use resolver) in `monitoring.py`.
-  2) Quote minimal representative amount for the specific token using its decimals (e.g., 1 whole token in smallest units or a small notional like $10 equivalent).
-  3) Add rate limiting and backoff per alert to stay within free tier limits.
-- Tests: Alert evaluation tests for varied decimals; import-safety tests.
-- Docs: Update monitoring section in how-it-works.
+- **Current**: Uses `1 ETH` for all symbols; missing imports.
+- **Plan**:
+  1.  **Fix Imports**: Add `TOKEN_ADDRESSES` import in `monitoring.py`.
+  2.  **Dynamic Quotes**: Quote minimal representative amount for each token.
+  3.  **Rate Limiting**: Add rate limiting and backoff.
+- **Testing & Version Control**:
+    - **Test**: Alert evaluation tests for varied decimals.
+    - **Git**:
+        - `git add .`
+        - `git commit -m "fix(monitoring): improve price alert robustness"`
+        - `git push`
 
 ### A5. Insights use placeholders
-- Current: Portfolio inferred from existence of wallets; “trend” mocked.
-- Plan:
-  - Pull real snapshot via `PortfolioService.get_snapshot` and summarize holdings; enrich with live prices via OKX; remove mocked trend; keep Gemini prompt but based on actual positions.
-- Tests: Mock snapshot data and verify prompt content assembled.
+- **Current**: Portfolio and trend are mocked.
+- **Plan**:
+  - Pull real snapshot via `PortfolioService.get_snapshot`.
+  - Enrich with live prices via OKX.
+- **Testing & Version Control**:
+    - **Test**: Mock snapshot data and verify prompt content.
+    - **Git**:
+        - `git add .`
+        - `git commit -m "feat(insights): use real data for portfolio insights"`
+        - `git push`
 
 ### A6. Portfolio performance persistence cadence
-- Current: Snapshot saved once per monitoring cycle per day; no backfill.
-- Plan: Keep once-per-day snapshot to stay light on free tier; add idempotent “today already saved” check (already covered by UNIQUE). Add manual `/snapshot` admin for backfill if needed.
-- Tests: Ensure duplicate same-day inserts update value per ON CONFLICT.
+- **Current**: Snapshot saved once per day; no backfill.
+- **Plan**:
+  - Add idempotent “today already saved” check.
+  - Add manual `/snapshot` admin command.
+- **Testing & Version Control**:
+    - **Test**: Ensure duplicate same-day inserts update value.
+    - **Git**:
+        - `git add .`
+        - `git commit -m "feat(portfolio): add manual snapshot and idempotent saves"`
+        - `git push`
 
 ### A7. Advanced orders (stop-loss/take-profit)
-- Current: Only acknowledgements.
-- Plan (phase 2): Persist advanced orders in DB; extend monitoring to check conditions using quotes; notify user. Execution remains manual confirmation for now (safer, free tier friendly). INPUT NEEDED.
-- Tests: DB tests for create/list/trigger logic; monitoring unit tests.
+- **Current**: Only acknowledgements.
+- **Plan (phase 2)**: Persist orders in DB; extend monitoring to check conditions.
+- **Testing & Version Control**:
+    - **Test**: DB tests for create/list/trigger logic.
+    - **Git**:
+        - `git add .`
+        - `git commit -m "feat(orders): implement advanced order persistence"`
+        - `git push`
 
 ### A8. Rebalance plan execution fidelity
-- Current: Greedy single-hop toward the most underweight; execution reuses general swap flow; no slippage config per leg.
-- Plan: Allow per-trade slippage configuration; simulate quotes per leg in DRY_RUN and show user expected slippage and path; live execution only when enabled.
-- Tests: Unit tests for slippage plumbing and plan presentation.
+- **Current**: Greedy single-hop; no slippage config.
+- **Plan**: Allow per-trade slippage configuration; simulate quotes per leg in `DRY_RUN`.
+- **Testing & Version Control**:
+    - **Test**: Unit tests for slippage plumbing.
+    - **Git**:
+        - `git add .`
+        - `git commit -m "feat(rebalance): add slippage configuration"`
+        - `git push`
 
 ### A9. Webhook/polling lifecycle and shutdown
-- Current: Polling branch calls `bot_app.updater.start_polling()` and `bot_app.start()`; ensure clean shutdown paths.
-- Plan: Verify FastAPI startup/shutdown ordering on Render; keep polling default if webhook URL not set.
-- Tests: None beyond existing handlers; manual smoke on Render.
+- **Current**: Polling branch calls `bot_app.updater.start_polling()` and `bot_app.start()`.
+- **Plan**: Verify FastAPI startup/shutdown ordering on Render.
+- **Testing & Version Control**:
+    - **Test**: Manual smoke test on Render.
+    - **Git**: No code changes, no commit.
 
 ### A10. Requirements and docs drift
-- Current: `Flask[async]` remains in requirements; docs mention MongoDB in `plan.md` (legacy).
-- Plan: Remove `Flask[async]`; clarify PostgreSQL everywhere; keep FastAPI as the only web framework.
-- Tests: CI install check; run full tests.
+- **Current**: `Flask[async]` in requirements; MongoDB mentioned in `plan.md`.
+- **Plan**: Remove `Flask[async]`; clarify PostgreSQL everywhere.
+- **Testing & Version Control**:
+    - **Test**: CI install check; run full tests.
+    - **Git**:
+        - `git add .`
+        - `git commit -m "chore(deps): remove Flask and clarify PostgreSQL usage"`
+        - `git push`
 
 ### A11. Admin clear-DB endpoint hardening
-- Current: Guarded by secret only.
-- Plan: Add optional IP allowlist via env; return 404 if key invalid; add prominent warnings in docs; keep it for dev only.
-- Tests: Unit tests for guard logic.
+- **Current**: Guarded by secret only.
+- **Plan**: Add optional IP allowlist; return 404 if key invalid.
+- **Testing & Version Control**:
+    - **Test**: Unit tests for guard logic.
+    - **Git**:
+        - `git add .`
+        - `git commit -m "feat(admin): harden clear-db endpoint"`
+        - `git push`
 
 ### A12. E2E path for price charts and BTC special-case
-- Current: Chain hardcoded to 1 for charts; BTC instrument vs address duality already handled in client.
-- Plan: Continue charts on ETH chain when addresses are used; for BTC use market candles; add minimal chain selection support via intent entities later.
-- Tests: Already covered by existing chart tests; add chain param tests.
+- **Current**: Chain hardcoded to 1 for charts.
+- **Plan**: Continue charts on ETH chain; use market candles for BTC.
+- **Testing & Version Control**:
+    - **Test**: Add chain param tests.
+    - **Git**:
+        - `git add .`
+        - `git commit -m "feat(charts): add chain parameter support"`
+        - `git push`
 
 ## B. Database Migrations (Non-breaking)
-- users: add `default_wallet_id INTEGER NULL REFERENCES wallets(id)`, `live_trading_enabled BOOLEAN DEFAULT FALSE`.
-- tokens: new table for token metadata (symbol, chain_id, address, decimals, PRIMARY KEY(symbol, chain_id)).
-- Backfill step optional.
+- `users`: add `default_wallet_id INTEGER NULL REFERENCES wallets(id)`, `live_trading_enabled BOOLEAN DEFAULT FALSE`.
+- `tokens`: new table for token metadata (`symbol`, `chain_id`, `address`, `decimals`, `PRIMARY KEY(symbol, chain_id)`).
 
 ## C. Testing Strategy
-- Extend unit tests for:
-  - OKX client headers and chainId propagation
-  - Token resolver
-  - Alert evaluator with per-symbol decimals
-  - Wallet selection & live trading guardrails
-  - Insights prompt sources actual snapshot
-  - Requirements sanity (import success)
-- Keep all tests runnable on Render free tier (no heavy network; mock HTTP).
+- Extend unit tests for all new features and fixes.
+- All tests must pass before committing and pushing.
 
 ## D. Documentation Updates
-- README: “Enabling Live Trading,” “Selecting Default Wallet,” “Price Alerts,” “Token Resolution,” “Security.”
-- how-it-works.md: update trading flow, monitoring/alerts, and portfolio sections.
-- okx_dex_api_integration.md: document `OK-ACCESS-PROJECT` on aggregator endpoints too.
+- Update `README.md`, `how-it-works.md`, and `okx_dex_api_integration.md` to reflect the changes.
 
-## E. Inputs Needed from You
-1) Approve approach for LIVE trading:
-   - Option A: Server-side signing with stored encrypted private keys (simpler UX, higher custodial risk)
-   - Option B: User-side signing via deep-link to OKX Wallet / injected Web3 (safer, more UX work)
-2) Approve that cross-chain swaps remain simulated until OKX-bridge flow is integrated (later phase).
-3) Provide `OKX_PROJECT_ID` for headers; confirm supported chains to prioritize.
+## E. Phase 1 – Actionable To-Do (1–2 days)
+1.  Add `OK-ACCESS-PROJECT` header to `okx_client.py`.
+2.  Fix monitoring imports and per-symbol quote amount.
+3.  Create `tokens` table and a simple resolver.
+4.  Normalize price query to use dynamic decimals.
+5.  Remove `Flask[async]` from requirements.
+6.  Write tests for all the above.
+7.  Update documentation.
 
-## F. Phase 1 – Actionable To‑Do (1–2 days)
-- Add `OK-ACCESS-PROJECT` header to `okx_client.py`.
-- Fix monitoring imports and per-symbol quote amount (use resolver fallback to decimals map).
-- Create `tokens` table and a simple resolver with curated seed for ETH/USDC/USDT/WBTC/MATIC/DAI.
-- Normalize price query to use dynamic decimals and 1 unit or $10 notional.
-- Remove `Flask[async]` from requirements.
-- Tests covering the above.
-- Docs: Update OKX guide and README sections for the changes.
-
-Deliverables of Phase 1: all tests green, pushed branch, and PR.
-
-## G. Phase 2 – Live Trading & Advanced Orders (needs approval)
-- Add `users.default_wallet_id`, `users.live_trading_enabled`, flows to select default wallet and enable live trading.
-- Update `confirm_swap` to resolve wallet and guard on live flag.
-- Persist and evaluate advanced orders in monitoring.
-- More tests & docs.
-
-## H. Render Free Tier Notes
-- Keep monitoring loop intervals configurable; default 10 min portfolio sync; alerts check each 60s.
-- Avoid extra processes; reuse FastAPI startup task.
-
-## I. Risk & Rollback
-- All DB changes idempotent. Feature flags (live trading) default off. DRY_RUN stays default on. 
+## F. Phase 2 – Live Trading & Advanced Orders
+1.  Implement live trading flow.
+2.  Persist and evaluate advanced orders.
+3.  Write tests and update documentation.

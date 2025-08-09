@@ -10,7 +10,7 @@ import json
 from datetime import datetime, timezone, timedelta
 from dotenv import load_dotenv
 
-from src.constants import DRY_RUN_MODE
+from src.constants import DRY_RUN_MODE, OKX_PROJECT_ID
 
 # Load environment variables from .env file
 load_dotenv()
@@ -42,13 +42,16 @@ class OKXClient:
         message = timestamp + method + request_path + body
         signature = sign(message, self.api_secret)
         
-        return {
+        headers = {
             'OK-ACCESS-KEY': self.api_key,
             'OK-ACCESS-SIGN': signature,
             'OK-ACCESS-TIMESTAMP': timestamp,
             'OK-ACCESS-PASSPHRASE': self.passphrase,
             'Content-Type': 'application/json'
         }
+        if OKX_PROJECT_ID:
+            headers['OK-ACCESS-PROJECT'] = OKX_PROJECT_ID
+        return headers
 
     def get_live_quote(self, from_token_address: str, to_token_address: str, amount: str, chainId: int = 1) -> dict:
         """
