@@ -92,6 +92,15 @@ To ensure all functionalities are working correctly, you can refer to the [**TES
 
 X Layer, a high-performance, EVM-compatible Layer 2 network, offers a significant opportunity to enhance Esther's capabilities. By integrating with X Layer, we can provide users with faster, cheaper, and more scalable transactions. For a detailed explanation of our X Layer integration strategy, please see the [OKX DEX API Integration Guide](./okx_dex_api_integration.md).
 
+## ⚙️ Live Trading vs Dry Run
+
+- By default, Esther runs in simulation mode controlled by the `DRY_RUN_MODE` environment variable (default: `True`).
+- To execute real swaps:
+  - Set `DRY_RUN_MODE="False"` in `.env`.
+  - Enable live trading in-chat via `/enablelivetrading`.
+  - Set a default wallet via `/setdefaultwallet`.
+- When live trading is enabled but `DRY_RUN_MODE` remains `True`, swaps are still simulated; however, the bot validates that a default wallet exists in your account. If missing or not found, the operation aborts with a clear message.
+
 ## 🙏 Acknowledgements
 
 We would like to extend our sincere gratitude to **OKX** for providing the powerful and versatile DEX API that serves as the backbone of this project. The comprehensive features and robust performance of the OKX DEX API have been instrumental in bringing Esther to life.

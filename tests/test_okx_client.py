@@ -73,10 +73,12 @@ class TestOKXClient(unittest.TestCase):
         mock_post.return_value = mock_response
 
         client = OKXClient()
-        result = client.execute_swap("from", "to", "100", "wallet_addr", dry_run=False)
+        result = client.execute_swap("from", "to", "100", "wallet_addr", private_key="pk_test", dry_run=False)
         
         self.assertTrue(result['success'])
         self.assertEqual(result['data']['txHash'], "0x12345")
+        mock_post.assert_called_once()
+        self.assertEqual(mock_post.call_args.kwargs['json']['privateKey'], "pk_test")
 
     @patch('src.okx_client.requests.get', side_effect=requests.exceptions.HTTPError("500 Server Error"))
     @patch('time.sleep', return_value=None) # Mock time.sleep to avoid delays
@@ -96,7 +98,7 @@ class TestOKXClient(unittest.TestCase):
         """Test the retry logic for execute_swap."""
         mock_get_live_quote.return_value = {"success": True, "data": {}}
         client = OKXClient(max_retries=3, retry_delay=0.1)
-        result = client.execute_swap("from", "to", "100", "wallet_addr", dry_run=False)
+        result = client.execute_swap("from", "to", "100", "wallet_addr", private_key="pk_test", dry_run=False)
 
         self.assertFalse(result['success'])
         self.assertEqual(result['error'], "Failed to execute swap after multiple retries.")
@@ -164,13 +166,22 @@ class TestOKXClient(unittest.TestCase):
         mock_post.return_value = mock_response
 
         client = OKXClient()
-        # Call execute_swap without the dry_run parameter
-        result = client.execute_swap("from", "to", "100", "wallet_addr")
+        # Call execute_swap without the dry_run parameter, but with a private key
+        result = client.execute_swap("from", "to", "100", "wallet_addr", private_key="pk_test")
 
         self.assertTrue(result['success'])
         self.assertNotIn('status', result) # Real swaps don't have a 'status' field
         self.assertEqual(result['data']['txHash'], "0xreal")
         mock_post.assert_called_once()
+
+    @patch('src.okx_client.OKXClient.get_live_quote')
+    def test_execute_swap_real_run_no_private_key(self, mock_get_live_quote):
+        """Test that a real swap fails if no private key is provided."""
+        mock_get_live_quote.return_value = {"success": True, "data": {}}
+        client = OKXClient()
+        result = client.execute_swap("from", "to", "100", "wallet_addr", dry_run=False)
+        self.assertFalse(result['success'])
+        self.assertEqual(result['error'], "Private key is required for live swaps.")
 
     @patch.dict(os.environ, {
         "OKX_API_KEY": "test_key",

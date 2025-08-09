@@ -23,3 +23,10 @@
 ## 4. Security & API Key Management
 - All sensitive credentials, including Telegram Bot Tokens, OKX DEX API keys, and Gemini API keys, are managed securely using environment variables.
 - User-specific API keys or wallet information stored in the database are encrypted to prevent unauthorized access.
+
+## 5. Trading Flow Technical Notes
+- `confirm_swap` determines live vs simulation using two flags: per-user `live_trading_enabled` and global `DRY_RUN_MODE`.
+- If user enabled live trading:
+  - Default wallet must exist; absence aborts the flow with a clear message (even in simulation).
+  - For live trades (`DRY_RUN_MODE` = False), the default wallet’s encrypted private key is decrypted in-memory for signing.
+- `TokenResolver` is lazily instantiated inside `confirm_swap` to avoid NoneType issues when handlers are invoked without full app startup.

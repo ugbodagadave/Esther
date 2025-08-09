@@ -54,16 +54,12 @@ Here is a comprehensive guide to testing the Esther bot's features using natural
 
 ### 4. Trading (Buy, Sell, Swap)
 
-**Test 1: Buy ETH**
-*   **Your Message:** `Buy 0.1 ETH with USDT`
-*   **Expected Bot Response:**
-    1.  A confirmation message showing the estimated amount of ETH you will receive for your USDT.
-    2.  Two buttons: "✅ Confirm" and "❌ Cancel".
-    3.  After confirming, a message indicating that the simulated trade was successful.
+**Note:** If you have enabled live trading but are still running with `DRY_RUN_MODE="True"`, Esther will validate that a default wallet is set and present in the database. If not, you will receive a message such as:
 
-**Test 2: Sell ETH**
-*   **Your Message:** `Sell 0.5 ETH for USDC`
-*   **Expected Bot Response:** A similar confirmation flow as the "buy" command, ending with a success message for the simulated sale.
+- "Live trading is enabled, but you have not set a default wallet. Please use /setdefaultwallet."
+- "Your default wallet could not be found. Please set it again."
+
+This ensures safe configuration before moving to live mode.
 
 ---
 
@@ -137,12 +133,4 @@ Here is a comprehensive guide to testing the Esther bot's features using natural
 
 ### 12. Testing with DRY_RUN_MODE
 
-**Test 1: Verify Dry Run is Active**
-*   **Setup:** Ensure `DRY_RUN_MODE="True"` in your `.env` file.
-*   **Your Message:** `Buy 0.1 ETH with USDT`
-*   **Expected Bot Response:** After confirming the swap, the final message should explicitly state that the transaction was a simulation. For example: "[DRY RUN] ✅ Swap Simulated Successfully! ... This was a simulation. No real transaction was executed."
-
-**Test 2: Verify Live Mode is Active**
-*   **Setup:** Ensure `DRY_RUN_MODE="False"` in your `.env` file.
-*   **Your Message:** `Buy 0.1 ETH with USDT`
-*   **Expected Bot Response:** After confirming the swap, the final message should indicate a live transaction and include a transaction hash. For example: "[LIVE] ✅ Swap Executed Successfully! ... Transaction Hash: `0x...`"
+**Additional Expectation:** When `DRY_RUN_MODE="True"` and live trading is enabled, the bot still requires a valid default wallet (for validation only). If the wallet is missing or not found, the confirmation flow aborts with a clear message rather than performing a simulation.

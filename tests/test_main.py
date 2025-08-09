@@ -5,6 +5,7 @@ import asyncio
 from telegram import Update, User
 from telegram.ext import ConversationHandler, Application, ContextTypes
 
+from src.database import initialize_database
 from src.main import (
     start,
     help_command,
@@ -248,41 +249,6 @@ class TestMainHandlers(unittest.IsolatedAsyncioTestCase):
         mock_enable_live_trading_start.assert_called_once_with(update, context)
         self.assertEqual(result, AWAIT_LIVE_TRADING_CONFIRMATION)
 
-    @patch('src.main.okx_client.execute_swap')
-    @patch('src.main.DRY_RUN_MODE', True)
-    async def test_confirm_swap_respects_dry_run_mode(self, mock_execute_swap):
-        """Test that confirm_swap passes the DRY_RUN_MODE constant to execute_swap."""
-        # Arrange
-        update, context = await self._create_update_context()
-        
-        # Mock a callback query and context
-        query = AsyncMock(spec=Update.callback_query)
-        query.answer = AsyncMock()
-        query.edit_message_text = AsyncMock()
-        update.callback_query = query
-        
-        context.user_data['swap_details'] = {
-            "from_token": "USDC",
-            "to_token": "ETH",
-            "from_token_address": "0x...",
-            "to_token_address": "0x...",
-            "amount": "100",
-            "amount_in_smallest_unit": "100000000",
-            "source_chain_id": 1,
-        }
-        
-        # Mock the return value of execute_swap
-        mock_execute_swap.return_value = {"success": True, "data": {}}
-
-        # Act
-        await confirm_swap(update, context)
-
-        # Assert
-        mock_execute_swap.assert_called_once()
-        # Check the keyword arguments passed to execute_swap
-        _, kwargs = mock_execute_swap.call_args
-        self.assertTrue(kwargs.get('dry_run'))
-
     @patch('src.main.WEBHOOK_URL', "https://test.com")
     async def test_received_wallet_address_sends_web_app(self):
         """Test that received_wallet_address sends a web app button."""
@@ -456,6 +422,228 @@ class TestLiveTradingSettings(unittest.IsolatedAsyncioTestCase):
         mock_cur.execute.assert_called_once_with("UPDATE users SET live_trading_enabled = %s WHERE telegram_id = %s;", (True, 123))
         query.edit_message_text.assert_called_once_with("✅ Live trading has been **enabled**.", parse_mode='Markdown')
         self.assertEqual(result, ConversationHandler.END)
+
+class TestConfirmSwap(unittest.IsolatedAsyncioTestCase):
+
+    @patch('src.main.token_resolver', new_callable=MagicMock)
+    @patch('src.main.get_db_connection')
+    def setUp(self, mock_get_conn, mock_token_resolver):
+        """Set up a basic test environment and initialize the database."""
+        self.app = Application.builder().token("test-token").build()
+        # Ensure the test database has the latest schema
+        initialize_database()
+        # Initialize the token resolver
+        from src.token_resolver import TokenResolver
+        global token_resolver
+        token_resolver = TokenResolver()
+
+    async def _create_update_context(self, text: str = "") -> tuple[Update, ContextTypes.DEFAULT_TYPE]:
+        """Helper to create mock Update and Context objects."""
+        user = User(id=123, first_name="Test", is_bot=False, username="testuser")
+        
+        update = MagicMock(spec=Update)
+        update.update_id = 12345
+        
+        update.message = MagicMock(spec=Update.message)
+        update.message.text = text
+        update.message.from_user = user
+        update.message.reply_text = AsyncMock()
+        
+        update.effective_user = user
+        
+        context = ContextTypes.DEFAULT_TYPE(application=self.app, chat_id=123, user_id=123)
+        return update, context
+
+    def _mock_db(self):
+        """Helper to mock the database connection and cursor."""
+        conn = MagicMock()
+        cur = MagicMock()
+        conn.cursor.return_value.__enter__.return_value = cur
+        return conn, cur
+
+    @patch('src.main.token_resolver', new_callable=MagicMock)
+    @patch('src.main.get_db_connection')
+    @patch('src.main.okx_client.execute_swap')
+    @patch('src.main.decrypt_data', return_value="decrypted_key")
+    @patch('src.main.DRY_RUN_MODE', False)
+    async def test_confirm_swap_live_trade(self, mock_decrypt, mock_execute_swap, mock_get_conn, mock_token_resolver):
+        """Test confirm_swap executes a live trade when conditions are met."""
+        # Arrange
+        mock_token_resolver.get_token_info.return_value = {'decimals': 18}
+        update, context = await self._create_update_context()
+        query = AsyncMock(spec=Update.callback_query)
+        query.answer = AsyncMock()
+        query.edit_message_text = AsyncMock()
+        update.callback_query = query
+        
+        context.user_data['swap_details'] = {
+            "from_token": "USDC", "to_token": "ETH", "from_token_address": "0x...", 
+            "to_token_address": "0x...", "amount": "100", "amount_in_smallest_unit": "100000000",
+            "source_chain_id": 1
+        }
+        
+        mock_conn, mock_cur = self._mock_db()
+        mock_get_conn.return_value = mock_conn
+        # Simulate live trading enabled and default wallet set
+        mock_cur.fetchone.side_effect = [
+            (True, 1), # user_settings
+            ("0xLiveWallet", b"encrypted_key") # wallet_data
+        ]
+        
+        mock_execute_swap.return_value = {"success": True, "data": {"toTokenAmount": "100000000000000000", "txHash": "0xabc"}}
+
+        # Act
+        await confirm_swap(update, context)
+
+        # Assert
+        mock_execute_swap.assert_called_once()
+        _, kwargs = mock_execute_swap.call_args
+        self.assertFalse(kwargs.get('dry_run'))
+        self.assertEqual(kwargs.get('wallet_address'), "0xLiveWallet")
+        self.assertEqual(kwargs.get('private_key'), "decrypted_key")
+        query.edit_message_text.assert_called()
+        # Check the final call to edit_message_text
+        final_call = query.edit_message_text.call_args_list[-1]
+        self.assertIn("LIVE", final_call.kwargs.get('text', ''))
+
+    @patch('src.main.token_resolver', new_callable=MagicMock)
+    @patch('src.main.get_db_connection')
+    @patch('src.main.okx_client.execute_swap')
+    @patch('src.main.DRY_RUN_MODE', False)
+    async def test_confirm_swap_dry_run_when_live_disabled(self, mock_execute_swap, mock_get_conn, mock_token_resolver):
+        """Test confirm_swap performs a dry run when live trading is disabled."""
+        # Arrange
+        mock_token_resolver.get_token_info.return_value = {'decimals': 18}
+        update, context = await self._create_update_context()
+        query = AsyncMock(spec=Update.callback_query)
+        query.answer = AsyncMock()
+        query.edit_message_text = AsyncMock()
+        update.callback_query = query
+        
+        context.user_data['swap_details'] = {
+            "from_token": "USDC", "to_token": "ETH", "from_token_address": "0x...", 
+            "to_token_address": "0x...", "amount": "100", "amount_in_smallest_unit": "100000000",
+            "source_chain_id": 1
+        }
+        
+        mock_conn, mock_cur = self._mock_db()
+        mock_get_conn.return_value = mock_conn
+        # Simulate live trading disabled
+        mock_cur.fetchone.return_value = (False, 1)
+        
+        mock_execute_swap.return_value = {"success": True, "data": {"toTokenAmount": "100000000000000000"}}
+
+        # Act
+        await confirm_swap(update, context)
+
+        # Assert
+        mock_execute_swap.assert_called_once()
+        _, kwargs = mock_execute_swap.call_args
+        self.assertTrue(kwargs.get('dry_run'))
+        query.edit_message_text.assert_called()
+        # Check the final call to edit_message_text
+        final_call = query.edit_message_text.call_args_list[-1]
+        self.assertIn("DRY RUN", final_call.kwargs.get('text', ''))
+
+    @patch('src.main.token_resolver', new_callable=MagicMock)
+    @patch('src.main.get_db_connection')
+    @patch('src.main.okx_client.execute_swap')
+    @patch('src.main.DRY_RUN_MODE', True)
+    async def test_confirm_swap_respects_dry_run_mode(self, mock_execute_swap, mock_get_conn, mock_token_resolver):
+        """Test that confirm_swap passes the DRY_RUN_MODE constant to execute_swap."""
+        # Arrange
+        mock_token_resolver.get_token_info.return_value = {'decimals': 18}
+        update, context = await self._create_update_context()
+        query = AsyncMock(spec=Update.callback_query)
+        query.answer = AsyncMock()
+        query.edit_message_text = AsyncMock()
+        update.callback_query = query
+        
+        context.user_data['swap_details'] = {
+            "from_token": "USDC", "to_token": "ETH", "from_token_address": "0x...", 
+            "to_token_address": "0x...", "amount": "100", "amount_in_smallest_unit": "100000000",
+            "source_chain_id": 1
+        }
+        
+        mock_conn, mock_cur = self._mock_db()
+        mock_get_conn.return_value = mock_conn
+        # Simulate live trading enabled and default wallet set
+        mock_cur.fetchone.side_effect = [
+            (True, 1), # user_settings
+        ]
+        
+        mock_execute_swap.return_value = {"success": True, "data": {"toTokenAmount": "100000000000000000"}}
+
+        # Act
+        await confirm_swap(update, context)
+
+        # Assert
+        mock_execute_swap.assert_called_once()
+        _, kwargs = mock_execute_swap.call_args
+        self.assertTrue(kwargs.get('dry_run'))
+        final_call = query.edit_message_text.call_args_list[-1]
+        self.assertIn("DRY RUN", final_call.kwargs.get('text', ''))
+
+    @patch('src.main.get_db_connection')
+    @patch('src.main.okx_client.execute_swap')
+    async def test_confirm_swap_no_default_wallet(self, mock_execute_swap, mock_get_conn):
+        """Test confirm_swap when live trading is enabled but no default wallet is set."""
+        # Arrange
+        update, context = await self._create_update_context()
+        query = AsyncMock(spec=Update.callback_query)
+        query.answer = AsyncMock()
+        query.edit_message_text = AsyncMock()
+        update.callback_query = query
+        
+        context.user_data['swap_details'] = {
+            "from_token": "USDC", "to_token": "ETH", "from_token_address": "0x...", 
+            "to_token_address": "0x...", "amount": "100", "amount_in_smallest_unit": "100000000",
+            "source_chain_id": 1
+        }
+        
+        mock_conn, mock_cur = self._mock_db()
+        mock_get_conn.return_value = mock_conn
+        # Simulate live trading enabled but no default wallet
+        mock_cur.fetchone.return_value = (True, None)
+
+        # Act
+        await confirm_swap(update, context)
+
+        # Assert
+        mock_execute_swap.assert_not_called()
+        query.edit_message_text.assert_called_once_with("Live trading is enabled, but you have not set a default wallet. Please use /setdefaultwallet.")
+
+    @patch('src.main.get_db_connection')
+    @patch('src.main.okx_client.execute_swap')
+    async def test_confirm_swap_wallet_not_found(self, mock_execute_swap, mock_get_conn):
+        """Test confirm_swap when the default wallet is not found in the database."""
+        # Arrange
+        update, context = await self._create_update_context()
+        query = AsyncMock(spec=Update.callback_query)
+        query.answer = AsyncMock()
+        query.edit_message_text = AsyncMock()
+        update.callback_query = query
+        
+        context.user_data['swap_details'] = {
+            "from_token": "USDC", "to_token": "ETH", "from_token_address": "0x...", 
+            "to_token_address": "0x...", "amount": "100", "amount_in_smallest_unit": "100000000",
+            "source_chain_id": 1
+        }
+        
+        mock_conn, mock_cur = self._mock_db()
+        mock_get_conn.return_value = mock_conn
+        # Simulate live trading enabled, default wallet set, but wallet not found
+        mock_cur.fetchone.side_effect = [
+            (True, 1), # user_settings
+            None # wallet_data
+        ]
+
+        # Act
+        await confirm_swap(update, context)
+
+        # Assert
+        mock_execute_swap.assert_not_called()
+        query.edit_message_text.assert_called_once_with("Your default wallet could not be found. Please set it again.")
 
 if __name__ == '__main__':
     unittest.main()

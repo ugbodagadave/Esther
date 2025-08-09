@@ -47,3 +47,18 @@ except Exception as e:
 1.  **Define a New Exception**: Add a new custom exception class to `src/exceptions.py`.
 2.  **Raise the Exception**: In the relevant part of the code (e.g., `src/database.py`), raise the new exception when the specific error condition is met.
 3.  **Handle the Exception**: Add a new `except` block in the relevant command handler in `src/main.py` to handle the new exception and provide user feedback.
+
+## Trading Error Cases (confirm_swap)
+
+- **Live trading enabled but no default wallet**
+  - Message: "Live trading is enabled, but you have not set a default wallet. Please use /setdefaultwallet."
+  - Severity: Warning (user action required)
+  - Log: info/warning with `telegram_id`
+
+- **Default wallet not found in database**
+  - Message: "Your default wallet could not be found. Please set it again."
+  - Severity: Warning (data consistency)
+  - Log: warning with `telegram_id` and requested `default_wallet_id`
+
+- **Token resolution unavailable (during tests or early runtime)**
+  - Mitigation: `TokenResolver` is lazily initialized in `confirm_swap` to prevent `NoneType` errors when the app has not yet run startup hooks.

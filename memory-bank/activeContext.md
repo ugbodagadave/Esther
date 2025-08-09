@@ -1,39 +1,20 @@
 # Active Context: Esther
 
 ## 1. Current Focus
-The current focus is on implementing the live trading flow, as outlined in Phase 2 of the `full_implementation_plan.md`.
+- Finalizing live trading readiness: strict wallet validation, consistent dry-run behavior, and comprehensive test coverage.
+- Expanding end-to-end tests to cover all major features and user settings flows.
 
 ## 2. Recent Changes & Decisions
-- **Live Trading User Settings**: Implemented the `/setdefaultwallet` and `/enablelivetrading` commands, and their corresponding natural language intents, to allow users to manage their live trading preferences.
-- **DB Migration for Live Trading**: Added `users.default_wallet_id` and `users.live_trading_enabled` columns to the `users` table to support the live trading feature.
-- **Price Chart Bug Fix**: Fixed a critical bug where the price chart for BTC was showing incorrect prices. The issue was caused by using the WBTC token address instead of the correct instrument ID for BTC. The `get_historical_price` function has been refactored to handle both instrument IDs and token addresses, using the correct API endpoint for each.
-- **Matplotlib Backend**: Configured `matplotlib` to use the `Agg` backend to prevent GUI-related errors in a server environment.
-- **Simple Price Charts Feature**: Implemented the core feature, including the NLP intent, data fetching, chart generation, and Telegram bot handler.
-- **Portfolio Performance Bug Fix**: Fixed a critical bug in the `portfolio_performance` function where the time period was not being correctly parsed from user input. The new implementation is more robust and handles a wider variety of user inputs (e.g., "14 days", "28d", "last month").
-- **Portfolio Performance Tracker**: Implemented the core feature, including database schema changes, new API client methods, and the conversational flow.
-- **Error Handling**: Implemented a robust error handling system for the wallet addition feature. This includes creating custom exceptions, refactoring the database and main application logic to handle these exceptions gracefully, and adding comprehensive unit tests to ensure the new system works as expected.
-- **UI Improvements**: The UI of the secure wallet input web app has been updated to a dark-themed, neo-brutalism design.
-- **Concurrency Fix**: Resolved a critical bug that caused the bot to process messages twice by removing the redundant polling loop when a webhook is active.
-- **Secure Wallet Input**: Implemented a secure web app for private key entry, enhancing security by preventing sensitive data from being stored in chat history.
-- **`DRY_RUN_MODE` Refinement Complete**: The `DRY_RUN_MODE` feature has been refactored to ensure consistent application across the codebase. The configuration has been centralized in `src/constants.py`, and comprehensive unit and integration tests have been added to verify its behavior. All relevant documentation has been updated.
-- **Portfolio Rebalance Feature Complete**: The portfolio rebalance feature has been fully implemented, including the conversational flow for sequential swap execution.
-- **Architectural Refactor**: The application has been refactored from a multi-threaded Flask application to a unified `asyncio` event loop using FastAPI. This has resolved the stability issues and created a robust foundation for future development.
-- **Deployment Command Update**: The `render.yaml` file has been updated to use `uvicorn` to run the FastAPI application, which is the correct and stable approach for an ASGI application.
-- **Portfolio Service Enhancement**: The `suggest_rebalance` function in `PortfolioService` has been enhanced to calculate the `from_amount` in the token's native units, which is a prerequisite for executing rebalance plans.
-- **Token Resolution**: Implemented a dynamic token resolver to fetch token metadata from the database, replacing the hardcoded token information.
-- **Price Query Normalization**: Updated the price query logic to use dynamic decimals from the new token resolver, ensuring accurate price calculations for all tokens.
-- **Monitoring Service**: Improved the price alert mechanism to use dynamic quote amounts based on the token's decimals.
-- **OKX Client**: Added the `OK-ACCESS-PROJECT` header to all requests in `okx_client.py` to ensure API parity.
+- **Live Trading Settings (Completed)**: `/setdefaultwallet` and `/enablelivetrading` commands and NLP intents wired; DB schema in place.
+- **Confirm Swap Hardening**: Early abort when live trading enabled but default wallet missing/not found (even under dry-run); lazy `TokenResolver` init in `confirm_swap`.
+- **E2E Extended**: Added NLP checks for `set_default_wallet` and `enable_live_trading`; added DB-level E2E to set default wallet and enable live trading.
+- **Docs**: Updated `how-it-works.md`, `README.md`, `TESTING_GUIDE.md`, `error_handling.md`.
 
 ## 3. Next Steps
-1.  **Implement Live Trading Flow**: Continue with the implementation of the live trading flow, including user settings, updating the `confirm_swap` function, and writing comprehensive tests.
-2.  **Implement Advanced Orders**: Begin work on the advanced orders feature, including database migrations, monitoring, and notifications.
-3.  **On-Demand Education**: Begin work on an integrated learning module to explain DeFi concepts on the fly.
+1. Implement advanced orders end-to-end (schema, monitoring evaluation loop, notifications).
+2. Add E2E scenarios for alert triggers using mocked OKX quotes (non-network).
+3. Enhance UX prompts around setting default wallet/live trading during trade confirmation.
 
 ## 4. Active Learnings & Insights
-- API endpoints can change, and it's important to have a robust testing and validation process to catch these changes early.
-- Non-interactive backends for libraries like `matplotlib` are essential for server-side applications.
-- Robust input parsing is crucial for a good user experience. A simple regex or string matching is often not enough to handle the variety of user inputs.
-- Decimal precision is a critical detail in DeFi applications. Hardcoding values is risky; dynamic lookup is essential.
-- Deployment environments (like Render) can have subtle differences from local setups. Understanding how WSGI servers like Gunicorn interact with `asyncio` applications is vital for debugging.
-- A stable development environment is a prerequisite for productive feature development. It was necessary to pause and fix the deployment before other work could continue.
+- Validation should reflect user intent state (live enabled) even when environment is in simulation mode.
+- Lazy initialization patterns reduce test flakiness when startup hooks aren’t invoked.

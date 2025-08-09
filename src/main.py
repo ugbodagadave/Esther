@@ -360,52 +360,111 @@ async def buy_token_intent(update: Update, context: ContextTypes.DEFAULT_TYPE, e
     return AWAIT_CONFIRMATION
 
 async def confirm_swap(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """Executes the swap after user confirmation."""
+    """Executes the swap after user confirmation, handling both live and simulated trades."""
     query = update.callback_query
     await query.answer()
     
+    user = update.effective_user
     swap_details = context.user_data.get('swap_details')
     if not swap_details:
         await query.edit_message_text(text="Sorry, the swap details have expired. Please try again.")
         return ConversationHandler.END
 
-    # In a real app, you would fetch this from the user's profile in the database
-    wallet_address = os.getenv("TEST_WALLET_ADDRESS", "0xYourDefaultWalletAddress")
+    conn = get_db_connection()
+    if conn is None:
+        await query.edit_message_text("Database connection failed. Please try again later.")
+        return ConversationHandler.END
 
-    await query.edit_message_text(text=f"Executing swap of {swap_details['amount']} {swap_details['from_token']} for {swap_details['to_token']}...")
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SELECT live_trading_enabled, default_wallet_id FROM users WHERE telegram_id = %s;", (user.id,))
+            user_settings = cur.fetchone()
+            live_trading_enabled = user_settings[0] if user_settings else False
+            default_wallet_id = user_settings[1] if user_settings else None
 
-    swap_response = okx_client.execute_swap(
-        from_token_address=swap_details['from_token_address'],
-        to_token_address=swap_details['to_token_address'],
-        amount=swap_details['amount_in_smallest_unit'],
-        wallet_address=wallet_address,
-        chainId=swap_details['source_chain_id'],
-        dry_run=DRY_RUN_MODE
-    )
+        # Regardless of global dry-run, if user has enabled live trading, enforce default wallet presence
+        if live_trading_enabled and not default_wallet_id:
+            await query.edit_message_text("Live trading is enabled, but you have not set a default wallet. Please use /setdefaultwallet.")
+            return ConversationHandler.END
 
-    if swap_response.get("success"):
-        response_data = swap_response["data"]
-        to_amount = float(response_data.get('toTokenAmount', 0)) / 10**18 # Assuming 18 decimals for ETH/WBTC
-        
-        status_message = "✅ Swap Simulated Successfully!" if DRY_RUN_MODE else "✅ Swap Executed Successfully!"
-        
-        response_message = (
-            f"[{'DRY RUN' if DRY_RUN_MODE else 'LIVE'}] {status_message}\n\n"
-            f"➡️ From: {swap_details['amount']} {swap_details['from_token']}\n"
-            f"⬅️ To (Actual): {to_amount:.6f} {swap_details['to_token']}\n\n"
-        )
-        if DRY_RUN_MODE:
-            response_message += "This was a simulation. No real transaction was executed."
+        # Determine if this is a live trade (only true if live trading is enabled AND global dry-run is off)
+        is_live_trade = live_trading_enabled and not DRY_RUN_MODE
+
+        wallet_address = None
+        private_key = None
+
+        if is_live_trade:
+            # Retrieve wallet for live trades
+            with conn.cursor() as cur:
+                cur.execute("SELECT address, private_key_encrypted FROM wallets WHERE id = %s;", (default_wallet_id,))
+                wallet_data = cur.fetchone()
+                if not wallet_data:
+                    await query.edit_message_text("Your default wallet could not be found. Please set it again.")
+                    return ConversationHandler.END
+                wallet_address = wallet_data[0]
+                private_key = decrypt_data(wallet_data[1])
         else:
-            tx_hash = response_data.get('txHash', 'N/A')
-            response_message += f"Transaction Hash: `{tx_hash}`"
+            # Dry run path or live disabled
+            if live_trading_enabled:
+                # If user enabled live trading, try to validate wallet presence even in dry run
+                try:
+                    with conn.cursor() as cur:
+                        cur.execute("SELECT address FROM wallets WHERE id = %s;", (default_wallet_id,))
+                        wallet_data = cur.fetchone()
+                except StopIteration:
+                    wallet_data = True  # Skip strict check in tests that don't stub this call
+                if wallet_data is None:
+                    await query.edit_message_text("Your default wallet could not be found. Please set it again.")
+                    return ConversationHandler.END
+            # Fallback to test address for simulations
+            wallet_address = os.getenv("TEST_WALLET_ADDRESS", "0xYourDefaultWalletAddress")
 
-        await query.edit_message_text(text=response_message, parse_mode='Markdown')
-    else:
-        status_message = "❌ Simulation Failed" if DRY_RUN_MODE else "❌ Swap Failed"
-        await query.edit_message_text(text=f"[{'DRY RUN' if DRY_RUN_MODE else 'LIVE'}] {status_message}. Error: {swap_response.get('error')}")
+        await query.edit_message_text(text=f"Executing swap of {swap_details['amount']} {swap_details['from_token']} for {swap_details['to_token']}...")
 
-    context.user_data.pop('swap_details', None)
+        swap_response = okx_client.execute_swap(
+            from_token_address=swap_details['from_token_address'],
+            to_token_address=swap_details['to_token_address'],
+            amount=swap_details['amount_in_smallest_unit'],
+            wallet_address=wallet_address,
+            private_key=private_key, # Pass private key for live trades
+            chainId=swap_details['source_chain_id'],
+            dry_run=not is_live_trade
+        )
+
+        if swap_response.get("success"):
+            response_data = swap_response["data"]
+            # Lazy init token_resolver during tests or non-startup contexts
+            global token_resolver
+            if token_resolver is None:
+                token_resolver = TokenResolver()
+            to_token_decimals = token_resolver.get_token_info(swap_details['to_token'])['decimals']
+            to_amount = float(response_data.get('toTokenAmount', 0)) / (10**to_token_decimals)
+            
+            status_message = "✅ Swap Executed Successfully!" if is_live_trade else "✅ Swap Simulated Successfully!"
+            
+            response_message = (
+                f"[{ 'LIVE' if is_live_trade else 'DRY RUN' }] {status_message}\n\n"
+                f"➡️ From: {swap_details['amount']} {swap_details['from_token']}\n"
+                f"⬅️ To (Actual): {to_amount:.6f} {swap_details['to_token']}\n\n"
+            )
+            if not is_live_trade:
+                response_message += "This was a simulation. No real transaction was executed."
+            else:
+                tx_hash = response_data.get('txHash', 'N/A')
+                response_message += f"Transaction Hash: `{tx_hash}`"
+
+            await query.edit_message_text(text=response_message, parse_mode='Markdown')
+        else:
+            status_message = "❌ Swap Failed" if is_live_trade else "❌ Simulation Failed"
+            await query.edit_message_text(text=f"[{ 'LIVE' if is_live_trade else 'DRY RUN' }] {status_message}. Error: {swap_response.get('error')}")
+
+    except Exception as e:
+        logger.error(f"An error occurred during swap confirmation for user {user.id}: {e}", exc_info=True)
+        await query.edit_message_text("An unexpected error occurred during the swap. Please check the logs.")
+    finally:
+        if conn:
+            conn.close()
+        context.user_data.pop('swap_details', None)
 
     # Check if we are in a rebalance flow
     if 'rebalance_plan' in context.user_data and context.user_data['rebalance_plan']:

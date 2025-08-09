@@ -66,10 +66,14 @@ Here is the step-by-step journey of a user command, from Telegram to execution a
     *   **User Action**: The user clicks either "Confirm" or "Cancel".
     *   **Callback Handling**: A `CallbackQueryHandler` captures the user's choice.
     *   **Swap Execution**: If the user confirms, the `confirm_swap` function is called. It retrieves the swap details from `context.user_data` and calls the `execute_swap` method in the **External Services Layer**.
-    *   **Dry Run vs. Live Mode**: The `confirm_swap` function now checks if `live_trading_enabled` is `True` for the user.
-        *   If `dry_run` is `True` (default), the function returns a simulated success message with the quote data, and no transaction is sent.
-        *   If `live_trading_enabled` is `True`, the function resolves the user's `default_wallet_id`, fetches the corresponding wallet, decrypts the private key in-memory, and uses it to sign and execute a real transaction via the OKX DEX aggregator.
-        *   If `live_trading_enabled` is `False`, the bot informs the user that live trading is disabled and provides instructions on how to enable it.
+    *   **Dry Run vs. Live Mode**: The `confirm_swap` function evaluates two flags:
+        - `live_trading_enabled` (per-user setting in DB)
+        - Global `DRY_RUN_MODE` (from environment)
+      Behavior:
+        - When `DRY_RUN_MODE` is `True` (default), swaps are simulated. If the user has turned on live trading, the bot still validates that a default wallet exists and is present in the database; otherwise it aborts with a clear message.
+        - When `DRY_RUN_MODE` is `False` and `live_trading_enabled` is `True`, the bot loads the default wallet, decrypts the private key in-memory, and executes a live swap.
+        - When `live_trading_enabled` is `False`, swaps are simulated and the bot may use a configured test wallet address.
+      Additionally, `TokenResolver` is lazily initialized inside `confirm_swap` if it has not yet been set (e.g., when tests invoke handlers without full app startup).
     *   **Cancellation**: If the user cancels, the `cancel_swap` function is called, the conversation ends, and the stored swap details are cleared.
 6.  **Response and Logging**:
     *   The result of the quote API call is received.

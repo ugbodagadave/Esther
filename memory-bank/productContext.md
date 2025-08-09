@@ -20,3 +20,15 @@ The user experience for Esther must be seamless, intuitive, and trustworthy.
 - **Trust and Transparency**: Every transaction must be preceded by a clear confirmation step. All data, recommendations, and analyses must be presented with transparency, including disclaimers for predictive content.
 - **Personalization**: Esther should feel like a personal trading assistant. It will learn from user behavior and preferences to provide tailored advice and a customized experience.
 - **Educational Empowerment**: The agent should not just execute commands but also educate users, helping them become more knowledgeable and confident in their DeFi journey.
+
+## 4. Key UX Flows
+- **Set Default Wallet**
+  - Trigger: Natural language (“set my default wallet”) or `/setdefaultwallet`.
+  - Flow: Lists wallets with inline buttons → user selects → confirmation message.
+  - Error states: If none exist, prompt to add a wallet first.
+
+- **Enable/Disable Live Trading**
+  - Trigger: Natural language (“enable live trading”) or `/enablelivetrading`.
+  - Prerequisite: Default wallet must be set; otherwise the bot guides the user to set it.
+  - Flow: Shows current status and two buttons (Enable/Disable) → persists choice → confirmation message.
+  - Safety: Even when app is in dry-run, if the user has enabled live trading, swaps validate default wallet presence and abort with clear guidance if misconfigured.

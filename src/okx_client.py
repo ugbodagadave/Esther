@@ -93,14 +93,16 @@ class OKXClient:
         
         return {"success": False, "error": "Failed to fetch quote after multiple retries."}
 
-    def execute_swap(self, from_token_address: str, to_token_address: str, amount: str, wallet_address: str, chainId: int = 1, slippage: str = "1", dry_run: bool = None) -> dict:
+    def execute_swap(self, from_token_address: str, to_token_address: str, amount: str, wallet_address: str, private_key: str = None, chainId: int = 1, slippage: str = "1", dry_run: bool = None) -> dict:
         """
         Executes a swap. It always fetches a quote first.
         If dry_run is True, it only simulates the transaction.
         If dry_run is False, it executes a real swap on the blockchain.
+        A private_key is required for real swaps.
         """
         if dry_run is None:
             dry_run = DRY_RUN_MODE
+        
         # Always get a quote first
         quote_response = self.get_live_quote(from_token_address, to_token_address, amount, chainId)
 
@@ -116,6 +118,9 @@ class OKXClient:
                 "message": "✅ Swap simulated successfully (no real transaction)"
             }
         
+        if not private_key:
+            return {"success": False, "error": "Private key is required for live swaps."}
+
         # Proceed with the real swap if not a dry run
         logger.info(f"Executing REAL swap for wallet {wallet_address}")
         for attempt in range(self.max_retries):
@@ -126,6 +131,7 @@ class OKXClient:
                     "toTokenAddress": to_token_address,
                     "amount": amount,
                     "walletAddress": wallet_address,
+                    "privateKey": private_key,
                     "slippage": slippage,
                     "chainId": chainId
                 }
