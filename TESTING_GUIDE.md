@@ -42,6 +42,14 @@ Here is a comprehensive guide to testing the Esther bot's features using natural
 *   **Your Message:** `I want to add a new wallet`
 *   **Expected Bot Response:** Esther will guide you through a conversational flow to get the wallet name and address. It will then present a button to open a secure web app where you can enter your private key. Upon submission, the bot will confirm that the wallet has been saved.
 
+**Test 3: Set Default Wallet**
+*   **Your Message:** `/setdefaultwallet`
+*   **Expected Bot Response:** A list of your saved wallets with buttons to select one as the default for trading. After selection, a confirmation message should appear.
+
+**Test 4: Enable Live Trading**
+*   **Your Message:** `/enablelivetrading`
+*   **Expected Bot Response:** A message showing the current status of live trading (enabled/disabled) with buttons to change the setting. After selection, a confirmation message should appear.
+
 ---
 
 ### 4. Trading (Buy, Sell, Swap)
