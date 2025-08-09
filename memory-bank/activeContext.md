@@ -18,6 +18,10 @@ The current focus is on ensuring the stability and correctness of the newly impl
 - **Architectural Refactor**: The application has been refactored from a multi-threaded Flask application to a unified `asyncio` event loop using FastAPI. This has resolved the stability issues and created a robust foundation for future development.
 - **Deployment Command Update**: The `render.yaml` file has been updated to use `uvicorn` to run the FastAPI application, which is the correct and stable approach for an ASGI application.
 - **Portfolio Service Enhancement**: The `suggest_rebalance` function in `PortfolioService` has been enhanced to calculate the `from_amount` in the token's native units, which is a prerequisite for executing rebalance plans.
+- **Token Resolution**: Implemented a dynamic token resolver to fetch token metadata from the database, replacing the hardcoded token information.
+- **Price Query Normalization**: Updated the price query logic to use dynamic decimals from the new token resolver, ensuring accurate price calculations for all tokens.
+- **Monitoring Service**: Improved the price alert mechanism to use dynamic quote amounts based on the token's decimals.
+- **OKX Client**: Added the `OK-ACCESS-PROJECT` header to all requests in `okx_client.py` to ensure API parity.
 
 ## 3. Next Steps
 1.  **On-Demand Education**: Begin work on an integrated learning module to explain DeFi concepts on the fly.

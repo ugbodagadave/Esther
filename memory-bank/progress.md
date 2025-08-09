@@ -36,6 +36,10 @@ The project is moving into a feature expansion phase. The "Simple Price Charts" 
     - Token resolution for BTC and other symbols is fixed.
     - Price alert response message is corrected.
     - Detailed logging for OKX API endpoints is added.
+    - **Token Resolution**: Implemented a dynamic token resolver to fetch token metadata from the database, replacing the hardcoded token information.
+    - **Price Query Normalization**: Updated the price query logic to use dynamic decimals from the new token resolver, ensuring accurate price calculations for all tokens.
+    - **Monitoring Service**: Improved the price alert mechanism to use dynamic quote amounts based on the token's decimals.
+    - **OKX Client**: Added the `OK-ACCESS-PROJECT` header to all requests in `okx_client.py` to ensure API parity.
 
 ## 3. What's Left to Build
 - **On-Demand Education**: An integrated learning module to explain DeFi concepts on the fly.

@@ -26,6 +26,10 @@ Here is a comprehensive guide to testing the Esther bot's features using natural
 *   **Your Message:** `How much is ETH worth?`
 *   **Expected Bot Response:** A message showing the current price of Ethereum (ETH). For example: "The current price of Ethereum (ETH) is $3,578."
 
+**Test 3: Price of unsupported token**
+*   **Your Message:** `What's the price of FOO?`
+*   **Expected Bot Response:** A message indicating that the token is not supported. For example: "Sorry, I don't have the address for the token FOO."
+
 ---
 
 ### 3. Wallet Management
