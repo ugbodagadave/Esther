@@ -301,25 +301,13 @@ async def buy_token_intent(update: Update, context: ContextTypes.DEFAULT_TYPE, e
         await update.message.reply_text(f"Sorry, I don't support one of the specified chains.")
         return ConversationHandler.END
 
-    # Store details in context for later use
-    context.user_data['swap_details'] = {
-        "from_token": currency.upper(),
-        "to_token": symbol.upper(),
-        "from_token_address": from_token_address,
-        "to_token_address": to_token_address,
-        "amount": amount,
-        "source_chain": source_chain,
-        "destination_chain": destination_chain,
-        "source_chain_id": source_chain_id,
-        "destination_chain_id": destination_chain_id,
-    }
-
+    # Resolve addresses/decimals BEFORE using them
     from_token_address = from_token_info['address']
     to_token_address = to_token_info['address']
     from_token_decimals = from_token_info['decimals']
     to_token_decimals = to_token_info['decimals']
 
-    # This is a huge simplification. Amount needs to be converted based on the 'from' token's decimals.
+    # Convert amount using 'from' token decimals
     amount_in_smallest_unit = str(int(float(amount) * 10**from_token_decimals))
 
     # Get a quote to show the user
@@ -337,8 +325,20 @@ async def buy_token_intent(update: Update, context: ContextTypes.DEFAULT_TYPE, e
     quote_data = quote_response["data"]
     to_amount = float(quote_data.get('toTokenAmount', 0)) / 10**to_token_decimals
 
-    context.user_data['swap_details']['amount_in_smallest_unit'] = amount_in_smallest_unit
-    context.user_data['swap_details']['estimated_to_amount'] = to_amount
+    # Store details in context AFTER we have resolved addresses and obtained a quote
+    context.user_data['swap_details'] = {
+        "from_token": currency.upper(),
+        "to_token": symbol.upper(),
+        "from_token_address": from_token_address,
+        "to_token_address": to_token_address,
+        "amount": amount,
+        "amount_in_smallest_unit": amount_in_smallest_unit,
+        "estimated_to_amount": to_amount,
+        "source_chain": source_chain,
+        "destination_chain": destination_chain,
+        "source_chain_id": source_chain_id,
+        "destination_chain_id": destination_chain_id,
+    }
 
     keyboard = [
         [
@@ -512,28 +512,16 @@ async def sell_token_intent(update: Update, context: ContextTypes.DEFAULT_TYPE, 
         await update.message.reply_text(f"Sorry, I don't support one of the specified chains.")
         return ConversationHandler.END
 
-    # Store details in context for later use
-    context.user_data['swap_details'] = {
-        "from_token": symbol.upper(),
-        "to_token": currency.upper(),
-        "from_token_address": from_token_address,
-        "to_token_address": to_token_address,
-        "amount": amount,
-        "source_chain": source_chain,
-        "destination_chain": destination_chain,
-        "source_chain_id": source_chain_id,
-        "destination_chain_id": destination_chain_id,
-    }
-
+    # Resolve addresses/decimals BEFORE using them
     from_token_address = from_token_info['address']
     to_token_address = to_token_info['address']
     from_token_decimals = from_token_info['decimals']
     to_token_decimals = to_token_info['decimals']
 
-    # This is a huge simplification. Amount needs to be converted based on the 'from' token's decimals.
+    # Convert amount using 'from' token decimals
     amount_in_smallest_unit = str(int(float(amount) * 10**from_token_decimals))
 
-    # Get a quote to show the user
+    # Get a quote to show the user (sell path: from=symbol, to=currency)
     quote_response = okx_client.get_live_quote(
         from_token_address=from_token_address,
         to_token_address=to_token_address,
@@ -548,8 +536,20 @@ async def sell_token_intent(update: Update, context: ContextTypes.DEFAULT_TYPE, 
     quote_data = quote_response["data"]
     to_amount = float(quote_data.get('toTokenAmount', 0)) / 10**to_token_decimals
 
-    context.user_data['swap_details']['amount_in_smallest_unit'] = amount_in_smallest_unit
-    context.user_data['swap_details']['estimated_to_amount'] = to_amount
+    # Store details AFTER resolution and quote
+    context.user_data['swap_details'] = {
+        "from_token": symbol.upper(),
+        "to_token": currency.upper(),
+        "from_token_address": from_token_address,
+        "to_token_address": to_token_address,
+        "amount": amount,
+        "amount_in_smallest_unit": amount_in_smallest_unit,
+        "estimated_to_amount": to_amount,
+        "source_chain": source_chain,
+        "destination_chain": destination_chain,
+        "source_chain_id": source_chain_id,
+        "destination_chain_id": destination_chain_id,
+    }
 
     keyboard = [
         [
