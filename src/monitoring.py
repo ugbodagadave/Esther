@@ -6,6 +6,7 @@ from telegram import Bot
 from src.database import get_db_connection
 from src.okx_client import OKXClient
 from src.portfolio import PortfolioService
+from src.constants import TOKEN_ADDRESSES, TOKEN_DECIMALS
 
 # Enable logging
 logging.basicConfig(
@@ -77,19 +78,23 @@ async def check_alerts():
                 # This is a simplified price check. In a real app, you would need to handle different quote currencies.
                 from_token_address = TOKEN_ADDRESSES.get(symbol.upper())
                 to_token_address = TOKEN_ADDRESSES.get("USDT")
+                decimals = TOKEN_DECIMALS.get(symbol.upper())
                 
-                if not from_token_address or not to_token_address:
+                if not from_token_address or not to_token_address or not decimals:
                     logger.warning(f"Skipping alert {alert_id} due to unknown symbol {symbol}")
                     continue
+
+                amount = str(1 * 10**decimals) # 1 whole token in its smallest unit
 
                 quote_response = okx_client.get_live_quote(
                     from_token_address=from_token_address,
                     to_token_address=to_token_address,
-                    amount="1000000000000000000" # 1 ETH for price check
+                    amount=amount
                 )
 
                 if quote_response.get("success"):
-                    current_price = float(quote_response["data"].get('toTokenAmount', 0)) / 1_000_000
+                    to_decimals = TOKEN_DECIMALS.get("USDT")
+                    current_price = float(quote_response["data"].get('toTokenAmount', 0)) / (10**to_decimals)
                     
                     if (condition == 'above' and current_price > target_price) or \
                        (condition == 'below' and current_price < target_price):
@@ -124,11 +129,4 @@ async def main():
         await asyncio.sleep(60)  # sleep 1 minute between alert scans
 
 if __name__ == '__main__':
-    # This is a placeholder for the TOKEN_ADDRESSES map. In a real implementation, this would be shared.
-    TOKEN_ADDRESSES = {
-        "ETH": "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
-        "USDC": "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48",
-        "USDT": "0xdac17f958d2ee523a2206206994597c13d831ec7",
-        "WBTC": "0x2260fac5e5542a773aa44fbcfedf7c193bc2c599",
-    }
     asyncio.run(main())

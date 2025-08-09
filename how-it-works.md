@@ -168,6 +168,7 @@ Esther now keeps a real-time view of every user's on-chain balances **without re
      * `/api/v5/dex/balance/all-token-balances-by-address` – This single endpoint provides a consolidated list of native and token balances, along with their USD prices, across multiple chains.
    * All requests include the **`OK-ACCESS-PROJECT`** header. The value comes from the
      `OKX_PROJECT_ID` environment variable you obtain in the OKX *Developer Center → Projects* page.
+     This is handled automatically by the `OKXClient`.
      Without this header the API gateway returns an error.
    * Results are normalised into a common schema and pushed into the `holdings` table (one row per token, per user).
 2. **Valuation**

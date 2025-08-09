@@ -16,7 +16,7 @@ All requests to the OKX Web3 APIs (DEX, Explorer, Market) require **four** piece
 * `OKX_PROJECT_ID` – identifies the *Project* that groups your keys and allocates quota.
 
 The first three values go into the regular `OK-ACCESS-*` headers used across all OKX APIs. The
-`OKX_PROJECT_ID` is injected as the additional header `OK-ACCESS-PROJECT`. If this header is missing
+`OKX_PROJECT_ID` is injected as the additional header `OK-ACCESS-PROJECT`. This is handled automatically by the `OKXClient`. If this header is missing
 the DEX and Market endpoints respond with an error.
 
 All four credentials are stored in a `.env` file and loaded at runtime.
