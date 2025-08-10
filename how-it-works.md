@@ -341,5 +341,5 @@ Esther employs a comprehensive testing strategy to ensure reliability and stabil
 
 - Phase 1 (done): Centralized error codes (`src/error_codes.py`), per-update correlation IDs (`src/correlation.py`), guarded handlers and a global error handler (`src/error_handler.py`) applied to key flows in `src/main.py`.
 - Phase 2 (done): Conversation watchdogs with timeouts for `AWAIT_*` states and an inline cancel flow ensure chats never get stuck.
-- Phase 3 (next): Add exponential backoff with jitter and a circuit breaker around OKX calls to fail fast during outages and recover gracefully.
+- Phase 3 (done): Exponential backoff with jitter and a per‑endpoint circuit breaker around OKX calls. Breaker short‑circuits during outages and auto‑recovers after cooldown.
 - Phase 4 (planned): LLM FailureAdvisor to turn internal failures into concise, actionable guidance; strictly on-error and feature-flagged.

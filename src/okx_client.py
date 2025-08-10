@@ -11,6 +11,8 @@ from datetime import datetime, timezone, timedelta
 from dotenv import load_dotenv
 
 from src.constants import DRY_RUN_MODE, OKX_PROJECT_ID
+from src.retry import compute_exponential_backoff_delays, sleep_with_backoff
+from src.circuit import breaker, short_circuit_response
 
 # Load environment variables from .env file
 load_dotenv()
@@ -55,59 +57,70 @@ class OKXClient:
 
     def get_live_quote(self, from_token_address: str, to_token_address: str, amount: str, chainId: int = 1) -> dict:
         """
-        Fetches a real swap quote from the OKX DEX aggregator with retry logic.
+        Fetches a real swap quote from the OKX DEX aggregator with retry logic and circuit breaker.
         """
+        endpoint_key = "dex/aggregator/quote"
+        if not breaker.allow_request(endpoint_key):
+            return short_circuit_response(endpoint_key)
+
+        request_path = '/api/v5/dex/aggregator/quote'
+        params = {
+            "chainId": chainId,
+            "amount": amount,
+            "toTokenAddress": to_token_address,
+            "fromTokenAddress": from_token_address
+        }
+        query_string = '&'.join([f'{k}={v}' for k, v in params.items()])
+        full_request_path = f"{request_path}?{query_string}"
+        headers = self._get_request_headers('GET', full_request_path)
+        url = f"{self.base_url}{full_request_path}"
+
+        delays = compute_exponential_backoff_delays(self.max_retries)
+        last_error = None
         for attempt in range(self.max_retries):
             try:
-                request_path = '/api/v5/dex/aggregator/quote'
-                params = {
-                    "chainId": chainId,
-                    "amount": amount,
-                    "toTokenAddress": to_token_address,
-                    "fromTokenAddress": from_token_address
-                }
-                
-                query_string = '&'.join([f'{k}={v}' for k, v in params.items()])
-                full_request_path = f"{request_path}?{query_string}"
-
-                headers = self._get_request_headers('GET', full_request_path)
-                url = f"{self.base_url}{full_request_path}"
-                
                 logger.info(f"Sending GET request to OKX: {url}")
                 response = requests.get(url, headers=headers, timeout=10)
                 response.raise_for_status()
                 data = response.json()
 
                 if data.get("code") == "0":
+                    breaker.record_success(endpoint_key)
                     return {"success": True, "data": data.get("data", [{}])[0]}
                 else:
                     error_msg = data.get("msg", "Unknown API error")
                     logger.error(f"Error fetching quote from OKX API: {error_msg}")
-                    return {"success": False, "error": f"API Error: {error_msg}"}
+                    last_error = error_msg
+                    breaker.record_failure(endpoint_key)
             except requests.exceptions.HTTPError as e:
-                logger.warning(f"HTTP Error on attempt {attempt + 1}: {e}. Retrying in {self.retry_delay}s...")
-                time.sleep(self.retry_delay)
+                logger.warning(f"HTTP Error on attempt {attempt + 1}: {e}.")
+                last_error = str(e)
+                breaker.record_failure(endpoint_key)
             except requests.exceptions.RequestException as e:
-                logger.error(f"Error fetching quote: {e}")
-                return {"success": False, "error": f"A network error occurred: {e}"}
-        
-        return {"success": False, "error": "Failed to fetch quote after multiple retries."}
+                logger.error(f"Network error fetching quote: {e}")
+                last_error = str(e)
+                breaker.record_failure(endpoint_key)
+                break
+            # Sleep before next retry if any left
+            sleep_with_backoff(attempt, delays)
+
+        return {"success": False, "error": last_error or "Failed to fetch quote after multiple retries.", "code": "E_OKX_HTTP"}
 
     def execute_swap(self, from_token_address: str, to_token_address: str, amount: str, wallet_address: str, private_key: str = None, chainId: int = 1, slippage: str = "1", dry_run: bool = None) -> dict:
         """
-        Executes a swap. It always fetches a quote first.
+        Executes a swap with retry and circuit breaker. It always fetches a quote first.
         If dry_run is True, it only simulates the transaction.
         If dry_run is False, it executes a real swap on the blockchain.
         A private_key is required for real swaps.
         """
         if dry_run is None:
             dry_run = DRY_RUN_MODE
-        
+
         # Always get a quote first
         quote_response = self.get_live_quote(from_token_address, to_token_address, amount, chainId)
 
         if not quote_response.get("success"):
-            return quote_response  # Propagate the error from get_live_quote
+            return quote_response  # Propagate the error from get_live_quote (includes short-circuit case)
 
         if dry_run:
             logger.info(f"Executing DRY RUN swap from {from_token_address} to {to_token_address}")
@@ -117,29 +130,32 @@ class OKXClient:
                 "data": quote_response["data"],
                 "message": "✅ Swap simulated successfully (no real transaction)"
             }
-        
-        if not private_key:
-            return {"success": False, "error": "Private key is required for live swaps."}
 
-        # Proceed with the real swap if not a dry run
-        logger.info(f"Executing REAL swap for wallet {wallet_address}")
+        if not private_key:
+            return {"success": False, "error": "Private key is required for live swaps.", "code": "E_OKX_API"}
+
+        endpoint_key = "dex/aggregator/swap"
+        if not breaker.allow_request(endpoint_key):
+            return short_circuit_response(endpoint_key)
+
+        request_path = '/api/v5/dex/aggregator/swap'
+        body = {
+            "fromTokenAddress": from_token_address,
+            "toTokenAddress": to_token_address,
+            "amount": amount,
+            "walletAddress": wallet_address,
+            "privateKey": private_key,
+            "slippage": slippage,
+            "chainId": chainId
+        }
+        body_str = json.dumps(body)
+        headers = self._get_request_headers('POST', request_path, body_str)
+        url = f"{self.base_url}{request_path}"
+
+        delays = compute_exponential_backoff_delays(self.max_retries)
+        last_error = None
         for attempt in range(self.max_retries):
             try:
-                request_path = '/api/v5/dex/aggregator/swap'
-                body = {
-                    "fromTokenAddress": from_token_address,
-                    "toTokenAddress": to_token_address,
-                    "amount": amount,
-                    "walletAddress": wallet_address,
-                    "privateKey": private_key,
-                    "slippage": slippage,
-                    "chainId": chainId
-                }
-                
-                body_str = json.dumps(body)
-                headers = self._get_request_headers('POST', request_path, body_str)
-                url = f"{self.base_url}{request_path}"
-                
                 logger.info(f"Sending POST request to OKX: {url}")
                 response = requests.post(url, headers=headers, json=body, timeout=15)
                 response.raise_for_status()
@@ -147,23 +163,29 @@ class OKXClient:
 
                 if data.get("code") == "0":
                     logger.info(f"Successfully executed swap: {data.get('msg')}")
+                    breaker.record_success(endpoint_key)
                     return {"success": True, "data": data.get("data", [{}])[0]}
                 else:
                     error_msg = data.get("msg", "Unknown API error")
                     logger.error(f"Error executing swap on OKX API: {error_msg}")
-                    return {"success": False, "error": f"API Error: {error_msg}"}
+                    last_error = error_msg
+                    breaker.record_failure(endpoint_key)
             except requests.exceptions.HTTPError as e:
-                logger.warning(f"HTTP Error on attempt {attempt + 1}: {e}. Retrying in {self.retry_delay}s...")
-                time.sleep(self.retry_delay)
+                logger.warning(f"HTTP Error on attempt {attempt + 1}: {e}.")
+                last_error = str(e)
+                breaker.record_failure(endpoint_key)
             except requests.exceptions.RequestException as e:
-                logger.error(f"Error executing swap: {e}")
-                return {"success": False, "error": f"A network error occurred: {e}"}
-        
-        return {"success": False, "error": "Failed to execute swap after multiple retries."}
+                logger.error(f"Network error executing swap: {e}")
+                last_error = str(e)
+                breaker.record_failure(endpoint_key)
+                break
+            sleep_with_backoff(attempt, delays)
+
+        return {"success": False, "error": last_error or "Failed to execute swap after multiple retries.", "code": "E_OKX_HTTP"}
 
     def get_historical_price(self, token_address: str, chainId: int, period: str) -> dict:
         """
-        Fetches historical price data for a token.
+        Fetches historical price data for a token with retry and circuit breaker.
         Handles both instrument IDs (e.g., 'BTC-USD') and token addresses.
         """
         # Convert period to parameters
@@ -190,8 +212,12 @@ class OKXClient:
             okx_period = "1D"
 
         # Check if it's an instrument ID or a token address
+        endpoint_key = "market/history-candles" if '-' in token_address else "wallet/token/historical-price"
+
+        if not breaker.allow_request(endpoint_key):
+            return short_circuit_response(endpoint_key)
+
         if '-' in token_address:
-            # It's an instrument ID like BTC-USD, use the market data endpoint
             request_path = '/api/v5/market/history-candles'
             params = {
                 "instId": token_address,
@@ -200,7 +226,6 @@ class OKXClient:
             }
             base_url = "https://www.okx.com"
         else:
-            # It's a token address, use the wallet endpoint
             request_path = f'/api/v5/wallet/token/historical-price'
             params = {
                 "tokenAddress": token_address,
@@ -211,13 +236,13 @@ class OKXClient:
             }
             base_url = self.base_url
 
-            # Prepare an optional fallback for native ETH using Market API candles
             eth_zero_addr = "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
             fallback_inst_id = None
             if token_address.lower() == eth_zero_addr:
-                # Use market candles for ETH if wallet API is unavailable
                 fallback_inst_id = "ETH-USD"
 
+        delays = compute_exponential_backoff_delays(self.max_retries)
+        last_error = None
         for attempt in range(self.max_retries):
             try:
                 query_string = '&'.join([f'{k}={v}' for k, v in params.items()])
@@ -225,7 +250,7 @@ class OKXClient:
 
                 headers = self._get_request_headers('GET', full_request_path)
                 url = f"{base_url}{full_request_path}"
-                
+
                 logger.info(f"Sending GET request to OKX for historical price: {url}")
                 response = requests.get(url, headers=headers, timeout=10)
                 response.raise_for_status()
@@ -235,54 +260,30 @@ class OKXClient:
                     raw_data = data.get("data", [])
                     processed_data = []
                     if '-' in token_address:
-                        # Normalize history-candles data: [ts, o, h, l, c, vol, volCcy, volCcyQuote, confirm]
-                        # We want a list of dicts: [{"ts": "...", "price": "..."}]
                         for item in raw_data:
                             processed_data.append({"ts": item[0], "price": item[4]})
                     else:
-                        # Data from historical-price is already in the correct format
                         processed_data = raw_data
-
+                    breaker.record_success(endpoint_key)
                     return {"success": True, "data": processed_data}
                 else:
                     error_msg = data.get("msg", "Unknown API error")
                     logger.error(f"Error fetching historical price from OKX API: {error_msg}")
-                    # Retry on API error as well (not only HTTP errors)
-                    if attempt < self.max_retries - 1:
-                        time.sleep(self.retry_delay)
-                        continue
-                    # If ETH and wallet endpoint is flaky, try Market API candles as a fallback
-                    if fallback_inst_id:
-                        try:
-                            m_request_path = '/api/v5/market/history-candles'
-                            m_params = {"instId": fallback_inst_id, "bar": bar, "limit": limit}
-                            m_qs = '&'.join([f'{k}={v}' for k, v in m_params.items()])
-                            m_full = f"{m_request_path}?{m_qs}"
-                            headers = self._get_request_headers('GET', m_full)
-                            url = f"https://www.okx.com{m_full}"
-                            logger.info(f"Fallback: Sending GET request to OKX Market API: {url}")
-                            resp = requests.get(url, headers=headers, timeout=10)
-                            resp.raise_for_status()
-                            m_data = resp.json()
-                            if m_data.get("code") == "0":
-                                raw_data = m_data.get("data", [])
-                                processed_data = [{"ts": item[0], "price": item[4]} for item in raw_data]
-                                return {"success": True, "data": processed_data}
-                            else:
-                                f_msg = m_data.get("msg", "Unknown API error")
-                                logger.error(f"Fallback market candles error: {f_msg}")
-                        except Exception as _:
-                            # Swallow and return original error below
-                            pass
-                    return {"success": False, "error": f"API Error: {error_msg}"}
+                    last_error = error_msg
+                    breaker.record_failure(endpoint_key)
+                    # Retry on API error as well
             except requests.exceptions.HTTPError as e:
-                logger.warning(f"HTTP Error on attempt {attempt + 1}: {e}. Retrying in {self.retry_delay}s...")
-                time.sleep(self.retry_delay)
+                logger.warning(f"HTTP Error on attempt {attempt + 1}: {e}.")
+                last_error = str(e)
+                breaker.record_failure(endpoint_key)
             except requests.exceptions.RequestException as e:
-                logger.error(f"Error fetching historical price: {e}")
-                return {"success": False, "error": f"A network error occurred: {e}"}
-        
-        # Final fallback if defined and loop finished due to HTTP errors
+                logger.error(f"Network error fetching historical price: {e}")
+                last_error = str(e)
+                breaker.record_failure(endpoint_key)
+                break
+            sleep_with_backoff(attempt, delays)
+
+        # Fallback to market candles for ETH if wallet endpoint failed
         if 'fallback_inst_id' in locals() and fallback_inst_id:
             try:
                 m_request_path = '/api/v5/market/history-candles'
@@ -291,17 +292,18 @@ class OKXClient:
                 m_full = f"{m_request_path}?{m_qs}"
                 headers = self._get_request_headers('GET', m_full)
                 url = f"https://www.okx.com{m_full}"
-                logger.info(f"Final fallback: Sending GET request to OKX Market API: {url}")
+                logger.info(f"Fallback: Sending GET request to OKX Market API: {url}")
                 resp = requests.get(url, headers=headers, timeout=10)
                 resp.raise_for_status()
                 m_data = resp.json()
                 if m_data.get("code") == "0":
                     raw_data = m_data.get("data", [])
                     processed_data = [{"ts": item[0], "price": item[4]} for item in raw_data]
+                    breaker.record_success(endpoint_key)
                     return {"success": True, "data": processed_data}
-            except Exception as _:
+            except Exception:
                 pass
-        return {"success": False, "error": "Failed to fetch historical price after multiple retries."}
+        return {"success": False, "error": last_error or "Failed to fetch historical price after multiple retries.", "code": "E_OKX_HTTP"}
 
 
 if __name__ == '__main__':

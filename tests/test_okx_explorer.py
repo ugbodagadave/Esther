@@ -1,6 +1,7 @@
 import unittest
 from unittest.mock import patch, MagicMock
 import os
+import requests
 from src.okx_explorer import OKXExplorer
 
 class TestOKXExplorer(unittest.TestCase):
@@ -49,4 +50,20 @@ class TestOKXExplorer(unittest.TestCase):
 
     def test_default_base_url(self):
         explorer = OKXExplorer()
-        self.assertEqual(explorer.base_url, "https://web3.okx.com") 
+        self.assertEqual(explorer.base_url, "https://web3.okx.com")
+
+    @patch("src.circuit.breaker.allow_request", return_value=False)
+    def test_breaker_short_circuit_balances(self, mock_allow):
+        res = self.explorer.get_all_balances("0xabc", [1])
+        self.assertFalse(res["success"])
+        self.assertEqual(res.get("code"), "E_OKX_HTTP")
+        self.assertIn("circuit", res)
+
+    @patch("src.okx_explorer.requests.get")
+    @patch("src.okx_explorer.sleep_with_backoff", return_value=None)
+    def test_retry_helper_called(self, mock_sleep, mock_get):
+        mock_get.side_effect = requests.exceptions.HTTPError("500")
+        res = self.explorer.get_kline("BTC", bar="1D", limit=3)
+        self.assertFalse(res["success"]) 
+        self.assertEqual(mock_get.call_count, 3)
+        self.assertEqual(mock_sleep.call_count, 3) 

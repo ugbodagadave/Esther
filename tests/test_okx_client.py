@@ -4,6 +4,7 @@ import os
 import requests
 from src.okx_client import OKXClient
 from src.constants import DRY_RUN_MODE, OKX_PROJECT_ID
+from src import okx_client as okx_client_module
 
 class TestOKXClient(unittest.TestCase):
 
@@ -81,28 +82,56 @@ class TestOKXClient(unittest.TestCase):
         self.assertEqual(mock_post.call_args.kwargs['json']['privateKey'], "pk_test")
 
     @patch('src.okx_client.requests.get', side_effect=requests.exceptions.HTTPError("500 Server Error"))
-    @patch('time.sleep', return_value=None) # Mock time.sleep to avoid delays
+    @patch('src.okx_client.sleep_with_backoff', return_value=None) # Mock backoff sleep to avoid delays
     def test_get_live_quote_retry_logic(self, mock_sleep, mock_get):
-        """Test the retry logic for get_live_quote."""
+        """Test the retry logic for get_live_quote with exponential backoff helper."""
         client = OKXClient(max_retries=3, retry_delay=0.1)
         result = client.get_live_quote("from", "to", "100")
 
         self.assertFalse(result['success'])
-        self.assertEqual(result['error'], "Failed to fetch quote after multiple retries.")
+        self.assertIn('error', result)
         self.assertEqual(mock_get.call_count, 3)
+        # backoff helper is invoked once per attempt (even if last call sleeps 0)
+        self.assertEqual(mock_sleep.call_count, 3)
 
     @patch('src.okx_client.OKXClient.get_live_quote')
     @patch('src.okx_client.requests.post', side_effect=requests.exceptions.HTTPError("500 Server Error"))
-    @patch('time.sleep', return_value=None)
+    @patch('src.okx_client.sleep_with_backoff', return_value=None)
     def test_execute_swap_retry_logic(self, mock_sleep, mock_post, mock_get_live_quote):
-        """Test the retry logic for execute_swap."""
+        """Test the retry logic for execute_swap with backoff helper."""
         mock_get_live_quote.return_value = {"success": True, "data": {}}
         client = OKXClient(max_retries=3, retry_delay=0.1)
         result = client.execute_swap("from", "to", "100", "wallet_addr", private_key="pk_test", dry_run=False)
 
         self.assertFalse(result['success'])
-        self.assertEqual(result['error'], "Failed to execute swap after multiple retries.")
+        self.assertIn('error', result)
         self.assertEqual(mock_post.call_count, 3)
+        self.assertEqual(mock_sleep.call_count, 3)
+
+    @patch('src.circuit.breaker.allow_request', return_value=False)
+    def test_breaker_short_circuits_quote(self, mock_allow):
+        client = OKXClient()
+        res = client.get_live_quote("a", "b", "1")
+        self.assertFalse(res["success"]) 
+        self.assertEqual(res.get("code"), "E_OKX_HTTP")
+        self.assertIn("circuit", res)
+
+    @patch('src.okx_client.OKXClient.get_live_quote', return_value={"success": True, "data": {}})
+    @patch('src.circuit.breaker.allow_request', return_value=False)
+    def test_breaker_short_circuits_swap(self, mock_allow, mock_quote):
+        client = OKXClient()
+        res = client.execute_swap("a", "b", "1", "addr", private_key="pk", dry_run=False)
+        self.assertFalse(res["success"]) 
+        self.assertEqual(res.get("code"), "E_OKX_HTTP")
+        self.assertIn("circuit", res)
+
+    @patch('src.circuit.breaker.allow_request', return_value=False)
+    def test_breaker_short_circuits_history(self, mock_allow):
+        client = OKXClient()
+        res = client.get_historical_price("ETH-USD", 1, "7d")
+        self.assertFalse(res["success"]) 
+        self.assertEqual(res.get("code"), "E_OKX_HTTP")
+        self.assertIn("circuit", res)
 
     @patch.dict(os.environ, {
         "OKX_API_KEY": "test_key",

@@ -62,3 +62,35 @@ except Exception as e:
 
 - **Token resolution unavailable (during tests or early runtime)**
   - Mitigation: `TokenResolver` is lazily initialized in `confirm_swap` to prevent `NoneType` errors when the app has not yet run startup hooks.
+
+## Phase 3 Resilience: Backoff and Circuit Breaker
+
+- **Exponential Backoff with Jitter** (`src/retry.py`)
+  - All OKX Web3 calls now use exponential backoff with jitter between retries.
+  - Configurable via environment variables:
+    - `BACKOFF_BASE_SECS` (default 0.2)
+    - `BACKOFF_MULTIPLIER` (default 2.0)
+    - `BACKOFF_MAX_SECS` (default 5.0)
+    - `BACKOFF_JITTER_FRAC` (default 0.1)
+
+- **Circuit Breaker** (`src/circuit.py`)
+  - Per-endpoint breaker states: closed → open → half-open → closed.
+  - Opens after N consecutive failures; short-circuits requests while open.
+  - After cooldown, transitions to half-open and allows a trial request; success closes the breaker, failure re-opens it.
+  - Configurable via environment variables:
+    - `CIRCUIT_FAIL_THRESHOLD` (default 5)
+    - `CIRCUIT_RESET_SECS` (default 30)
+  - Short-circuit responses return a recognizable structure:
+    ```json
+    {
+      "success": false,
+      "error": "Service temporarily unavailable (protective pause)",
+      "code": "E_OKX_HTTP",
+      "circuit": {"endpoint": "...", "state": "open", "retry_after_secs": 30}
+    }
+    ```
+
+- **Error Codes**
+  - Network/HTTP failures are surfaced with `code: E_OKX_HTTP` to reuse existing guards.
+
+These mechanisms ensure handlers can gracefully inform users during upstream outages and retry transient issues without hammering external services.
