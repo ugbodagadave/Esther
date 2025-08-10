@@ -1,11 +1,13 @@
 # Project Progress: Esther
 
 ## 1. Current Status
-**Phase 2: Live Trading & Advanced Orders**
-
-The project has entered Phase 2, focusing on implementing live trading functionality and advanced order types.
+**Error Handling Overhaul**: Phase 1 (centralized errors + guards) and Phase 2 (timeouts) completed.
 
 ## 2. What Works
+- Centralized error taxonomy (`src/error_codes.py`) and per-update correlation IDs (`src/correlation.py`).
+- Guarded handlers + global error handler (`src/error_handler.py`) integrated; key handlers wrapped in `src/main.py`.
+- Conversation watchdogs: timeouts scheduled for `AWAIT_CONFIRMATION`, `AWAIT_WEB_APP_DATA`, alerts, wallet selection, and live trading confirmation.
+- Cancel flow via inline "❌ Cancel" for timed-out states.
 - **Live Trading User Settings**: Users can now set a default wallet and enable/disable live trading using natural language or the `/setdefaultwallet` and `/enablelivetrading` commands. Validation now occurs even during simulations when live trading is enabled.
 - **Confirm Swap Flow**: Fixed and hardened. Validates presence of default wallet if live trading is enabled; aborts with clear messages when missing/not found; lazily initializes `TokenResolver` to avoid startup/test race conditions.
 - **Insights (Real Data)**: Insights now use `PortfolioService.get_snapshot()` to build holdings before invoking Gemini Pro. Minimal OKX price enrichment is applied.
@@ -53,6 +55,8 @@ The project has entered Phase 2, focusing on implementing live trading functiona
     - **OKX Client**: Added the `OK-ACCESS-PROJECT` header to all requests in `okx_client.py` to ensure API parity.
 
 ## 3. What's Left to Build
+- Phase 3 (Resilience): Exponential backoff with jitter helper, circuit breaker around OKX calls, short-circuit messaging, tests.
+- Phase 4 (LLM FailureAdvisor): On-error guidance only, actions, and fallbacks; tests.
 - **A6 – Manual Snapshot Command**: Add a `/snapshot` admin command (idempotent daily save) and tests.
 - **A7 – Advanced Orders**: Persist stop-loss/take-profit, evaluate in monitoring, and notify.
 - **A8 – Rebalance Slippage**: Per-trade slippage config and per-leg simulation in DRY_RUN.

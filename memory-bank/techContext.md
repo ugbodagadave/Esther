@@ -41,3 +41,9 @@
 ## 7. Insights Data Source (A5)
 - Insights now consume `PortfolioService.get_snapshot()` to build holdings `{symbol: quantity}`.
 - Minimal enrichment from OKX DEX quote endpoints is included in the prompt context.
+
+## 8. Error Handling (Phases 1–2)
+- Centralized error codes with default user messages and remediation hints.
+- Guarded handlers ensure no-stuck conversations; global error handler for uncaught exceptions.
+- Correlation IDs via contextvars for async-safe tracing.
+- Conversation watchdog timeouts scheduled for long-wait states; inline cancel action.

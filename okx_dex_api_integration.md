@@ -44,10 +44,11 @@ These calls are **GET** requests signed with the same HMAC flow as trading reque
 
 The `OKXClient` includes robust error handling to manage potential issues with the API:
 
-- **Retry Mechanism**: Failed requests are automatically retried with exponential backoff
-- **HTTP Status Code Handling**: Specific handling for 401 (Unauthorized), 429 (Rate Limited), and 500+ (Server Errors)
-- **Request Validation**: Ensures all required parameters are present and properly formatted
-- **Chain ID Formatting**: Automatically converts chain IDs to strings to prevent API formatting errors
+- Retry Mechanism: Failed requests are retried (Phase 3 will switch to exponential backoff with jitter)
+- Circuit Breaker (Phase 3): Calls short‑circuit during outages and recover after a cool‑down
+- HTTP Status Code Handling: Specific handling for common statuses
+- Request Validation: Ensures all required parameters are present and properly formatted
+- Chain ID Formatting: Automatically converts chain IDs to strings to prevent API formatting errors
 
 ### E. Portfolio Integration
 

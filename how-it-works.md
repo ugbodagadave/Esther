@@ -339,11 +339,7 @@ Esther employs a comprehensive testing strategy to ensure reliability and stabil
 
 ## 3.1 Error Handling Architecture
 
-- Centralized error codes (`src/error_codes.py`) map internal failures to consistent user messages and remediation hints.
-- A `guarded_handler` decorator (`src/error_handler.py`) wraps Telegram handlers to:
-  - Catch unexpected exceptions
-  - Log with a per-update correlation ID
-  - Clear conversation state and end the flow to avoid being stuck
-  - Send a safe fallback message to the user
-- A global error handler is registered on the Telegram `Application` to catch uncaught exceptions anywhere in the stack and notify users gracefully.
-- Correlation IDs are managed via `src/correlation.py` using contextvars to aid log-based debugging across async boundaries.
+- Phase 1 (done): Centralized error codes (`src/error_codes.py`), per-update correlation IDs (`src/correlation.py`), guarded handlers and a global error handler (`src/error_handler.py`) applied to key flows in `src/main.py`.
+- Phase 2 (done): Conversation watchdogs with timeouts for `AWAIT_*` states and an inline cancel flow ensure chats never get stuck.
+- Phase 3 (next): Add exponential backoff with jitter and a circuit breaker around OKX calls to fail fast during outages and recover gracefully.
+- Phase 4 (planned): LLM FailureAdvisor to turn internal failures into concise, actionable guidance; strictly on-error and feature-flagged.
