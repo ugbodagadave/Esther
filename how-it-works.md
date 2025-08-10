@@ -337,7 +337,7 @@ Esther employs a comprehensive testing strategy to ensure reliability and stabil
 - Use short, descriptive commit messages
 - Maintain test coverage for all new features
 
-## 3.1 Error Handling Architecture
+## 13 Error Handling Architecture
 
 - Phase 1 (done): Centralized error codes (`src/error_codes.py`), per-update correlation IDs (`src/correlation.py`), guarded handlers and a global error handler (`src/error_handler.py`) applied to key flows in `src/main.py`.
 - Phase 2 (done): Conversation watchdogs with timeouts for `AWAIT_*` states and an inline cancel flow ensure chats never get stuck.
