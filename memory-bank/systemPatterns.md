@@ -42,3 +42,5 @@ graph TD
 - **Validation-First Confirmation**: Before executing a swap, validate user settings that affect safety (e.g., live trading enabled requires a default wallet) even if environment is in simulation mode.
 - **Lazy Initialization**: Services created during app startup (e.g., `TokenResolver`) should be lazily checked/instantiated in handlers to prevent test/startup race conditions.
 - **Symbol Normalization**: Normalize symbols that differ between instrument and token contexts (e.g., `BTC`→`WBTC` for EVM swaps; `BTC-USD` for market candles) in a single resolver to keep business logic consistent.
+- **Human-Readable Help Menu**: Present capabilities as bullets with em dashes, no code backticks, optimized for quick scanning.
+- **Mobile WebApp Fallback**: Prefer inline WebApp buttons, with an optional reply-keyboard WebApp fallback behind `MOBILE_WEBAPP_FALLBACK` for Android clients that require it.

@@ -24,6 +24,8 @@ from telegram.ext import (
 )
 from dotenv import load_dotenv
 
+from src.error_handler import guarded_handler, add_global_error_handler
+
 # Load environment variables from .env file
 load_dotenv()
 
@@ -41,6 +43,7 @@ logger = logging.getLogger(__name__)
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 ADMIN_SECRET_KEY = os.getenv("ADMIN_SECRET_KEY")
 WEBHOOK_URL = os.getenv("WEBHOOK_URL")
+MOBILE_WEBAPP_FALLBACK = os.getenv("MOBILE_WEBAPP_FALLBACK", "false").lower() in ("1", "true", "yes")
 PORT = int(os.environ.get('PORT', 8080))
 
 from src.nlp import NLPClient
@@ -73,6 +76,56 @@ AWAIT_ALERT_SYMBOL, AWAIT_ALERT_CONDITION, AWAIT_ALERT_PRICE = 5, 6, 7
 AWAIT_REBALANCE_CONFIRMATION = 8
 AWAIT_WALLET_SELECTION = 10
 AWAIT_LIVE_TRADING_CONFIRMATION = 11
+
+HANDLER_TIMEOUT_SECS = int(os.getenv("HANDLER_TIMEOUT_SECS", "180"))
+
+async def cancel_any_flow(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    query = update.callback_query
+    if query:
+        await query.answer()
+        await query.edit_message_text(text="Cancelled.")
+    context.user_data.clear()
+    return ConversationHandler.END
+
+
+def _timeout_job_name(chat_id: int, state_name: str) -> str:
+    return f"timeout:{chat_id}:{state_name}"
+
+
+def schedule_state_timeout(update: Update, context: ContextTypes.DEFAULT_TYPE, state_name: str):
+    try:
+        chat_id = update.effective_chat.id if hasattr(update, 'effective_chat') else None
+        if chat_id is None:
+            return
+        name = _timeout_job_name(chat_id, state_name)
+        # Cancel existing timeout for this state
+        for job in context.job_queue.get_jobs_by_name(name):
+            job.schedule_removal()
+        # Schedule new timeout
+        context.job_queue.run_once(
+            timeout_job,
+            HANDLER_TIMEOUT_SECS,
+            name=name,
+            chat_id=chat_id,
+            data={"state": state_name},
+        )
+    except Exception as e:
+        logger.warning(f"Failed to schedule timeout for {state_name}: {e}")
+
+
+async def timeout_job(context: ContextTypes.DEFAULT_TYPE):
+    try:
+        chat_id = context.job.chat_id
+        state_name = (context.job.data or {}).get("state", "this step")
+        keyboard = [[InlineKeyboardButton("❌ Cancel", callback_data="cancel_flow")]]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        await context.bot.send_message(
+            chat_id=chat_id,
+            text=f"This step ({state_name}) timed out. You can cancel and try again.",
+            reply_markup=reply_markup,
+        )
+    except Exception as e:
+        logger.error(f"Timeout job failed to notify user: {e}")
 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -155,27 +208,27 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     help_text = (
         "Here's what I can do for you:\n\n"
         "📊 Portfolio & Performance\n"
-        "   - `Show me my portfolio`: Sync and summarize your assets.\n"
-        "   - `What's my performance 30d?`: See portfolio performance over a period.\n"
-        "   - `Show price chart for BTC 7d`: Visualize token price history.\n\n"
+        "  • Show me my portfolio — Sync and summarize your assets.\n"
+        "  • What's my performance 30d? — See portfolio performance over a period.\n"
+        "  • Show price chart for BTC 7d — Visualize token price history.\n\n"
         "👛 Wallets\n"
-        "   - `Add a new wallet`: Connect a wallet securely via web app.\n"
-        "   - `List my wallets`: See all saved wallets.\n"
-        "   - `Delete a wallet`: Remove a wallet from your profile.\n"
-        "   - `/setdefaultwallet`: Choose the default wallet for trading.\n\n"
+        "  • Add a new wallet — Connect a wallet securely via web app.\n"
+        "  • List my wallets — See all saved wallets.\n"
+        "  • Delete a wallet — Remove a wallet from your profile.\n"
+        "  • /setdefaultwallet — Choose the default wallet for trading.\n\n"
         "💱 Trading & Quotes\n"
-        "   - `Buy 0.1 ETH with USDC`: Simulate or execute a swap.\n"
-        "   - `Sell 50 USDC for ETH`: Convert between tokens.\n"
-        "   - `What is the price of BTC?`: Quick price check.\n\n"
+        "  • Buy 0.1 ETH with USDC — Simulate or execute a swap.\n"
+        "  • Sell 50 USDC for ETH — Convert between tokens.\n"
+        "  • What is the price of BTC? — Quick price check.\n\n"
         "🔔 Alerts\n"
-        "   - `Set a price alert`: Be notified when targets are hit.\n"
-        "   - `List my alerts`: Review active alerts.\n\n"
+        "  • Set a price alert — Be notified when targets are hit.\n"
+        "  • List my alerts — Review active alerts.\n\n"
         "🧠 Insights & Rebalance\n"
-        "   - `Give me insights`: Personalized, portfolio-aware market notes.\n"
-        "   - `Rebalance my portfolio`: Get a step-by-step trade plan.\n\n"
+        "  • Give me insights — Personalized, portfolio‑aware market notes.\n"
+        "  • Rebalance my portfolio — Get a step‑by‑step trade plan.\n\n"
         "⚙️ Live trading controls\n"
-        "   - `/enablelivetrading`: Toggle live mode (off by default).\n"
-        "   - `Help`: Ask me anything in natural language."
+        "  • /enablelivetrading — Toggle live mode (off by default).\n"
+        "  • Help — Ask me anything in natural language."
     )
     # Check if the call is from a button click
     if update.callback_query:
@@ -258,6 +311,7 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int
         return ConversationHandler.END
 
 
+@guarded_handler("E_OKX_API")
 async def get_price_chart_intent(update: Update, context: ContextTypes.DEFAULT_TYPE, entities: dict):
     """Handles the get_price_chart intent."""
     symbol = entities.get("symbol")
@@ -290,6 +344,7 @@ async def get_price_chart_intent(update: Update, context: ContextTypes.DEFAULT_T
     await update.message.reply_photo(photo=chart_image, caption=f"Price chart for {symbol.upper()} ({period})")
 
 
+@guarded_handler("E_OKX_API")
 async def get_price_intent(update: Update, context: ContextTypes.DEFAULT_TYPE, entities: dict):
     """Handles the get_price intent."""
     symbol = entities.get("symbol")
@@ -324,6 +379,7 @@ async def get_price_intent(update: Update, context: ContextTypes.DEFAULT_TYPE, e
     else:
         await update.message.reply_text(f"Sorry, I couldn't fetch a quote. Error: {quote_response.get('error')}")
 
+@guarded_handler("E_OKX_API")
 async def buy_token_intent(update: Update, context: ContextTypes.DEFAULT_TYPE, entities: dict) -> int:
     """Handles the buy_token intent and starts the confirmation conversation."""
     symbol = entities.get("symbol")
@@ -405,8 +461,10 @@ async def buy_token_intent(update: Update, context: ContextTypes.DEFAULT_TYPE, e
     
     await update.message.reply_text(response_message, reply_markup=reply_markup, parse_mode='Markdown')
 
+    schedule_state_timeout(update, context, "AWAIT_CONFIRMATION")
     return AWAIT_CONFIRMATION
 
+@guarded_handler("E_OKX_API")
 async def confirm_swap(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Executes the swap after user confirmation, handling both live and simulated trades."""
     query = update.callback_query
@@ -535,6 +593,7 @@ async def cancel_swap(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int
 
     return ConversationHandler.END
 
+@guarded_handler("E_OKX_API")
 async def sell_token_intent(update: Update, context: ContextTypes.DEFAULT_TYPE, entities: dict) -> int:
     """Handles the sell_token intent and starts the confirmation conversation."""
     symbol = entities.get("symbol")
@@ -616,6 +675,7 @@ async def sell_token_intent(update: Update, context: ContextTypes.DEFAULT_TYPE, 
     
     await update.message.reply_text(response_message, reply_markup=reply_markup, parse_mode='Markdown')
 
+    schedule_state_timeout(update, context, "AWAIT_CONFIRMATION")
     return AWAIT_CONFIRMATION
 
 async def set_stop_loss_intent(update: Update, context: ContextTypes.DEFAULT_TYPE, entities: dict) -> int:
@@ -646,6 +706,7 @@ async def set_take_profit_intent(update: Update, context: ContextTypes.DEFAULT_T
     await update.message.reply_text(f"Alert set: I will notify you if {symbol.upper()} > ${price}.")
     return ConversationHandler.END
 
+@guarded_handler("E_UNKNOWN")
 async def insights(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Provides personalized market insights."""
     user = update.effective_user
@@ -672,6 +733,7 @@ def _normalize_chart_period(period_str: str) -> str:
     # Default
     return '7d'
 
+@guarded_handler("E_DB_QUERY")
 async def portfolio_performance(update: Update, context: ContextTypes.DEFAULT_TYPE, entities: dict):
     """Handles the get_portfolio_performance intent."""
     user = update.effective_user
@@ -728,6 +790,7 @@ async def rebalance_portfolio_start(update: Update, context: ContextTypes.DEFAUL
     
     return await present_next_rebalance_swap(update, context)
 
+@guarded_handler("E_OKX_API")
 async def present_next_rebalance_swap(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Presents the next swap in the rebalance plan for confirmation."""
     plan = context.user_data.get('rebalance_plan')
@@ -753,6 +816,7 @@ async def present_next_rebalance_swap(update: Update, context: ContextTypes.DEFA
         return await sell_token_intent(update, context, entities)
 
 # --- Portfolio Command ---
+@guarded_handler("E_DB_QUERY")
 async def portfolio(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Synchronize and display the user's portfolio."""
     user = update.effective_user
@@ -802,8 +866,26 @@ async def received_wallet_address(update: Update, context: ContextTypes.DEFAULT_
         "Great. Now, please click the button below to securely enter your private key.",
         reply_markup=reply_markup
     )
+
+    # Optional mobile fallback: some mobile clients open Web Apps more reliably via reply keyboard
+    if MOBILE_WEBAPP_FALLBACK:
+        try:
+            from telegram import ReplyKeyboardMarkup, KeyboardButton
+            reply_kb = ReplyKeyboardMarkup(
+                [[KeyboardButton("Enter Private Key Securely", web_app=WebAppInfo(url=f"{WEBHOOK_URL}/web-app/index.html"))]],
+                resize_keyboard=True,
+                one_time_keyboard=True,
+            )
+            await update.message.reply_text(
+                "If the button above didn’t open on mobile, use this keyboard button:",
+                reply_markup=reply_kb
+            )
+        except Exception as e:
+            logger.warning(f"Could not send mobile WebApp fallback keyboard: {e}")
+    schedule_state_timeout(update, context, "AWAIT_WEB_APP_DATA")
     return AWAIT_WEB_APP_DATA
 
+@guarded_handler("E_DB_QUERY")
 async def received_private_key(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Receives the private key from the web app, saves the wallet, and ends the conversation."""
     user = update.effective_user
@@ -839,6 +921,7 @@ async def received_private_key(update: Update, context: ContextTypes.DEFAULT_TYP
 
     return ConversationHandler.END
 
+@guarded_handler("E_DB_QUERY")
 async def list_wallets(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Lists all of the user's saved wallets."""
     user = update.effective_user
@@ -955,6 +1038,7 @@ async def set_default_wallet_start(update: Update, context: ContextTypes.DEFAULT
             keyboard = [[InlineKeyboardButton(f"{name} ({address[:6]}...{address[-4:]})", callback_data=f"set_wallet_{wallet_id}")] for wallet_id, name, address in wallets]
             reply_markup = InlineKeyboardMarkup(keyboard)
             await update.message.reply_text("Which wallet would you like to set as your default for trading?", reply_markup=reply_markup)
+            schedule_state_timeout(update, context, "AWAIT_WALLET_SELECTION")
             return AWAIT_WALLET_SELECTION
 
     except Exception as e:
@@ -1020,6 +1104,7 @@ async def enable_live_trading_start(update: Update, context: ContextTypes.DEFAUL
             ]
             reply_markup = InlineKeyboardMarkup(keyboard)
             await update.message.reply_text(f"Live trading is currently **{status}**. Would you like to change this setting?", reply_markup=reply_markup, parse_mode='Markdown')
+            schedule_state_timeout(update, context, "AWAIT_LIVE_TRADING_CONFIRMATION")
             return AWAIT_LIVE_TRADING_CONFIRMATION
 
     except Exception as e:
@@ -1063,6 +1148,7 @@ async def enable_live_trading_callback(update: Update, context: ContextTypes.DEF
 async def add_alert_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Starts the conversation to add a new price alert."""
     await update.message.reply_text("Let's set up a price alert. Which token symbol would you like to monitor (e.g., BTC, ETH)?")
+    schedule_state_timeout(update, context, "AWAIT_ALERT_SYMBOL")
     return AWAIT_ALERT_SYMBOL
 
 async def received_alert_symbol(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
@@ -1076,6 +1162,7 @@ async def received_alert_symbol(update: Update, context: ContextTypes.DEFAULT_TY
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
     await update.message.reply_text("Great. Do you want to be alerted when the price is above or below a certain value?", reply_markup=reply_markup)
+    schedule_state_timeout(update, context, "AWAIT_ALERT_CONDITION")
     return AWAIT_ALERT_CONDITION
 
 async def received_alert_condition(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
@@ -1084,6 +1171,7 @@ async def received_alert_condition(update: Update, context: ContextTypes.DEFAULT
     await query.answer()
     context.user_data['alert_condition'] = query.data.split("_")[1]
     await query.edit_message_text(text=f"Condition set to '{context.user_data['alert_condition']}'. Now, what is the target price in USD?")
+    schedule_state_timeout(update, context, "AWAIT_ALERT_PRICE")
     return AWAIT_ALERT_PRICE
 
 async def received_alert_price(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
@@ -1124,6 +1212,7 @@ async def received_alert_price(update: Update, context: ContextTypes.DEFAULT_TYP
 
     return ConversationHandler.END
 
+@guarded_handler("E_DB_QUERY")
 async def list_alerts(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Lists all of the user's active alerts."""
     user = update.effective_user
@@ -1177,18 +1266,37 @@ conv_handler = ConversationHandler(
         AWAIT_CONFIRMATION: [
             CallbackQueryHandler(confirm_swap, pattern="^confirm_swap$"),
             CallbackQueryHandler(cancel_swap, pattern="^cancel_swap$"),
+            CallbackQueryHandler(cancel_any_flow, pattern="^cancel_flow$"),
         ],
         # States for adding a wallet
         AWAIT_WALLET_NAME: [MessageHandler(filters.TEXT & ~filters.COMMAND, received_wallet_name)],
         AWAIT_WALLET_ADDRESS: [MessageHandler(filters.TEXT & ~filters.COMMAND, received_wallet_address)],
-        AWAIT_WEB_APP_DATA: [MessageHandler(filters.StatusUpdate.WEB_APP_DATA, received_private_key)],
+        AWAIT_WEB_APP_DATA: [
+            MessageHandler(filters.StatusUpdate.WEB_APP_DATA, received_private_key),
+            CallbackQueryHandler(cancel_any_flow, pattern="^cancel_flow$"),
+        ],
         # States for adding an alert
-        AWAIT_ALERT_SYMBOL: [MessageHandler(filters.TEXT & ~filters.COMMAND, received_alert_symbol)],
-        AWAIT_ALERT_CONDITION: [CallbackQueryHandler(received_alert_condition, pattern="^alert_")],
-        AWAIT_ALERT_PRICE: [MessageHandler(filters.TEXT & ~filters.COMMAND, received_alert_price)],
+        AWAIT_ALERT_SYMBOL: [
+            MessageHandler(filters.TEXT & ~filters.COMMAND, received_alert_symbol),
+            CallbackQueryHandler(cancel_any_flow, pattern="^cancel_flow$"),
+        ],
+        AWAIT_ALERT_CONDITION: [
+            CallbackQueryHandler(received_alert_condition, pattern="^alert_"),
+            CallbackQueryHandler(cancel_any_flow, pattern="^cancel_flow$"),
+        ],
+        AWAIT_ALERT_PRICE: [
+            MessageHandler(filters.TEXT & ~filters.COMMAND, received_alert_price),
+            CallbackQueryHandler(cancel_any_flow, pattern="^cancel_flow$"),
+        ],
         # States for setting default wallet and enabling live trading
-        AWAIT_WALLET_SELECTION: [CallbackQueryHandler(set_default_wallet_callback, pattern="^set_wallet_")],
-        AWAIT_LIVE_TRADING_CONFIRMATION: [CallbackQueryHandler(enable_live_trading_callback, pattern="^enable_live_trading_")],
+        AWAIT_WALLET_SELECTION: [
+            CallbackQueryHandler(set_default_wallet_callback, pattern="^set_wallet_"),
+            CallbackQueryHandler(cancel_any_flow, pattern="^cancel_flow$"),
+        ],
+        AWAIT_LIVE_TRADING_CONFIRMATION: [
+            CallbackQueryHandler(enable_live_trading_callback, pattern="^enable_live_trading_"),
+            CallbackQueryHandler(cancel_any_flow, pattern="^cancel_flow$"),
+        ],
     },
     fallbacks=[CommandHandler("start", start)],
     per_message=False,
@@ -1249,6 +1357,9 @@ async def shutdown_event():
 @app.get('/')
 def health_check():
     return {"status": "ok"}
+
+# Register global error handler once the application is built
+add_global_error_handler(bot_app)
 
 @app.post('/webhook')
 async def telegram_webhook(request: Request):

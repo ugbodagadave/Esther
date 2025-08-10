@@ -44,10 +44,11 @@ These calls are **GET** requests signed with the same HMAC flow as trading reque
 
 The `OKXClient` includes robust error handling to manage potential issues with the API:
 
-- **Retry Mechanism**: Failed requests are automatically retried with exponential backoff
-- **HTTP Status Code Handling**: Specific handling for 401 (Unauthorized), 429 (Rate Limited), and 500+ (Server Errors)
-- **Request Validation**: Ensures all required parameters are present and properly formatted
-- **Chain ID Formatting**: Automatically converts chain IDs to strings to prevent API formatting errors
+- Retry Mechanism: Failed requests are retried (Phase 3 will switch to exponential backoff with jitter)
+- Circuit Breaker (Phase 3): Calls short‑circuit during outages and recover after a cool‑down
+- HTTP Status Code Handling: Specific handling for common statuses
+- Request Validation: Ensures all required parameters are present and properly formatted
+- Chain ID Formatting: Automatically converts chain IDs to strings to prevent API formatting errors
 
 ### E. Portfolio Integration
 
@@ -166,3 +167,5 @@ X Layer is OKX’s zkEVM Layer‑2 built with Polygon CDK, designed for low fees
 - DRY‑RUN behavior remains unchanged.
 
 This approach keeps Esther’s current architecture intact while unlocking lower‑cost execution paths on X Layer.
+
+> Note: The in-chat Help menu has been refreshed for clearer human reading (bulleted items, no backticks).

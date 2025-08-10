@@ -9,19 +9,18 @@
 - **Database**: **PostgreSQL** is used as the relational database, hosted on Render's free tier.
 
 ## 2. Core Integrations
-- **OKX DEX API**: This is the central integration for all trading-related functionality. It is used to fetch market data, execute trades, and manage user portfolios.
+- **OKX DEX API**: Central integration for quotes/swaps/portfolio.
+- **OKX X Layer**: zkEVM L2 (Polygon CDK, OKB gas). Esther can target X Layer by passing its chain identifier to OKX Aggregator; portfolio sync includes X Layer addresses. No contract rewrites needed (EVM compatible).
 - **News APIs**: Integration with a reliable crypto news source like **NewsAPI** or **CryptoCompare API** is required to power news aggregation and sentiment analysis.
 - **Blockchain Explorers**: APIs from services like **Etherscan** will be used to verify transaction statuses and fetch other on-chain data.
 
 ## 3. Development & Deployment
-- **Development Environment**: Standard Python tools, including `venv` and `requirements.txt`, are used for managing dependencies.
-- **Version Control**: **Git** is used for version control, with the repository hosted on GitHub.
-- **Deployment**:
-    - **Current (Development)**: The application is deployed on **Render** using a stable **polling** mechanism (`python src/main.py`). This is ideal for the current development and debugging phase.
-    - **Future (Production)**: The application is designed to be deployed using a **webhook** model with a WSGI server like **Gunicorn**, which is more scalable for production environments.
+- Render hosting; webhook via `WEBHOOK_URL` when set, otherwise polling.
+- Telegram Web App (private key input) served at `/web-app/index.html`.
+- Android inline WebApp requires BotFather `/setdomain` configured with the HTTPS origin.
 
 ## 4. Security & API Key Management
-- All sensitive credentials, including Telegram Bot Tokens, OKX DEX API keys, and Gemini API keys, are managed securely using environment variables.
+- Environment variables (subset): `TELEGRAM_BOT_TOKEN`, `GEMINI_API_KEY`, `DATABASE_URL`, `ENCRYPTION_KEY`, `OKX_API_KEY`, `OKX_API_SECRET`, `OKX_API_PASSPHRASE`, `OKX_PROJECT_ID`, `WEBHOOK_URL`, `DRY_RUN_MODE`, optional `TEST_WALLET_ADDRESS`, `TEST_WALLET_PRIVATE_KEY`, `PORTFOLIO_SYNC_INTERVAL`, `ALERT_QUOTE_DELAY_MS`, `ALERT_ERROR_BACKOFF_MS`, `MOBILE_WEBAPP_FALLBACK`, `ADMIN_SECRET_KEY`.
 - User-specific API keys or wallet information stored in the database are encrypted to prevent unauthorized access.
 
 ## 5. Trading Flow Technical Notes
@@ -42,3 +41,9 @@
 ## 7. Insights Data Source (A5)
 - Insights now consume `PortfolioService.get_snapshot()` to build holdings `{symbol: quantity}`.
 - Minimal enrichment from OKX DEX quote endpoints is included in the prompt context.
+
+## 8. Error Handling (Phases 1–2)
+- Centralized error codes with default user messages and remediation hints.
+- Guarded handlers ensure no-stuck conversations; global error handler for uncaught exceptions.
+- Correlation IDs via contextvars for async-safe tracing.
+- Conversation watchdog timeouts scheduled for long-wait states; inline cancel action.

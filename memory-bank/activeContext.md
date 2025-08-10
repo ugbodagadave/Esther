@@ -1,8 +1,8 @@
 # Active Context: Esther
 
 ## 1. Current Focus
-- Completed A4 (alert throttling/backoff) and A5 (insights from real snapshots).
-- Next: implement A6 `/snapshot` admin command (idempotent daily save) with tests.
+- Completed Error Handling Phases 1 & 2 (centralized errors, guards, global handler, timeouts, cancel flow).
+- Next: Phase 3 – exponential backoff with jitter and circuit breaker for OKX clients; tests.
 
 ## 2. Recent Changes & Decisions
 - **Live Trading Settings (Completed)**: `/setdefaultwallet` and `/enablelivetrading` commands and NLP intents wired; DB schema in place.
@@ -11,9 +11,9 @@
 - **A5 – Insights**: Switched to `PortfolioService.get_snapshot()` for portfolio holdings; kept minimal price enrichment; tests updated to mock snapshot.
 
 ## 3. Next Steps
-1. Implement `/snapshot` admin command (A6) and unit tests.
-2. Plan A7 advanced orders persistence and monitoring checks.
-3. Add E2E coverage once `/snapshot` is available.
+1. Implement Phase 3 resilience (backoff helper + circuit breaker) with unit tests.
+2. Phase 4 FailureAdvisor integration for on-error guidance (feature-flagged) and tests.
+3. Revisit A6 `/snapshot` after resilience work.
 
 ## 4. Active Learnings & Insights
 - Validation should reflect user intent state (live enabled) even when environment is in simulation mode.

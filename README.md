@@ -66,18 +66,50 @@ For a more detailed breakdown of how these features work, please see the [How It
 3.  **Add Your Secret Keys:**
     Create a file named `.env` in the main folder and add your secret keys:
     ```dotenv
-    # For Telegram and the AI
+    # Core
     TELEGRAM_BOT_TOKEN="your_telegram_bot_token"
     GEMINI_API_KEY="your_gemini_api_key"
+    DATABASE_URL="your_postgresql_connection_string"
+    ENCRYPTION_KEY="your_32_byte_base64_fernet_key"
 
-    # For the OKX Crypto Exchange
+    # OKX DEX API
     OKX_API_KEY="your_okx_api_key"
     OKX_API_SECRET="your_okx_api_secret"
     OKX_API_PASSPHRASE="your_okx_api_passphrase"
-    OKX_PROJECT_ID="your_okx_project_id"
+    OKX_PROJECT_ID="your_okx_project_id"  # injected as OK-ACCESS-PROJECT
 
-    # For the Database
-    DATABASE_URL="your_postgresql_connection_string"
+    # Webhook / Hosting
+    WEBHOOK_URL="https://your-public-domain"  # Render URL; if unset, bot uses polling
+
+    # Behavior
+    DRY_RUN_MODE="True"  # default simulation mode
+
+    # Monitoring (optional)
+    PORTFOLIO_SYNC_INTERVAL="600"       # seconds (default: 600)
+    ALERT_QUOTE_DELAY_MS="100"          # default 100
+    ALERT_ERROR_BACKOFF_MS="500"        # default 500
+
+    # Mobile Web App fallback (optional)
+    MOBILE_WEBAPP_FALLBACK="False"  # set True to also send a reply-keyboard WebApp button on mobile
+
+    # Admin (optional but recommended for dev tools)
+    ADMIN_SECRET_KEY="a_long_random_string"
+
+    # Error Handling (optional)
+    ERROR_ADVISOR_ENABLED="False"       # set True to enable LLM FailureAdvisor on error paths
+
+    # Handler timeouts (optional)
+    HANDLER_TIMEOUT_SECS="180"          # per-step watchdog timeout in seconds
+
+    # Circuit Breaker (optional)
+    CIRCUIT_FAIL_THRESHOLD="5"          # consecutive failures to open breaker
+    CIRCUIT_RESET_SECS="30"             # cooldown before half-open trial
+
+    # Backoff Tuning (optional)
+    BACKOFF_BASE_SECS="0.2"
+    BACKOFF_MULTIPLIER="2.0"
+    BACKOFF_MAX_SECS="5.0"
+    BACKOFF_JITTER_FRAC="0.1"
     ```
 
 4.  **Start the Bot:**
@@ -105,6 +137,8 @@ See the concise plan in `okx_dex_api_integration.md`.
   - Enable live trading in-chat via `/enablelivetrading`.
   - Set a default wallet via `/setdefaultwallet`.
 - When live trading is enabled but `DRY_RUN_MODE` remains `True`, swaps are still simulated; however, the bot validates that a default wallet exists in your account. If missing or not found, the operation aborts with a clear message.
+
+Esther includes a robust, phased error handling system for clear guidance during failures. See `error_handling.md` for details.
 
 ## 🙏 Acknowledgements
 

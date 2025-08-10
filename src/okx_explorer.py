@@ -7,6 +7,9 @@ import base64
 from datetime import datetime, timezone
 from dotenv import load_dotenv
 
+from src.retry import compute_exponential_backoff_delays, sleep_with_backoff
+from src.circuit import breaker, short_circuit_response
+
 # Load environment variables early so they are available for any import order
 load_dotenv()
 
@@ -63,29 +66,44 @@ class OKXExplorer:
             headers["OK-ACCESS-PROJECT"] = project
         return headers
 
-    def _get(self, request_path: str, params: dict | None = None) -> dict:
-        """Generic GET with retry and unified response shape."""
+    def _get(self, request_path: str, params: dict | None = None, endpoint_key: str | None = None) -> dict:
+        """Generic GET with exponential backoff, circuit breaker, and unified response shape."""
+        if endpoint_key and not breaker.allow_request(endpoint_key):
+            return short_circuit_response(endpoint_key)
+
         query = "&".join([f"{k}={v}" for k, v in (params or {}).items()])
         full_path = f"{request_path}?{query}" if query else request_path
         url = f"{self.base_url}{full_path}"
 
+        delays = compute_exponential_backoff_delays(self.max_retries)
+        last_error = None
         for attempt in range(self.max_retries):
             try:
                 resp = requests.get(url, headers=self._headers("GET", full_path), timeout=10)
                 resp.raise_for_status()
                 payload = resp.json()
                 if payload.get("code") == "0":
+                    if endpoint_key:
+                        breaker.record_success(endpoint_key)
                     return {"success": True, "data": payload.get("data", [])}
                 error_msg = payload.get("msg", "Unknown API error")
                 logger.error("OKX Explorer API error: %s", error_msg)
-                return {"success": False, "error": error_msg}
+                last_error = error_msg
+                if endpoint_key:
+                    breaker.record_failure(endpoint_key)
             except requests.exceptions.HTTPError as e:
-                logger.warning("HTTP error (%s) on attempt %d – retrying in %ss", e, attempt + 1, self.retry_delay)
-                time.sleep(self.retry_delay)
+                logger.warning("HTTP error (%s) on attempt %d", e, attempt + 1)
+                last_error = str(e)
+                if endpoint_key:
+                    breaker.record_failure(endpoint_key)
             except requests.exceptions.RequestException as e:
                 logger.error("Network error while calling OKX Explorer: %s", e)
-                return {"success": False, "error": str(e)}
-        return {"success": False, "error": "Retries exhausted"}
+                last_error = str(e)
+                if endpoint_key:
+                    breaker.record_failure(endpoint_key)
+                break
+            sleep_with_backoff(attempt, delays)
+        return {"success": False, "error": last_error or "Retries exhausted", "code": "E_OKX_HTTP"}
 
     # ------------------------------------------------------------------
     # Public API methods
@@ -106,7 +124,11 @@ class OKXExplorer:
 
         chain_list = ",".join(map(str, chains))
         params = {"address": address, "chains": chain_list}
-        return self._get("/api/v5/dex/balance/all-token-balances-by-address", params)
+        return self._get(
+            "/api/v5/dex/balance/all-token-balances-by-address",
+            params,
+            endpoint_key="dex/balance/all-token-balances-by-address",
+        )
 
     def get_kline(self, symbol: str, bar: str = "1D", limit: int = 30) -> dict:
         """Return historical candle data.
@@ -114,11 +136,10 @@ class OKXExplorer:
         ``bar`` examples: 1m, 5m, 1H, 1D etc.
         ``limit`` max 100.
         """
-        # Note: The DEX market API uses a different endpoint for candles
-        # than the generic "explorer" one.
         return self._get(
             "/api/v5/dex/market/candlesticks-history",
             {"instId": f"{symbol.upper()}-USDT", "bar": bar, "limit": limit},
+            endpoint_key="dex/market/candlesticks-history",
         )
 
 
