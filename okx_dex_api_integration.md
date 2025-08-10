@@ -166,3 +166,5 @@ X Layer is OKX’s zkEVM Layer‑2 built with Polygon CDK, designed for low fees
 - DRY‑RUN behavior remains unchanged.
 
 This approach keeps Esther’s current architecture intact while unlocking lower‑cost execution paths on X Layer.
+
+> Note: The in-chat Help menu has been refreshed for clearer human reading (bulleted items, no backticks).
