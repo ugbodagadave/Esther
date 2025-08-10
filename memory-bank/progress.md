@@ -12,6 +12,10 @@ The project has entered Phase 2, focusing on implementing live trading functiona
 - **Alert Throttling/Backoff**: Price alert checks now include per-alert delay + jitter and error backoff with `ALERT_QUOTE_DELAY_MS` and `ALERT_ERROR_BACKOFF_MS` envs.
 - **E2E Coverage**: Extended to NLP intents (`set_default_wallet`, `enable_live_trading`), DB-level confirmation of default wallet/live trading, portfolio, rebalance, performance, price chart, quotes, and simulated swaps.
 - **Docs Updated**: `how-it-works.md`, project `README.md`, `TESTING_GUIDE.md`, and memory-bank docs reflect the above behaviors.
+- **DB Init Order Fix**: Schema creation reordered (wallets→users→dependents) to prevent "relation does not exist" after DB clears; `/start` handler can re-init schema on-the-fly.
+- **Admin Clear-DB Page**: Added note to restart or resend `/start` once after clearing.
+- **Help Menu UX**: Reformatted in-chat help with clear bullets and em dashes.
+- **Mobile WebApp**: Initialize/close on load; optional reply-keyboard fallback via `MOBILE_WEBAPP_FALLBACK` for Android.
 - **DB Migration for Live Trading**: The `users` table has been updated with `default_wallet_id` and `live_trading_enabled` columns.
 - **Simple Price Charts**: The new feature to allow users to request and view simple price charts for a given token and time period is fully implemented and working.
 - **Complete Project Foundation**: All core documentation (`Memory Bank`, `prd.md`, `plan.md`, etc.) is in place.

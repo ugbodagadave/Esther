@@ -98,17 +98,31 @@ Here is the step-by-step journey of a user command, from Telegram to execution a
 ## 3.6 Help Menu ("What I can do")
 
 - Portfolio & Performance
-  - Show my portfolio; Portfolio performance (e.g., "30d"); Price chart (e.g., "BTC 7d")
+  - Show my portfolio — Sync and summarize your assets
+  - What's my performance 30d? — See portfolio performance over a period
+  - Show price chart for BTC 7d — Visualize token price history
 - Wallets
-  - Add a new wallet (secure Web App), List wallets, Delete wallet, Set default wallet
+  - Add a new wallet — Connect a wallet securely via Web App
+  - List my wallets — See all saved wallets
+  - Delete a wallet — Remove a wallet from your profile
+  - /setdefaultwallet — Choose the default wallet for trading
 - Trading & Quotes
-  - Buy/Sell tokens, Quick price checks
+  - Buy 0.1 ETH with USDC — Simulate or execute a swap
+  - Sell 50 USDC for ETH — Convert between tokens
+  - What is the price of BTC? — Quick price check
 - Alerts
-  - Set a price alert, List active alerts
+  - Set a price alert — Be notified when targets are hit
+  - List my alerts — Review active alerts
 - Insights & Rebalance
-  - Generate insights, Rebalance plan
+  - Give me insights — Personalized, portfolio‑aware market notes
+  - Rebalance my portfolio — Get a step‑by‑step trade plan
 - Live trading controls
-  - Enable/disable live trading (off by default)
+  - /enablelivetrading — Toggle live mode (off by default)
+
+### Web App (Private Key) on Mobile
+- Android requires the bot’s domain to be set in BotFather (`/setdomain`) for inline Web Apps to open. Use only the HTTPS origin (e.g., `https://<your-app>.onrender.com`).
+- The Web App initializes with `Telegram.WebApp.ready()` and closes after submission.
+- Optional reply‑keyboard WebApp fallback can be enabled via `MOBILE_WEBAPP_FALLBACK=true`.
 
 ## 4. Conversational NLP & Natural Language Understanding
 
