@@ -77,6 +77,56 @@ AWAIT_REBALANCE_CONFIRMATION = 8
 AWAIT_WALLET_SELECTION = 10
 AWAIT_LIVE_TRADING_CONFIRMATION = 11
 
+HANDLER_TIMEOUT_SECS = int(os.getenv("HANDLER_TIMEOUT_SECS", "180"))
+
+async def cancel_any_flow(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    query = update.callback_query
+    if query:
+        await query.answer()
+        await query.edit_message_text(text="Cancelled.")
+    context.user_data.clear()
+    return ConversationHandler.END
+
+
+def _timeout_job_name(chat_id: int, state_name: str) -> str:
+    return f"timeout:{chat_id}:{state_name}"
+
+
+def schedule_state_timeout(update: Update, context: ContextTypes.DEFAULT_TYPE, state_name: str):
+    try:
+        chat_id = update.effective_chat.id if hasattr(update, 'effective_chat') else None
+        if chat_id is None:
+            return
+        name = _timeout_job_name(chat_id, state_name)
+        # Cancel existing timeout for this state
+        for job in context.job_queue.get_jobs_by_name(name):
+            job.schedule_removal()
+        # Schedule new timeout
+        context.job_queue.run_once(
+            timeout_job,
+            HANDLER_TIMEOUT_SECS,
+            name=name,
+            chat_id=chat_id,
+            data={"state": state_name},
+        )
+    except Exception as e:
+        logger.warning(f"Failed to schedule timeout for {state_name}: {e}")
+
+
+async def timeout_job(context: ContextTypes.DEFAULT_TYPE):
+    try:
+        chat_id = context.job.chat_id
+        state_name = (context.job.data or {}).get("state", "this step")
+        keyboard = [[InlineKeyboardButton("❌ Cancel", callback_data="cancel_flow")]]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        await context.bot.send_message(
+            chat_id=chat_id,
+            text=f"This step ({state_name}) timed out. You can cancel and try again.",
+            reply_markup=reply_markup,
+        )
+    except Exception as e:
+        logger.error(f"Timeout job failed to notify user: {e}")
+
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handles the /start command, registers the user, and provides a friendly welcome."""
@@ -411,6 +461,7 @@ async def buy_token_intent(update: Update, context: ContextTypes.DEFAULT_TYPE, e
     
     await update.message.reply_text(response_message, reply_markup=reply_markup, parse_mode='Markdown')
 
+    schedule_state_timeout(update, context, "AWAIT_CONFIRMATION")
     return AWAIT_CONFIRMATION
 
 @guarded_handler("E_OKX_API")
@@ -624,6 +675,7 @@ async def sell_token_intent(update: Update, context: ContextTypes.DEFAULT_TYPE, 
     
     await update.message.reply_text(response_message, reply_markup=reply_markup, parse_mode='Markdown')
 
+    schedule_state_timeout(update, context, "AWAIT_CONFIRMATION")
     return AWAIT_CONFIRMATION
 
 async def set_stop_loss_intent(update: Update, context: ContextTypes.DEFAULT_TYPE, entities: dict) -> int:
@@ -830,6 +882,7 @@ async def received_wallet_address(update: Update, context: ContextTypes.DEFAULT_
             )
         except Exception as e:
             logger.warning(f"Could not send mobile WebApp fallback keyboard: {e}")
+    schedule_state_timeout(update, context, "AWAIT_WEB_APP_DATA")
     return AWAIT_WEB_APP_DATA
 
 @guarded_handler("E_DB_QUERY")
@@ -985,6 +1038,7 @@ async def set_default_wallet_start(update: Update, context: ContextTypes.DEFAULT
             keyboard = [[InlineKeyboardButton(f"{name} ({address[:6]}...{address[-4:]})", callback_data=f"set_wallet_{wallet_id}")] for wallet_id, name, address in wallets]
             reply_markup = InlineKeyboardMarkup(keyboard)
             await update.message.reply_text("Which wallet would you like to set as your default for trading?", reply_markup=reply_markup)
+            schedule_state_timeout(update, context, "AWAIT_WALLET_SELECTION")
             return AWAIT_WALLET_SELECTION
 
     except Exception as e:
@@ -1050,6 +1104,7 @@ async def enable_live_trading_start(update: Update, context: ContextTypes.DEFAUL
             ]
             reply_markup = InlineKeyboardMarkup(keyboard)
             await update.message.reply_text(f"Live trading is currently **{status}**. Would you like to change this setting?", reply_markup=reply_markup, parse_mode='Markdown')
+            schedule_state_timeout(update, context, "AWAIT_LIVE_TRADING_CONFIRMATION")
             return AWAIT_LIVE_TRADING_CONFIRMATION
 
     except Exception as e:
@@ -1093,6 +1148,7 @@ async def enable_live_trading_callback(update: Update, context: ContextTypes.DEF
 async def add_alert_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Starts the conversation to add a new price alert."""
     await update.message.reply_text("Let's set up a price alert. Which token symbol would you like to monitor (e.g., BTC, ETH)?")
+    schedule_state_timeout(update, context, "AWAIT_ALERT_SYMBOL")
     return AWAIT_ALERT_SYMBOL
 
 async def received_alert_symbol(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
@@ -1106,6 +1162,7 @@ async def received_alert_symbol(update: Update, context: ContextTypes.DEFAULT_TY
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
     await update.message.reply_text("Great. Do you want to be alerted when the price is above or below a certain value?", reply_markup=reply_markup)
+    schedule_state_timeout(update, context, "AWAIT_ALERT_CONDITION")
     return AWAIT_ALERT_CONDITION
 
 async def received_alert_condition(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
@@ -1114,6 +1171,7 @@ async def received_alert_condition(update: Update, context: ContextTypes.DEFAULT
     await query.answer()
     context.user_data['alert_condition'] = query.data.split("_")[1]
     await query.edit_message_text(text=f"Condition set to '{context.user_data['alert_condition']}'. Now, what is the target price in USD?")
+    schedule_state_timeout(update, context, "AWAIT_ALERT_PRICE")
     return AWAIT_ALERT_PRICE
 
 async def received_alert_price(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
@@ -1208,18 +1266,37 @@ conv_handler = ConversationHandler(
         AWAIT_CONFIRMATION: [
             CallbackQueryHandler(confirm_swap, pattern="^confirm_swap$"),
             CallbackQueryHandler(cancel_swap, pattern="^cancel_swap$"),
+            CallbackQueryHandler(cancel_any_flow, pattern="^cancel_flow$"),
         ],
         # States for adding a wallet
         AWAIT_WALLET_NAME: [MessageHandler(filters.TEXT & ~filters.COMMAND, received_wallet_name)],
         AWAIT_WALLET_ADDRESS: [MessageHandler(filters.TEXT & ~filters.COMMAND, received_wallet_address)],
-        AWAIT_WEB_APP_DATA: [MessageHandler(filters.StatusUpdate.WEB_APP_DATA, received_private_key)],
+        AWAIT_WEB_APP_DATA: [
+            MessageHandler(filters.StatusUpdate.WEB_APP_DATA, received_private_key),
+            CallbackQueryHandler(cancel_any_flow, pattern="^cancel_flow$"),
+        ],
         # States for adding an alert
-        AWAIT_ALERT_SYMBOL: [MessageHandler(filters.TEXT & ~filters.COMMAND, received_alert_symbol)],
-        AWAIT_ALERT_CONDITION: [CallbackQueryHandler(received_alert_condition, pattern="^alert_")],
-        AWAIT_ALERT_PRICE: [MessageHandler(filters.TEXT & ~filters.COMMAND, received_alert_price)],
+        AWAIT_ALERT_SYMBOL: [
+            MessageHandler(filters.TEXT & ~filters.COMMAND, received_alert_symbol),
+            CallbackQueryHandler(cancel_any_flow, pattern="^cancel_flow$"),
+        ],
+        AWAIT_ALERT_CONDITION: [
+            CallbackQueryHandler(received_alert_condition, pattern="^alert_"),
+            CallbackQueryHandler(cancel_any_flow, pattern="^cancel_flow$"),
+        ],
+        AWAIT_ALERT_PRICE: [
+            MessageHandler(filters.TEXT & ~filters.COMMAND, received_alert_price),
+            CallbackQueryHandler(cancel_any_flow, pattern="^cancel_flow$"),
+        ],
         # States for setting default wallet and enabling live trading
-        AWAIT_WALLET_SELECTION: [CallbackQueryHandler(set_default_wallet_callback, pattern="^set_wallet_")],
-        AWAIT_LIVE_TRADING_CONFIRMATION: [CallbackQueryHandler(enable_live_trading_callback, pattern="^enable_live_trading_")],
+        AWAIT_WALLET_SELECTION: [
+            CallbackQueryHandler(set_default_wallet_callback, pattern="^set_wallet_"),
+            CallbackQueryHandler(cancel_any_flow, pattern="^cancel_flow$"),
+        ],
+        AWAIT_LIVE_TRADING_CONFIRMATION: [
+            CallbackQueryHandler(enable_live_trading_callback, pattern="^enable_live_trading_"),
+            CallbackQueryHandler(cancel_any_flow, pattern="^cancel_flow$"),
+        ],
     },
     fallbacks=[CommandHandler("start", start)],
     per_message=False,
