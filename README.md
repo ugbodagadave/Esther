@@ -66,18 +66,38 @@ For a more detailed breakdown of how these features work, please see the [How It
 3.  **Add Your Secret Keys:**
     Create a file named `.env` in the main folder and add your secret keys:
     ```dotenv
-    # For Telegram and the AI
+    # Core
     TELEGRAM_BOT_TOKEN="your_telegram_bot_token"
     GEMINI_API_KEY="your_gemini_api_key"
+    DATABASE_URL="your_postgresql_connection_string"
+    ENCRYPTION_KEY="your_32_byte_base64_fernet_key"
 
-    # For the OKX Crypto Exchange
+    # OKX DEX API
     OKX_API_KEY="your_okx_api_key"
     OKX_API_SECRET="your_okx_api_secret"
     OKX_API_PASSPHRASE="your_okx_api_passphrase"
-    OKX_PROJECT_ID="your_okx_project_id"
+    OKX_PROJECT_ID="your_okx_project_id"  # injected as OK-ACCESS-PROJECT
 
-    # For the Database
-    DATABASE_URL="your_postgresql_connection_string"
+    # Webhook / Hosting
+    WEBHOOK_URL="https://your-public-domain"  # Render URL; if unset, bot uses polling
+
+    # Behavior
+    DRY_RUN_MODE="True"  # default simulation mode
+
+    # Dev & E2E helpers (optional)
+    TEST_WALLET_ADDRESS="0x..."
+    TEST_WALLET_PRIVATE_KEY="..."
+
+    # Monitoring (optional)
+    PORTFOLIO_SYNC_INTERVAL="600"       # seconds (default: 600)
+    ALERT_QUOTE_DELAY_MS="100"          # default 100
+    ALERT_ERROR_BACKOFF_MS="500"        # default 500
+
+    # Mobile Web App fallback (optional)
+    MOBILE_WEBAPP_FALLBACK="False"  # set True to also send a reply-keyboard WebApp button on mobile
+
+    # Admin (optional but recommended for dev tools)
+    ADMIN_SECRET_KEY="a_long_random_string"
     ```
 
 4.  **Start the Bot:**
