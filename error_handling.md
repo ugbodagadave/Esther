@@ -94,3 +94,16 @@ except Exception as e:
   - Network/HTTP failures are surfaced with `code: E_OKX_HTTP` to reuse existing guards.
 
 These mechanisms ensure handlers can gracefully inform users during upstream outages and retry transient issues without hammering external services.
+
+## Phase 4: LLM-powered FailureAdvisor (`src/failure_advisor.py`)
+
+- **Role**: Translates structured internal error data into a concise, user-friendly message plus 2–3 suggested single-word actions. It is used only on failure paths and never controls application flow.
+- **Enablement**: Controlled by `ERROR_ADVISOR_ENABLED` (set to `true` to enable). If disabled or any error occurs, handlers fall back to static messages from `src/error_codes.py`.
+- **Integration**: `src/error_handler.py`'s `guarded_handler` builds an `error_context` (keys: `correlation_id`, `handler`, `error_code`, `user_message`, optional `intent`, `entities`, `circuit_state`) and calls `FailureAdvisor.summarize(...)`.
+- **Replies with Actions**: When advice includes `actions`, the reply renders inline buttons with `callback_data` formatted as `action:<action>`, lowercased (e.g., `action:retry`).
+- **Prompt Design**: The advisor uses a precise, role-based prompt to produce strictly JSON output with `message` and `actions`. It instructs the model to keep the message non-technical and succinct, and to choose actions from a small, known set.
+- **Privacy**: Only minimal, non-sensitive structured context is sent (error code, intent name, entities, breaker state). Raw user PII and secrets are never included.
+
+### Environment Variables
+
+- `ERROR_ADVISOR_ENABLED`: Toggle LLM FailureAdvisor (default: `false`).

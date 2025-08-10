@@ -342,4 +342,4 @@ Esther employs a comprehensive testing strategy to ensure reliability and stabil
 - Phase 1 (done): Centralized error codes (`src/error_codes.py`), per-update correlation IDs (`src/correlation.py`), guarded handlers and a global error handler (`src/error_handler.py`) applied to key flows in `src/main.py`.
 - Phase 2 (done): Conversation watchdogs with timeouts for `AWAIT_*` states and an inline cancel flow ensure chats never get stuck.
 - Phase 3 (done): Exponential backoff with jitter and a per‑endpoint circuit breaker around OKX calls. Breaker short‑circuits during outages and auto‑recovers after cooldown.
-- Phase 4 (planned): LLM FailureAdvisor to turn internal failures into concise, actionable guidance; strictly on-error and feature-flagged.
+- Phase 4 (now): LLM FailureAdvisor translates structured errors to concise guidance. Enabled via `ERROR_ADVISOR_ENABLED=true`. Sends only minimal, non-sensitive context (error code, intent name, entities, breaker state), never raw PII.

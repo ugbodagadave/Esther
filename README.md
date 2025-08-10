@@ -84,10 +84,6 @@ For a more detailed breakdown of how these features work, please see the [How It
     # Behavior
     DRY_RUN_MODE="True"  # default simulation mode
 
-    # Dev & E2E helpers (optional)
-    TEST_WALLET_ADDRESS="0x..."
-    TEST_WALLET_PRIVATE_KEY="..."
-
     # Monitoring (optional)
     PORTFOLIO_SYNC_INTERVAL="600"       # seconds (default: 600)
     ALERT_QUOTE_DELAY_MS="100"          # default 100
@@ -98,6 +94,22 @@ For a more detailed breakdown of how these features work, please see the [How It
 
     # Admin (optional but recommended for dev tools)
     ADMIN_SECRET_KEY="a_long_random_string"
+
+    # Error Handling (optional)
+    ERROR_ADVISOR_ENABLED="False"       # set True to enable LLM FailureAdvisor on error paths
+
+    # Handler timeouts (optional)
+    HANDLER_TIMEOUT_SECS="180"          # per-step watchdog timeout in seconds
+
+    # Circuit Breaker (optional)
+    CIRCUIT_FAIL_THRESHOLD="5"          # consecutive failures to open breaker
+    CIRCUIT_RESET_SECS="30"             # cooldown before half-open trial
+
+    # Backoff Tuning (optional)
+    BACKOFF_BASE_SECS="0.2"
+    BACKOFF_MULTIPLIER="2.0"
+    BACKOFF_MAX_SECS="5.0"
+    BACKOFF_JITTER_FRAC="0.1"
     ```
 
 4.  **Start the Bot:**
@@ -125,6 +137,8 @@ See the concise plan in `okx_dex_api_integration.md`.
   - Enable live trading in-chat via `/enablelivetrading`.
   - Set a default wallet via `/setdefaultwallet`.
 - When live trading is enabled but `DRY_RUN_MODE` remains `True`, swaps are still simulated; however, the bot validates that a default wallet exists in your account. If missing or not found, the operation aborts with a clear message.
+
+Esther includes a robust, phased error handling system for clear guidance during failures. See `error_handling.md` for details.
 
 ## 🙏 Acknowledgements
 

@@ -118,3 +118,5 @@ dmypy.json
 .clinerules/
 .cursor/
 CROSS_CHAIN_SWAP_TESTING_GUIDE.md
+full_implementation_plan.md
+error-handling-plan.md
