@@ -1281,10 +1281,10 @@ async def shutdown_event():
 def health_check():
     return {"status": "ok"}
 
-@app.post('/webhook')
 # Register global error handler once the application is built
 add_global_error_handler(bot_app)
 
+@app.post('/webhook')
 async def telegram_webhook(request: Request):
     """Handle incoming Telegram updates via webhook."""
     try:
