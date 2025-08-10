@@ -7,6 +7,7 @@
 **Esther** is an AI Agent that lives in your Telegram chat. It makes trading easy and accessible for everyone by integrating with the **OKX DEX API**, which allows users to swap cryptocurrencies across multiple blockchains and DEXs for the most competitive prices. With Esther, you can trade, get market updates, and manage your crypto portfolio just by having a natural conversation.
 
 This project is submitted for the **OKX ETHCC Hackathon**, in the **DeFi, RWAs & Autonomous Apps** track.
+
 Demo Video: https://youtu.be/BHNRu3qseFw
 
 ## ✨ Core Functionalities
