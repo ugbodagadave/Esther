@@ -24,6 +24,8 @@ from telegram.ext import (
 )
 from dotenv import load_dotenv
 
+from src.error_handler import guarded_handler, add_global_error_handler
+
 # Load environment variables from .env file
 load_dotenv()
 
@@ -259,6 +261,7 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int
         return ConversationHandler.END
 
 
+@guarded_handler("E_OKX_API")
 async def get_price_chart_intent(update: Update, context: ContextTypes.DEFAULT_TYPE, entities: dict):
     """Handles the get_price_chart intent."""
     symbol = entities.get("symbol")
@@ -291,6 +294,7 @@ async def get_price_chart_intent(update: Update, context: ContextTypes.DEFAULT_T
     await update.message.reply_photo(photo=chart_image, caption=f"Price chart for {symbol.upper()} ({period})")
 
 
+@guarded_handler("E_OKX_API")
 async def get_price_intent(update: Update, context: ContextTypes.DEFAULT_TYPE, entities: dict):
     """Handles the get_price intent."""
     symbol = entities.get("symbol")
@@ -325,6 +329,7 @@ async def get_price_intent(update: Update, context: ContextTypes.DEFAULT_TYPE, e
     else:
         await update.message.reply_text(f"Sorry, I couldn't fetch a quote. Error: {quote_response.get('error')}")
 
+@guarded_handler("E_OKX_API")
 async def buy_token_intent(update: Update, context: ContextTypes.DEFAULT_TYPE, entities: dict) -> int:
     """Handles the buy_token intent and starts the confirmation conversation."""
     symbol = entities.get("symbol")
@@ -408,6 +413,7 @@ async def buy_token_intent(update: Update, context: ContextTypes.DEFAULT_TYPE, e
 
     return AWAIT_CONFIRMATION
 
+@guarded_handler("E_OKX_API")
 async def confirm_swap(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Executes the swap after user confirmation, handling both live and simulated trades."""
     query = update.callback_query
@@ -536,6 +542,7 @@ async def cancel_swap(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int
 
     return ConversationHandler.END
 
+@guarded_handler("E_OKX_API")
 async def sell_token_intent(update: Update, context: ContextTypes.DEFAULT_TYPE, entities: dict) -> int:
     """Handles the sell_token intent and starts the confirmation conversation."""
     symbol = entities.get("symbol")
@@ -647,6 +654,7 @@ async def set_take_profit_intent(update: Update, context: ContextTypes.DEFAULT_T
     await update.message.reply_text(f"Alert set: I will notify you if {symbol.upper()} > ${price}.")
     return ConversationHandler.END
 
+@guarded_handler("E_UNKNOWN")
 async def insights(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Provides personalized market insights."""
     user = update.effective_user
@@ -673,6 +681,7 @@ def _normalize_chart_period(period_str: str) -> str:
     # Default
     return '7d'
 
+@guarded_handler("E_DB_QUERY")
 async def portfolio_performance(update: Update, context: ContextTypes.DEFAULT_TYPE, entities: dict):
     """Handles the get_portfolio_performance intent."""
     user = update.effective_user
@@ -729,6 +738,7 @@ async def rebalance_portfolio_start(update: Update, context: ContextTypes.DEFAUL
     
     return await present_next_rebalance_swap(update, context)
 
+@guarded_handler("E_OKX_API")
 async def present_next_rebalance_swap(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Presents the next swap in the rebalance plan for confirmation."""
     plan = context.user_data.get('rebalance_plan')
@@ -754,6 +764,7 @@ async def present_next_rebalance_swap(update: Update, context: ContextTypes.DEFA
         return await sell_token_intent(update, context, entities)
 
 # --- Portfolio Command ---
+@guarded_handler("E_DB_QUERY")
 async def portfolio(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Synchronize and display the user's portfolio."""
     user = update.effective_user
@@ -821,6 +832,7 @@ async def received_wallet_address(update: Update, context: ContextTypes.DEFAULT_
             logger.warning(f"Could not send mobile WebApp fallback keyboard: {e}")
     return AWAIT_WEB_APP_DATA
 
+@guarded_handler("E_DB_QUERY")
 async def received_private_key(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Receives the private key from the web app, saves the wallet, and ends the conversation."""
     user = update.effective_user
@@ -856,6 +868,7 @@ async def received_private_key(update: Update, context: ContextTypes.DEFAULT_TYP
 
     return ConversationHandler.END
 
+@guarded_handler("E_DB_QUERY")
 async def list_wallets(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Lists all of the user's saved wallets."""
     user = update.effective_user
@@ -1141,6 +1154,7 @@ async def received_alert_price(update: Update, context: ContextTypes.DEFAULT_TYP
 
     return ConversationHandler.END
 
+@guarded_handler("E_DB_QUERY")
 async def list_alerts(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Lists all of the user's active alerts."""
     user = update.effective_user
@@ -1268,6 +1282,9 @@ def health_check():
     return {"status": "ok"}
 
 @app.post('/webhook')
+# Register global error handler once the application is built
+add_global_error_handler(bot_app)
+
 async def telegram_webhook(request: Request):
     """Handle incoming Telegram updates via webhook."""
     try:

@@ -336,3 +336,14 @@ Esther employs a comprehensive testing strategy to ensure reliability and stabil
 - Mock external dependencies to ensure isolated testing
 - Use short, descriptive commit messages
 - Maintain test coverage for all new features
+
+## 3.1 Error Handling Architecture
+
+- Centralized error codes (`src/error_codes.py`) map internal failures to consistent user messages and remediation hints.
+- A `guarded_handler` decorator (`src/error_handler.py`) wraps Telegram handlers to:
+  - Catch unexpected exceptions
+  - Log with a per-update correlation ID
+  - Clear conversation state and end the flow to avoid being stuck
+  - Send a safe fallback message to the user
+- A global error handler is registered on the Telegram `Application` to catch uncaught exceptions anywhere in the stack and notify users gracefully.
+- Correlation IDs are managed via `src/correlation.py` using contextvars to aid log-based debugging across async boundaries.
